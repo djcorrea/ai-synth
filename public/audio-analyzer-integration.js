@@ -206,11 +206,11 @@ function updateRefStatus(text, color) {
 }
 
 function applyGenreSelection(genre) {
-    if (!genre) return;
+    if (!genre) return Promise.resolve();
     window.PROD_AI_REF_GENRE = genre;
     localStorage.setItem('prodai_ref_genre', genre);
     // Carregar refs e, se já houver análise no modal, atualizar sugestões de referência e re-renderizar
-    loadReferenceData(genre).then(() => {
+    return loadReferenceData(genre).then(() => {
         try {
             if (typeof currentModalAnalysis === 'object' && currentModalAnalysis) {
                 // Recalcular sugestões reference_* com as novas tolerâncias

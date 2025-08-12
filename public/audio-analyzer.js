@@ -991,9 +991,22 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
     const sr = audioBuffer.sampleRate;
 
     // Resolver URLs absolutas para import dinâmico
-    const loudnessUrl = '/lib/audio/features/loudness.js';
-    const truepeakUrl = '/lib/audio/features/truepeak.js';
-  const spectrumUrl = '/lib/audio/features/spectrum.js';
+    // URLs base
+    const primary = {
+      loud: '/lib/audio/features/loudness.js',
+      tp: '/lib/audio/features/truepeak.js',
+      spec: '/lib/audio/features/spectrum.js'
+    };
+    const fallback = {
+      loud: '/public/lib/audio/features/loudness.js',
+      tp: '/public/lib/audio/features/truepeak.js',
+      spec: '/public/lib/audio/features/spectrum.js'
+    };
+    // Helper para importar com fallback
+    async function importWithFallback(url1, url2) {
+      try { return await import(url1 + '?v=' + Date.now()); }
+      catch (e) { try { return await import(url2 + '?v=' + Date.now()); } catch (e2) { return { __err: e2 || e }; } }
+    }
 
     // Cache global simples
     const cache = (window.__PROD_AI_ADV_CACHE__ = window.__PROD_AI_ADV_CACHE__ || {});
@@ -1004,11 +1017,11 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
 
     // Importar módulos necessários
     const imports = [];
-    if (doLoud && !cache.loudMod) imports.push(import(loudnessUrl).then(m => cache.loudMod = m).catch(e => ({ __err: e })));
-    if (doTP && !cache.tpMod) imports.push(import(truepeakUrl).then(m => cache.tpMod = m).catch(e => ({ __err: e })));
+    if (doLoud && !cache.loudMod) imports.push(importWithFallback(primary.loud, fallback.loud).then(m => cache.loudMod = m));
+    if (doTP && !cache.tpMod) imports.push(importWithFallback(primary.tp, fallback.tp).then(m => cache.tpMod = m));
   // Import espectro somente se quisermos fase 2 (flag USE_ADVANCED_SPECTRUM não false)
-  const doSpec = (typeof window === 'undefined' || window.USE_ADVANCED_SPECTRUM !== false);
-  if (doSpec && !cache.specMod) imports.push(import(spectrumUrl).then(m => cache.specMod = m).catch(e => ({ __err: e })));
+  const doSpec = (typeof window !== 'undefined' || window.USE_ADVANCED_SPECTRUM !== false);
+  if (doSpec && !cache.specMod) imports.push(importWithFallback(primary.spec, fallback.spec).then(m => cache.specMod = m));
     if (imports.length) await Promise.all(imports);
 
     // Cálculo LUFS/LRA
