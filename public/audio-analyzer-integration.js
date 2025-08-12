@@ -19,7 +19,10 @@ async function fetchRefJsonWithFallback(paths) {
     for (const p of paths) {
         if (!p) continue;
         try {
-            const res = await fetch(p, {
+            // Cache-busting para evitar CDN retornar 404 ou versões antigas
+            const hasQ = p.includes('?');
+            const url = p + (hasQ ? '&' : '?') + 'v=' + Date.now();
+            const res = await fetch(url, {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
             });
@@ -40,6 +43,7 @@ async function loadGenreManifest() {
     try {
         const json = await fetchRefJsonWithFallback([
             `/refs/out/genres.json`,
+            `/public/refs/out/genres.json`,
             `refs/out/genres.json`,
             `../refs/out/genres.json`
         ]);
@@ -115,6 +119,7 @@ async function loadReferenceData(genre) {
         updateRefStatus('⏳ carregando...', '#996600');
         const json = await fetchRefJsonWithFallback([
             `/refs/out/${genre}.json`,
+            `/public/refs/out/${genre}.json`,
             `refs/out/${genre}.json`,
             `../refs/out/${genre}.json`
         ]);
