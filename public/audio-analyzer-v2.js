@@ -115,6 +115,8 @@ class AudioAnalyzerV2 {
                 const tolLRA = refData.tol_lra || 0;
                 const targetStereo = refData.stereo_target;
                 const tolStereo = refData.tol_stereo || 0;
+                const targetTP = refData.true_peak_target;
+                const tolTP = refData.tol_true_peak || 0;
 
                 // Comparações principais
                 const check = (val, target, tol, type, label, unit='') => {
@@ -132,6 +134,10 @@ class AudioAnalyzerV2 {
                 };
                 check(metrics.lufs, targetLufs, tolLufs, 'reference_loudness', 'LUFS', '');
                 check(metrics.dynamicRange, targetDR, tolDR, 'reference_dynamics', 'DR', ' dB');
+                // True Peak (quando presente em métricas do V2)
+                if (Number.isFinite(metrics.peakDb)) {
+                    check(metrics.peakDb, targetTP, tolTP, 'reference_true_peak', 'True Peak', ' dBTP');
+                }
 
                 // LRA (quando disponível em métricas V1 não temos; será enriquecido em V2 adapter se presente)
                 if (metrics.lra != null) check(metrics.lra, targetLRA, tolLRA, 'reference_lra', 'LRA', ' dB');

@@ -212,12 +212,6 @@ class AudioAnalyzer {
     console.log('🎯 COPIANDO DIAGNOSTICS DO V2 PARA RESULT...');
     baseAnalysis.diagnostics = v2res.diagnostics;
     
-    // CORREÇÃO FINAL BRUTAL - FORÇAR __refEvidence = true
-    if (baseAnalysis.diagnostics && window.PROD_AI_REF_GENRE) {
-      console.log('🔥 FORÇANDO __refEvidence = true');
-      baseAnalysis.diagnostics.__refEvidence = true;
-    }
-    
     baseAnalysis.v2Diagnostics = v2res.diagnostics; // manter compatibilidade
     console.log('🎯 baseAnalysis.diagnostics copiado:', !!baseAnalysis.diagnostics);
     console.log('🎯 baseAnalysis.diagnostics.__refEvidence:', baseAnalysis.diagnostics?.__refEvidence);
