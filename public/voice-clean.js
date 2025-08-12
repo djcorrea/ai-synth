@@ -328,7 +328,7 @@ function setupVoice() {
             }
             
             // Tratar erros específicos
-            switch(event.error) {
+        switch(event.error) {
                 case 'not-allowed':
                     if (window.voiceState.currentInput) window.voiceState.currentInput.placeholder = '❌ Permissão negada - habilite o microfone';
                     alert('❌ Permissão do microfone negada!\n\nClique no ícone de microfone na barra de endereços e permita o acesso.');
@@ -344,7 +344,7 @@ function setupVoice() {
                     console.log('ℹ️ Gravação foi interrompida pelo usuário - normal');
                     break;
                 default:
-                    if (currentInput) currentInput.placeholder = `❌ Erro: ${event.error}`;
+            if (window.voiceState.currentInput) window.voiceState.currentInput.placeholder = `❌ Erro: ${event.error}`;
                     break;
             }
         };

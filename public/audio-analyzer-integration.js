@@ -22,28 +22,32 @@ async function fetchRefJsonWithFallback(paths) {
             // Cache-busting para evitar CDN retornar 404 ou versões antigas
             const hasQ = p.includes('?');
             const url = p + (hasQ ? '&' : '?') + 'v=' + Date.now();
+            if (__DEBUG_ANALYZER__) console.log('[refs] tentando fetch:', url);
             const res = await fetch(url, {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
             });
             if (res.ok) {
+                if (__DEBUG_ANALYZER__) console.log('[refs] OK:', p);
                 return await res.json();
             } else {
+                if (__DEBUG_ANALYZER__) console.warn('[refs] Falha', res.status, 'em', p);
                 lastErr = new Error(`HTTP ${res.status} @ ${p}`);
             }
         } catch (e) {
+            if (__DEBUG_ANALYZER__) console.warn('[refs] Erro fetch', p, e?.message || e);
             lastErr = e;
         }
     }
-    throw lastErr || new Error('Falha ao carregar JSON de referência');
+    throw lastErr || new Error('Falha ao carregar JSON de referência (todas as rotas testadas)');
 }
 
 // 📚 Carregar manifesto de gêneros (opcional). Se ausente, manter fallback.
 async function loadGenreManifest() {
     try {
         const json = await fetchRefJsonWithFallback([
+            `/public/refs/out/genres.json`, // priorizar caminho estático certo em produção
             `/refs/out/genres.json`,
-            `/public/refs/out/genres.json`,
             `refs/out/genres.json`,
             `../refs/out/genres.json`
         ]);
@@ -118,8 +122,8 @@ async function loadReferenceData(genre) {
         }
         updateRefStatus('⏳ carregando...', '#996600');
         const json = await fetchRefJsonWithFallback([
+            `/public/refs/out/${genre}.json`, // priorizar caminho estático certo em produção
             `/refs/out/${genre}.json`,
-            `/public/refs/out/${genre}.json`,
             `refs/out/${genre}.json`,
             `../refs/out/${genre}.json`
         ]);
