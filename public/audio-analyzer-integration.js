@@ -46,8 +46,8 @@ async function fetchRefJsonWithFallback(paths) {
 async function loadGenreManifest() {
     try {
         const json = await fetchRefJsonWithFallback([
-            `/public/refs/out/genres.json`, // priorizar caminho estático certo em produção
-            `/refs/out/genres.json`,
+            `/refs/out/genres.json`, // 1) absoluto com rewrite
+            `/public/refs/out/genres.json`, // 2) caminho físico dentro do projeto
             `refs/out/genres.json`,
             `../refs/out/genres.json`
         ]);
@@ -122,8 +122,8 @@ async function loadReferenceData(genre) {
         }
         updateRefStatus('⏳ carregando...', '#996600');
         const json = await fetchRefJsonWithFallback([
-            `/public/refs/out/${genre}.json`, // priorizar caminho estático certo em produção
-            `/refs/out/${genre}.json`,
+            `/refs/out/${genre}.json`, // 1) absoluto com rewrite
+            `/public/refs/out/${genre}.json`, // 2) caminho físico
             `refs/out/${genre}.json`,
             `../refs/out/${genre}.json`
         ]);
