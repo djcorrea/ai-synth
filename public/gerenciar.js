@@ -250,3 +250,4 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('🔧 Event listeners configurados');
 });
+ff
