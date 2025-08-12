@@ -117,11 +117,14 @@ function applyGenreSelection(genre) {
     if (!genre) return;
     window.PROD_AI_REF_GENRE = genre;
     localStorage.setItem('prodai_ref_genre', genre);
-    // Carregar refs e, se já houver análise no modal, re-renderizar comparação
+    // Carregar refs e, se já houver análise no modal, atualizar sugestões de referência e re-renderizar
     loadReferenceData(genre).then(() => {
         try {
             if (typeof currentModalAnalysis === 'object' && currentModalAnalysis) {
-                renderReferenceComparisons(currentModalAnalysis);
+                // Recalcular sugestões reference_* com as novas tolerâncias
+                try { updateReferenceSuggestions(currentModalAnalysis); } catch(e) { console.warn('updateReferenceSuggestions falhou', e); }
+                // Re-renderização completa para refletir sugestões e comparações
+                try { displayModalResults(currentModalAnalysis); } catch(e) { console.warn('re-render modal falhou', e); }
             }
         } catch (e) { console.warn('re-render comparação falhou', e); }
     });
@@ -177,6 +180,11 @@ function initializeAudioAnalyzerIntegration() {
                 const v = params.get('debug');
                 window.DEBUG_ANALYZER = (v === '1' || v === 'true');
                 __dbg(`[FLAG] DEBUG_ANALYZER = ${window.DEBUG_ANALYZER}`);
+            }
+            // Preferir métricas avançadas (ITU/oversampling) quando disponíveis, sem sobrescrever configs do usuário
+            if (typeof window.PREFER_ADVANCED_METRICS === 'undefined') {
+                window.PREFER_ADVANCED_METRICS = true;
+                __dbg('[FLAG] PREFER_ADVANCED_METRICS = true (auto)');
             }
         }
     } catch (_) { /* noop */ }
@@ -887,6 +895,42 @@ function renderReferenceComparisons(analysis) {
         `;
         document.head.appendChild(style);
     }
+}
+
+// Recalcular apenas as sugestões baseadas em referência (sem reprocessar o áudio)
+function updateReferenceSuggestions(analysis) {
+    if (!analysis || !analysis.technicalData || !__activeRefData) return;
+    const ref = __activeRefData;
+    const tech = analysis.technicalData;
+    // Garantir lista
+    const sug = Array.isArray(analysis.suggestions) ? analysis.suggestions : (analysis.suggestions = []);
+    // Remover sugestões antigas de referência
+    const refTypes = new Set(['reference_loudness','reference_dynamics','reference_lra','reference_stereo','reference_true_peak']);
+    for (let i = sug.length - 1; i >= 0; i--) {
+        const t = sug[i] && sug[i].type;
+        if (t && refTypes.has(t)) sug.splice(i, 1);
+    }
+    // Helper para criar sugestão se fora da tolerância
+    const addRefSug = (val, target, tol, type, label, unit='') => {
+        if (!Number.isFinite(val) || !Number.isFinite(target) || !Number.isFinite(tol)) return;
+        const diff = val - target;
+        if (Math.abs(diff) <= tol) return; // dentro da tolerância
+        const direction = diff > 0 ? 'acima' : 'abaixo';
+        sug.push({
+            type,
+            message: `${label} ${direction} do alvo (${target}${unit})`,
+            action: `Ajustar ${label} ${direction==='acima'?'para baixo':'para cima'} ~${target}${unit}`,
+            details: `Diferença: ${diff.toFixed(2)}${unit} • tolerância ±${tol}${unit} • gênero: ${window.PROD_AI_REF_GENRE}`
+        });
+    };
+    // Aplicar checks principais
+    const lufsVal = Number.isFinite(tech.lufsIntegrated) ? tech.lufsIntegrated : tech.rms;
+    addRefSug(lufsVal, ref.lufs_target, ref.tol_lufs, 'reference_loudness', 'LUFS', '');
+    const tpVal = Number.isFinite(tech.truePeakDbtp) ? tech.truePeakDbtp : tech.peak;
+    addRefSug(tpVal, ref.true_peak_target, ref.tol_true_peak, 'reference_true_peak', 'True Peak', ' dBTP');
+    addRefSug(tech.dynamicRange, ref.dr_target, ref.tol_dr, 'reference_dynamics', 'DR', ' dB');
+    if (Number.isFinite(tech.lra)) addRefSug(tech.lra, ref.lra_target, ref.tol_lra, 'reference_lra', 'LRA', ' dB');
+    if (Number.isFinite(tech.stereoCorrelation)) addRefSug(tech.stereoCorrelation, ref.stereo_target, ref.tol_stereo, 'reference_stereo', 'Stereo Corr', '');
 }
 
 // 🎨 Estilos do seletor de gênero (injeção única, não quebra CSS existente)

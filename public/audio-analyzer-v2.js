@@ -98,7 +98,8 @@ class AudioAnalyzerV2 {
         
         const problems = [];
         const suggestions = [];
-        let __refEvidence = false;
+    let __refEvidence = false;
+    let __referenceGenre = null;
         
         // ===== NOVO SISTEMA DE REFERÊNCIAS DINÂMICO =====
         if (typeof window !== 'undefined') {
@@ -107,6 +108,7 @@ class AudioAnalyzerV2 {
             const refData = window.PROD_AI_REF_DATA;
             if (refData && typeof refData === 'object') {
                 __refEvidence = true;
+                __referenceGenre = genre;
                 const targetLufs = refData.lufs_target;
                 const tolLufs = refData.tol_lufs || 0; 
                 const targetDR = refData.dr_target;
@@ -177,7 +179,8 @@ class AudioAnalyzerV2 {
             problems,
             suggestions,
             summary: `${problems.length} problema(s), ${suggestions.length} sugestão(ões)`,
-            __refEvidence // Importante para verificar se o sistema funcionou
+            __refEvidence, // Importante para verificar se o sistema funcionou
+            referenceGenre: __referenceGenre
         };
     }
 
