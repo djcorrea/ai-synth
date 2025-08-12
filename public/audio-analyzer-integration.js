@@ -13,10 +13,34 @@ let __activeRefData = null; // dados do gênero atual
 let __genreManifest = null; // manifesto de gêneros (opcional)
 let __activeRefGenre = null; // chave do gênero atualmente carregado em __activeRefData
 
+// Fallback embutido inline para evitar 404 em produção
+const __INLINE_EMBEDDED_REFS__ = {
+    manifest: { genres: [
+        { key: 'trance', label: 'Trance' },
+        { key: 'funk_mandela', label: 'Funk Mandela' },
+        { key: 'funk_bruxaria', label: 'Funk Bruxaria' },
+        { key: 'eletronico', label: 'Eletrônico' },
+        { key: 'eletrofunk', label: 'Eletrofunk' },
+        { key: 'funk_consciente', label: 'Funk Consciente' },
+        { key: 'trap', label: 'Trap' }
+    ]},
+    byGenre: {
+        trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:1}, low_bass:{target_db:-14.6,tol_db:2.8}, upper_bass:{target_db:-14.8,tol_db:1}, low_mid:{target_db:-12.6,tol_db:2.2}, mid:{target_db:-12,tol_db:2.5}, high_mid:{target_db:-20.2,tol_db:2.1}, brilho:{target_db:-24.7,tol_db:1}, presenca:{target_db:-32.1,tol_db:2.1} } },
+        funk_mandela:   { lufs_target: -13, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.2,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
+        funk_bruxaria:  { lufs_target: -10, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
+        eletronico:     { lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 8, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
+        eletrofunk:     { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
+        funk_consciente:{ lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 10, tol_dr: 2, lra_target: 7, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
+        trap:           { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-16,tol_db:4}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } }
+    }
+};
+
 // Carregar dinamicamente o fallback embutido se necessário
 async function ensureEmbeddedRefsReady(timeoutMs = 2500) {
     try {
         if (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) return true;
+        // Se não for explicitamente permitido, não tentar carregar pela rede para evitar 404
+        if (!(typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true)) return false;
         // Injetar script apenas uma vez
         if (typeof document !== 'undefined' && !document.getElementById('embeddedRefsScript')) {
             const s = document.createElement('script');
@@ -66,31 +90,28 @@ async function fetchRefJsonWithFallback(paths) {
 
 // 📚 Carregar manifesto de gêneros (opcional). Se ausente, manter fallback.
 async function loadGenreManifest() {
+    // 1) Preferir embutido em window, depois inline
     try {
-        const json = await fetchRefJsonWithFallback([
-            `/refs/out/genres.json`, // 1) absoluto com rewrite
-            `/public/refs/out/genres.json`, // 2) caminho físico dentro do projeto
-            `refs/out/genres.json`,
-            `../refs/out/genres.json`
-        ]);
-        // Esperado: { genres: [{ key: 'trance', label: 'Trance' }, ...] }
-        if (json && Array.isArray(json.genres)) {
-            __genreManifest = json.genres;
-            return __genreManifest;
-        }
-    } catch (e) {
-        __dwrn('Manifesto de gêneros não disponível (tentando EMBEDDED fallback):', e.message || e);
-        try {
-            // Garantir que o fallback embutido esteja disponível
-            await ensureEmbeddedRefsReady();
-            const emb = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.manifest) || null;
-            if (emb && Array.isArray(emb.genres)) {
-                __genreManifest = emb.genres;
-                return __genreManifest;
-            }
-        } catch(_) {}
+        const winEmb = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.manifest) || null;
+        if (winEmb && Array.isArray(winEmb.genres)) { __genreManifest = winEmb.genres; return __genreManifest; }
+    } catch {}
+    if (!__genreManifest && __INLINE_EMBEDDED_REFS__?.manifest?.genres?.length) {
+        __genreManifest = __INLINE_EMBEDDED_REFS__.manifest.genres;
+        return __genreManifest;
     }
-    return null;
+    // 2) Se permitido, tentar rede
+    if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
+        try {
+            const json = await fetchRefJsonWithFallback([
+                `/refs/out/genres.json`,
+                `/public/refs/out/genres.json`,
+                `refs/out/genres.json`,
+                `../refs/out/genres.json`
+            ]);
+            if (json && Array.isArray(json.genres)) { __genreManifest = json.genres; return __genreManifest; }
+        } catch (e) { __dwrn('Manifesto via rede indisponível:', e.message || e); }
+    }
+    return __genreManifest || null;
 }
 
 // 🏷️ Popular o <select> com base no manifesto, mantendo fallback e preservando seleção
@@ -152,31 +173,53 @@ async function loadReferenceData(genre) {
             return __activeRefData;
         }
         updateRefStatus('⏳ carregando...', '#996600');
-        const json = await fetchRefJsonWithFallback([
-            `/refs/out/${genre}.json`, // 1) absoluto com rewrite
-            `/public/refs/out/${genre}.json`, // 2) caminho físico
-            `refs/out/${genre}.json`,
-            `../refs/out/${genre}.json`
-        ]);
-        // Estrutura: { genre: { ... }}
-        const rootKey = Object.keys(json)[0];
-        const data = json[rootKey];
-        if (!data || typeof data !== 'object') {
-            throw new Error('JSON de referência inválido para "' + genre + '"');
+        // 1) Preferir embutido (window), depois inline, antes de rede
+        const embWin = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre && window.__EMBEDDED_REFS__.byGenre[genre]) || null;
+        const embInline = __INLINE_EMBEDDED_REFS__?.byGenre?.[genre] || null;
+        const useData = embWin || embInline;
+        if (useData && typeof useData === 'object') {
+            __refDataCache[genre] = useData;
+            __activeRefData = useData;
+            __activeRefGenre = genre;
+            window.PROD_AI_REF_DATA = useData;
+            updateRefStatus('✔ referências embutidas', '#0d6efd');
+            return useData;
         }
-    __refDataCache[genre] = data;
-    __activeRefData = data;
-    __activeRefGenre = genre;
-        window.PROD_AI_REF_DATA = data;
-        updateRefStatus('✔ referências aplicadas', '#0d6efd');
-        return data;
+        // 2) Se permitido, tentar rede
+        if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
+            const json = await fetchRefJsonWithFallback([
+                `/refs/out/${genre}.json`,
+                `/public/refs/out/${genre}.json`,
+                `refs/out/${genre}.json`,
+                `../refs/out/${genre}.json`
+            ]);
+            const rootKey = Object.keys(json)[0];
+            const data = json[rootKey];
+            if (!data || typeof data !== 'object') throw new Error('JSON de referência inválido para ' + genre);
+            __refDataCache[genre] = data;
+            __activeRefData = data;
+            __activeRefGenre = genre;
+            window.PROD_AI_REF_DATA = data;
+            updateRefStatus('✔ referências aplicadas', '#0d6efd');
+            return data;
+        }
+        // 3) Último recurso: trance inline
+        const fallback = __INLINE_EMBEDDED_REFS__?.byGenre?.trance;
+        if (fallback) {
+            __refDataCache['trance'] = fallback;
+            __activeRefData = fallback;
+            __activeRefGenre = 'trance';
+            window.PROD_AI_REF_DATA = fallback;
+            updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
+            return fallback;
+        }
+        throw new Error('Sem referências disponíveis');
     } catch (e) {
         console.warn('Falha ao carregar referências', genre, e);
         // Fallback: tentar EMBEDDED
         try {
-            await ensureEmbeddedRefsReady();
-            const embMap = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) || {};
-            const emb = embMap && embMap[genre];
+            const embMap = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) || __INLINE_EMBEDDED_REFS__.byGenre || {};
+            const emb = embMap[genre];
             if (emb && typeof emb === 'object') {
                 __refDataCache[genre] = emb;
                 __activeRefData = emb;

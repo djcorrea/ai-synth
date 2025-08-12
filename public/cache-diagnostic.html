@@ -97,11 +97,14 @@
 
     <!-- CARREGAMENTO DOS SCRIPTS REAIS NA ORDEM CORRETA -->
     <script src="audio-analyzer.js?v=20250812" defer></script>
-    <script src="refs/embedded-refs.js?v=20250812" defer></script>
+    <!-- Opcional: carregar embutido; o integrador já tem fallback inline -->
+    <!-- <script src="refs/embedded-refs.js?v=20250812" defer></script> -->
     <script src="audio-analyzer-integration.js?v=20250812" defer></script>
 
     <script>
-        // Timestamp de carregamento
+    // Forçar modo offline (sem rede) para evitar 404 de refs em produção
+    window.REFS_ALLOW_NETWORK = false;
+    // Timestamp de carregamento
         document.getElementById('loadTime').textContent = new Date().toLocaleString();
         
         let logContent = '';
@@ -177,22 +180,8 @@
             log('Testando sistema de gênero...');
             
             try {
-                // Test fetch do JSON
-                const res = await fetch('/refs/out/funk_mandela.json', { 
-                    cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    }
-                });
-                
-                if (res.ok) {
-                    log('JSON de referência: ACESSÍVEL', 'success');
-                    const data = await res.json();
-                    log(`Dados carregados: ${Object.keys(data).length} keys`, 'success');
-                } else {
-                    log(`JSON de referência: FALHA (${res.status})`, 'error');
-                }
+                // Pular teste de rede para refs quando offline
+                log('Modo REFS_ALLOW_NETWORK=false: pulando fetch de refs.', 'warning');
                 
                 // Test applyGenreSelection if available
                 if (typeof applyGenreSelection === 'function') {

@@ -233,12 +233,15 @@
     
     <!-- 🎵 AUDIO ANALYZER - Carregar os scripts -->
     <script src="audio-analyzer.js?v=20250812" defer></script>
-    <script src="refs/embedded-refs.js?v=20250812" defer></script>
+    <!-- Opcional: o integrador possui fallback inline; permita rede setando window.REFS_ALLOW_NETWORK=true antes do load -->
+    <!-- <script src="refs/embedded-refs.js?v=20250812" defer></script> -->
     <script src="audio-analyzer-integration.js?v=20250812" defer></script>
     
     <!-- Inicializar Audio Analyzer -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Por padrão, evitar fetch de refs na rede em produção para não gerar 404; o integrador usa fallback inline
+            window.REFS_ALLOW_NETWORK = false;
             // Aguardar um pouco para garantir que todos os scripts carregaram
             setTimeout(() => {
                 if (typeof initializeAudioAnalyzerIntegration === 'function') {
