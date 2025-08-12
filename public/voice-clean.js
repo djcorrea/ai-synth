@@ -360,7 +360,6 @@ function setupVoice() {
     }
     
     console.log('🎉 Voice integration configurada com sucesso!');
-    micIcon.title = 'Clique para gravar mensagem de voz';
 }
 
 console.log('📄 voice-clean.js carregado');
