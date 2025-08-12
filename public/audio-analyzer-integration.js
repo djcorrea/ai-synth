@@ -11,6 +11,7 @@ let __audioIntegrationInitialized = false; // evita listeners duplicados
 let __refDataCache = {}; // cache por gênero
 let __activeRefData = null; // dados do gênero atual
 let __genreManifest = null; // manifesto de gêneros (opcional)
+let __activeRefGenre = null; // chave do gênero atualmente carregado em __activeRefData
 
 // 📚 Carregar manifesto de gêneros (opcional). Se ausente, manter fallback.
 async function loadGenreManifest() {
@@ -83,6 +84,7 @@ async function loadReferenceData(genre) {
     try {
         if (__refDataCache[genre]) {
             __activeRefData = __refDataCache[genre];
+            __activeRefGenre = genre;
             updateRefStatus('✔ referências carregadas', '#0d6efd');
             return __activeRefData;
         }
@@ -93,8 +95,9 @@ async function loadReferenceData(genre) {
         // Estrutura: { genre: { ... }}
         const rootKey = Object.keys(json)[0];
         const data = json[rootKey];
-        __refDataCache[genre] = data;
-        __activeRefData = data;
+    __refDataCache[genre] = data;
+    __activeRefData = data;
+    __activeRefGenre = genre;
         window.PROD_AI_REF_DATA = data;
         updateRefStatus('✔ referências aplicadas', '#0d6efd');
         return data;
@@ -114,7 +117,14 @@ function applyGenreSelection(genre) {
     if (!genre) return;
     window.PROD_AI_REF_GENRE = genre;
     localStorage.setItem('prodai_ref_genre', genre);
-    loadReferenceData(genre);
+    // Carregar refs e, se já houver análise no modal, re-renderizar comparação
+    loadReferenceData(genre).then(() => {
+        try {
+            if (typeof currentModalAnalysis === 'object' && currentModalAnalysis) {
+                renderReferenceComparisons(currentModalAnalysis);
+            }
+        } catch (e) { console.warn('re-render comparação falhou', e); }
+    });
 }
 // Expor global
 if (typeof window !== 'undefined') {
@@ -345,10 +355,10 @@ async function handleModalFileSelection(file) {
             await waitForAudioAnalyzer();
         }
 
-        // Garantir que referências estejam carregadas antes da análise (evita race)
+        // Garantir que referências do gênero selecionado estejam carregadas antes da análise (evita race e gênero errado)
         try {
             const genre = (typeof window !== 'undefined') ? window.PROD_AI_REF_GENRE : null;
-            if (genre && !__activeRefData) {
+            if (genre && (!__activeRefData || __activeRefGenre !== genre)) {
                 updateModalProgress(25, `📚 Carregando referências: ${genre}...`);
                 await loadReferenceData(genre);
                 updateModalProgress(30, '📚 Referências ok');
