@@ -8,7 +8,9 @@
   "build:refs": "node tools/reference-builder.js",
   "validate:refs": "node tools/reference-validator.js",
   "calibrate:refs": "node tools/ref-calibrator.js",
-  "refs:pipeline": "node tools/refs-pipeline.js"
+  "refs:pipeline": "node tools/refs-pipeline.js",
+  "copy:refs": "node tools/copy-refs-to-public.js",
+  "postinstall": "npm run copy:refs"
   },
   "dependencies": {
     "cors": "^2.8.5",

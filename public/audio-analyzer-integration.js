@@ -13,12 +13,36 @@ let __activeRefData = null; // dados do gênero atual
 let __genreManifest = null; // manifesto de gêneros (opcional)
 let __activeRefGenre = null; // chave do gênero atualmente carregado em __activeRefData
 
+// Helper: buscar JSON tentando múltiplos caminhos (resiliente a diferenças local x produção)
+async function fetchRefJsonWithFallback(paths) {
+    let lastErr = null;
+    for (const p of paths) {
+        if (!p) continue;
+        try {
+            const res = await fetch(p, {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+            });
+            if (res.ok) {
+                return await res.json();
+            } else {
+                lastErr = new Error(`HTTP ${res.status} @ ${p}`);
+            }
+        } catch (e) {
+            lastErr = e;
+        }
+    }
+    throw lastErr || new Error('Falha ao carregar JSON de referência');
+}
+
 // 📚 Carregar manifesto de gêneros (opcional). Se ausente, manter fallback.
 async function loadGenreManifest() {
     try {
-        const res = await fetch(`../refs/out/genres.json`, { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
+        const json = await fetchRefJsonWithFallback([
+            `/refs/out/genres.json`,
+            `refs/out/genres.json`,
+            `../refs/out/genres.json`
+        ]);
         // Esperado: { genres: [{ key: 'trance', label: 'Trance' }, ...] }
         if (json && Array.isArray(json.genres)) {
             __genreManifest = json.genres;
@@ -89,12 +113,17 @@ async function loadReferenceData(genre) {
             return __activeRefData;
         }
         updateRefStatus('⏳ carregando...', '#996600');
-        const res = await fetch(`../refs/out/${genre}.json`, { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
+        const json = await fetchRefJsonWithFallback([
+            `/refs/out/${genre}.json`,
+            `refs/out/${genre}.json`,
+            `../refs/out/${genre}.json`
+        ]);
         // Estrutura: { genre: { ... }}
         const rootKey = Object.keys(json)[0];
         const data = json[rootKey];
+        if (!data || typeof data !== 'object') {
+            throw new Error('JSON de referência inválido para "' + genre + '"');
+        }
     __refDataCache[genre] = data;
     __activeRefData = data;
     __activeRefGenre = genre;

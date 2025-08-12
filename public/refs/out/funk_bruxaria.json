@@ -1,0 +1,54 @@
+{
+  "funk_bruxaria": {
+    "version": "1.0",
+    "generated_at": "2025-08-11T01:30:06.117Z",
+    "num_tracks": 8,
+    "lufs_target": -14,
+    "tol_lufs": 0.5,
+    "true_peak_target": -10.6,
+    "tol_true_peak": 1.43,
+    "dr_target": 7.4,
+    "tol_dr": 1.1,
+    "lra_target": 8.4,
+    "tol_lra": 3.5,
+    "stereo_target": 0.3,
+    "tol_stereo": 0.15,
+    "calor_target": -11.95,
+    "brilho_target": -17.69,
+    "clareza_target": -1.21,
+    "bands": {
+      "sub": {
+        "target_db": -12.5,
+        "tol_db": 3
+      },
+      "low_bass": {
+        "target_db": -15.2,
+        "tol_db": 2.8
+      },
+      "upper_bass": {
+        "target_db": -15.2,
+        "tol_db": 2
+      },
+      "low_mid": {
+        "target_db": -12,
+        "tol_db": 1
+      },
+      "mid": {
+        "target_db": -8.7,
+        "tol_db": 1
+      },
+      "high_mid": {
+        "target_db": -14.5,
+        "tol_db": 2.7
+      },
+      "brilho": {
+        "target_db": -17.7,
+        "tol_db": 3
+      },
+      "presenca": {
+        "target_db": -26.7,
+        "tol_db": 2.9
+      }
+    }
+  }
+}
