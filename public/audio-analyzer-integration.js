@@ -57,7 +57,14 @@ async function loadGenreManifest() {
             return __genreManifest;
         }
     } catch (e) {
-        __dwrn('Manifesto de gêneros não disponível (usando fallback):', e.message || e);
+        __dwrn('Manifesto de gêneros não disponível (tentando EMBEDDED fallback):', e.message || e);
+        try {
+            const emb = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.manifest) || null;
+            if (emb && Array.isArray(emb.genres)) {
+                __genreManifest = emb.genres;
+                return __genreManifest;
+            }
+        } catch(_) {}
     }
     return null;
 }
@@ -141,6 +148,19 @@ async function loadReferenceData(genre) {
         return data;
     } catch (e) {
         console.warn('Falha ao carregar referências', genre, e);
+        // Fallback: tentar EMBEDDED
+        try {
+            const embMap = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) || {};
+            const emb = embMap && embMap[genre];
+            if (emb && typeof emb === 'object') {
+                __refDataCache[genre] = emb;
+                __activeRefData = emb;
+                __activeRefGenre = genre;
+                window.PROD_AI_REF_DATA = emb;
+                updateRefStatus('✔ referências embutidas', '#0d6efd');
+                return emb;
+            }
+        } catch(_) {}
         updateRefStatus('⚠ falha refs', '#992222');
         return null;
     }
