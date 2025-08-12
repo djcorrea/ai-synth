@@ -1,0 +1,349 @@
+﻿
+=== Calibra├º├úo de funk_mandela | arquivos: 11 ===
+Alvo LUFS: -14 | Tol atuais: lufs=0.5, tp=1.21, dr=0.8, lra=2.6, stereo=0.09
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 203ms: { integrated: '-5.5 LUFS', lra: '7.6 LU', gatedBlocks: '1173/1215' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1727ms: { peak: '-10.38 dBTP', position: '355902.8 samples', clipping: 'none' }
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1660ms: { peak: '-10.38 dBTP', position: '355902.8 samples', clipping: 'none' }
+­ƒÄÁ STFT: 241 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 229ms: { integrated: '-4.8 LUFS', lra: '11.5 LU', gatedBlocks: '1347/1490' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1963ms: {
+  peak: '-11.03 dBTP',
+  position: '1366956.8 samples',
+  clipping: 'none'
+}
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1986ms: {
+  peak: '-11.03 dBTP',
+  position: '1366949.8 samples',
+  clipping: 'none'
+}
+­ƒÄÁ STFT: 296 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 231ms: { integrated: '-4.2 LUFS', lra: '6.3 LU', gatedBlocks: '1421/1459' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1976ms: {
+  peak: '-11.69 dBTP',
+  position: '1691636.8 samples',
+  clipping: 'none'
+}
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1908ms: {
+  peak: '-11.69 dBTP',
+  position: '6213866.8 samples',
+  clipping: 'none'
+}
+­ƒÄÁ STFT: 290 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 193ms: { integrated: '-4.2 LUFS', lra: '11.6 LU', gatedBlocks: '1131/1215' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1582ms: { peak: '-11.68 dBTP', position: '539188.8 samples', clipping: 'none' }
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1615ms: { peak: '-11.68 dBTP', position: '887890.8 samples', clipping: 'none' }
+­ƒÄÁ STFT: 241 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 330ms: { integrated: '-8.2 LUFS', lra: '7.7 LU', gatedBlocks: '2100/2165' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 2853ms: { peak: '-7.66 dBTP', position: '506700.8 samples', clipping: 'none' }
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 2834ms: { peak: '-7.66 dBTP', position: '501647.8 samples', clipping: 'none' }
+­ƒÄÁ STFT: 431 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 178ms: { integrated: '-5.0 LUFS', lra: '11.0 LU', gatedBlocks: '1073/1160' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1511ms: {
+  peak: '-10.86 dBTP',
+  position: '1064941.8 samples',
+  clipping: 'none'
+}
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1516ms: {
+  peak: '-10.86 dBTP',
+  position: '1064941.8 samples',
+  clipping: 'none'
+}
+­ƒÄÁ STFT: 230 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 217ms: { integrated: '-5.1 LUFS', lra: '8.3 LU', gatedBlocks: '1348/1437' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1898ms: {
+  peak: '-10.78 dBTP',
+  position: '1420418.8 samples',
+  clipping: 'none'
+}
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1871ms: {
+  peak: '-10.78 dBTP',
+  position: '1419488.8 samples',
+  clipping: 'none'
+}
+­ƒÄÁ STFT: 286 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 205ms: { integrated: '-3.5 LUFS', lra: '7.0 LU', gatedBlocks: '1335/1363' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1759ms: {
+  peak: '-12.61 dBTP',
+  position: '1396125.8 samples',
+  clipping: 'none'
+}
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1825ms: {
+  peak: '-12.61 dBTP',
+  position: '1396001.8 samples',
+  clipping: 'none'
+}
+­ƒÄÁ STFT: 271 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 248ms: { integrated: '-4.2 LUFS', lra: '10.0 LU', gatedBlocks: '1477/1596' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 2152ms: {
+  peak: '-11.66 dBTP',
+  position: '1418827.8 samples',
+  clipping: 'none'
+}
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 2087ms: {
+  peak: '-11.66 dBTP',
+  position: '1419115.8 samples',
+  clipping: 'none'
+}
+­ƒÄÁ STFT: 318 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 178ms: { integrated: '-6.6 LUFS', lra: '14.2 LU', gatedBlocks: '954/1123' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1497ms: { peak: '-9.29 dBTP', position: '889276.8 samples', clipping: 'none' }
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1468ms: { peak: '-9.29 dBTP', position: '887414.8 samples', clipping: 'none' }
+­ƒÄÁ STFT: 223 frames, FFT=65536, hop=24000
+­ƒôè LUFS Meter configurado: block=19200, hop=4800, ST=144000
+­ƒÄø´©Å Calculando LUFS integrado...
+Ô£à LUFS calculado em 185ms: { integrated: '-9.8 LUFS', lra: '9.9 LU', gatedBlocks: '1163/1251' }
+­ƒÅö´©Å True Peak Detector: 48000Hz ÔåÆ 192000Hz oversampling
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1726ms: { peak: '-6.06 dBTP', position: '2649169.8 samples', clipping: 'none' }
+­ƒÅö´©Å Detectando true peaks...
+Ô£à True Peak detectado em 1817ms: { peak: '-6.06 dBTP', position: '2627867.8 samples', clipping: 'none' }
+­ƒÄÁ STFT: 249 frames, FFT=65536, hop=24000
+
+=== Resultados por arquivo ===
+
+ÔÇó 12 JC NO BEAT, SHAVOZO, MC DELUX - Catucada Violenta [Hitmando ├ülbum 2K24].wav
+  true_peak_dbtp: val=-10.38 | tgt=-10.86 | ╬ö=0.48 | sev=OK
+  dr: val=7.1 | tgt=7.1 | ╬ö=0 | sev=OK
+  lra: val=7.6 | tgt=9.9 | ╬ö=-2.3 | sev=OK
+  stereo_width: val=0.13 | tgt=0.2 | ╬ö=-0.07 | sev=OK
+  band:sub: val=-9.2 | tgt=-15.5 | ╬ö=6.3 | sev=moderado
+  band:low_bass: val=-13.6 | tgt=-12.1 | ╬ö=-1.5 | sev=OK
+  band:upper_bass: val=-13.4 | tgt=-13.9 | ╬ö=0.5 | sev=OK
+  band:low_mid: val=-9.8 | tgt=-10.5 | ╬ö=0.7 | sev=OK
+  band:mid: val=-9.7 | tgt=-8.9 | ╬ö=-0.8 | sev=OK
+  band:high_mid: val=-12.3 | tgt=-13.2 | ╬ö=0.9 | sev=OK
+  band:brilho: val=-15.6 | tgt=-19.1 | ╬ö=3.5 | sev=leve
+  band:presenca: val=-20.9 | tgt=-25.5 | ╬ö=4.6 | sev=moderado
+
+ÔÇó 20 MONTAGEM SEM CHA╠âO (APOSAN X GBR).wav
+  true_peak_dbtp: val=-11.03 | tgt=-10.86 | ╬ö=-0.17 | sev=OK
+  dr: val=7.2 | tgt=7.1 | ╬ö=0.1 | sev=OK
+  lra: val=11.5 | tgt=9.9 | ╬ö=1.6 | sev=OK
+  stereo_width: val=0.18 | tgt=0.2 | ╬ö=-0.02 | sev=OK
+  band:sub: val=-17.2 | tgt=-15.5 | ╬ö=-1.7 | sev=OK
+  band:low_bass: val=-16.4 | tgt=-12.1 | ╬ö=-4.3 | sev=leve
+  band:upper_bass: val=-13 | tgt=-13.9 | ╬ö=0.9 | sev=OK
+  band:low_mid: val=-11.3 | tgt=-10.5 | ╬ö=-0.8 | sev=OK
+  band:mid: val=-9.1 | tgt=-8.9 | ╬ö=-0.2 | sev=OK
+  band:high_mid: val=-10.7 | tgt=-13.2 | ╬ö=2.5 | sev=leve
+  band:brilho: val=-19.7 | tgt=-19.1 | ╬ö=-0.6 | sev=OK
+  band:presenca: val=-29.1 | tgt=-25.5 | ╬ö=-3.6 | sev=leve
+
+ÔÇó 43 AUTOMOTIVO GREEN LIGHT - DJ MARIACHI, DJ GHIDINI, DJ APOSAN E MC GW.wav
+  true_peak_dbtp: val=-11.69 | tgt=-10.86 | ╬ö=-0.83 | sev=OK
+  dr: val=7 | tgt=7.1 | ╬ö=-0.1 | sev=OK
+  lra: val=6.3 | tgt=9.9 | ╬ö=-3.6 | sev=leve
+  stereo_width: val=0.27 | tgt=0.2 | ╬ö=0.07 | sev=OK
+  band:sub: val=-16.1 | tgt=-15.5 | ╬ö=-0.6 | sev=OK
+  band:low_bass: val=-14.8 | tgt=-12.1 | ╬ö=-2.7 | sev=OK
+  band:upper_bass: val=-17.1 | tgt=-13.9 | ╬ö=-3.2 | sev=moderado
+  band:low_mid: val=-9.5 | tgt=-10.5 | ╬ö=1 | sev=OK
+  band:mid: val=-6.5 | tgt=-8.9 | ╬ö=2.4 | sev=OK
+  band:high_mid: val=-10.5 | tgt=-13.2 | ╬ö=2.7 | sev=leve
+  band:brilho: val=-15.3 | tgt=-19.1 | ╬ö=3.8 | sev=leve
+  band:presenca: val=-22.8 | tgt=-25.5 | ╬ö=2.7 | sev=OK
+
+ÔÇó 8 FEIN - SUBMUNDO DO TRAVIS SCOTT - JC NO BEAT e DJ JAP├âO (VIP MIX) (1).wav
+  true_peak_dbtp: val=-11.68 | tgt=-10.86 | ╬ö=-0.82 | sev=OK
+  dr: val=6.2 | tgt=7.1 | ╬ö=-0.9 | sev=leve
+  lra: val=11.6 | tgt=9.9 | ╬ö=1.7 | sev=OK
+  stereo_width: val=0.2 | tgt=0.2 | ╬ö=0 | sev=OK
+  band:sub: val=-14.2 | tgt=-15.5 | ╬ö=1.3 | sev=OK
+  band:low_bass: val=-16.5 | tgt=-12.1 | ╬ö=-4.4 | sev=leve
+  band:upper_bass: val=-16.4 | tgt=-13.9 | ╬ö=-2.5 | sev=moderado
+  band:low_mid: val=-13.2 | tgt=-10.5 | ╬ö=-2.7 | sev=leve
+  band:mid: val=-8.2 | tgt=-8.9 | ╬ö=0.7 | sev=OK
+  band:high_mid: val=-13 | tgt=-13.2 | ╬ö=0.2 | sev=OK
+  band:brilho: val=-17.2 | tgt=-19.1 | ╬ö=1.9 | sev=OK
+  band:presenca: val=-23.1 | tgt=-25.5 | ╬ö=2.4 | sev=OK
+
+ÔÇó 8 Marshmello, Tropkillaz, Mu540, Mc GW - Movimenta  (Official Music Video) (1).wav
+  true_peak_dbtp: val=-7.66 | tgt=-10.86 | ╬ö=3.2 | sev=alto
+  dr: val=9.7 | tgt=7.1 | ╬ö=2.6 | sev=alto
+  lra: val=7.7 | tgt=9.9 | ╬ö=-2.2 | sev=OK
+  stereo_width: val=0.28 | tgt=0.2 | ╬ö=0.08 | sev=OK
+  band:sub: val=-15.5 | tgt=-15.5 | ╬ö=0 | sev=OK
+  band:low_bass: val=-11.5 | tgt=-12.1 | ╬ö=0.6 | sev=OK
+  band:upper_bass: val=-13.2 | tgt=-13.9 | ╬ö=0.7 | sev=OK
+  band:low_mid: val=-9.4 | tgt=-10.5 | ╬ö=1.1 | sev=OK
+  band:mid: val=-8.2 | tgt=-8.9 | ╬ö=0.7 | sev=OK
+  band:high_mid: val=-18.7 | tgt=-13.2 | ╬ö=-5.5 | sev=alto
+  band:brilho: val=-24.6 | tgt=-19.1 | ╬ö=-5.5 | sev=moderado
+  band:presenca: val=-32.2 | tgt=-25.5 | ╬ö=-6.7 | sev=moderado
+
+ÔÇó AUTOMOTIVO FIM DE ANO - JC NO BEAT, MC Menor MT e MC Pelourinho.wav
+  true_peak_dbtp: val=-10.86 | tgt=-10.86 | ╬ö=0 | sev=OK
+  dr: val=6.9 | tgt=7.1 | ╬ö=-0.2 | sev=OK
+  lra: val=11 | tgt=9.9 | ╬ö=1.1 | sev=OK
+  stereo_width: val=0.12 | tgt=0.2 | ╬ö=-0.08 | sev=OK
+  band:sub: val=-19.2 | tgt=-15.5 | ╬ö=-3.7 | sev=leve
+  band:low_bass: val=-12.1 | tgt=-12.1 | ╬ö=0 | sev=OK
+  band:upper_bass: val=-10.5 | tgt=-13.9 | ╬ö=3.4 | sev=alto
+  band:low_mid: val=-12.1 | tgt=-10.5 | ╬ö=-1.6 | sev=OK
+  band:mid: val=-10.8 | tgt=-8.9 | ╬ö=-1.9 | sev=OK
+  band:high_mid: val=-12.3 | tgt=-13.2 | ╬ö=0.9 | sev=OK
+  band:brilho: val=-17.6 | tgt=-19.1 | ╬ö=1.5 | sev=OK
+  band:presenca: val=-22.8 | tgt=-25.5 | ╬ö=2.7 | sev=OK
+
+ÔÇó AUTOMOTIVO VIAGEM COSMICA - DJ JAJA.wav
+  true_peak_dbtp: val=-10.78 | tgt=-10.86 | ╬ö=0.08 | sev=OK
+  dr: val=7.5 | tgt=7.1 | ╬ö=0.4 | sev=OK
+  lra: val=8.3 | tgt=9.9 | ╬ö=-1.6 | sev=OK
+  stereo_width: val=0.32 | tgt=0.2 | ╬ö=0.12 | sev=leve
+  band:sub: val=-14.5 | tgt=-15.5 | ╬ö=1 | sev=OK
+  band:low_bass: val=-10.6 | tgt=-12.1 | ╬ö=1.5 | sev=OK
+  band:upper_bass: val=-13.5 | tgt=-13.9 | ╬ö=0.4 | sev=OK
+  band:low_mid: val=-7.9 | tgt=-10.5 | ╬ö=2.6 | sev=leve
+  band:mid: val=-11.6 | tgt=-8.9 | ╬ö=-2.7 | sev=OK
+  band:high_mid: val=-21.3 | tgt=-13.2 | ╬ö=-8.1 | sev=alto
+  band:brilho: val=-27.3 | tgt=-19.1 | ╬ö=-8.2 | sev=alto
+  band:presenca: val=-36.4 | tgt=-25.5 | ╬ö=-10.9 | sev=alto
+
+ÔÇó FAIXA 02 - ELA ├ë PROFISSIONAL (GP DA ZL) - M.wav
+  true_peak_dbtp: val=-12.61 | tgt=-10.86 | ╬ö=-1.75 | sev=leve
+  dr: val=5.3 | tgt=7.1 | ╬ö=-1.8 | sev=moderado
+  lra: val=7 | tgt=9.9 | ╬ö=-2.9 | sev=leve
+  stereo_width: val=0.17 | tgt=0.2 | ╬ö=-0.03 | sev=OK
+  band:sub: val=-9.9 | tgt=-15.5 | ╬ö=5.6 | sev=moderado
+  band:low_bass: val=-10 | tgt=-12.1 | ╬ö=2.1 | sev=OK
+  band:upper_bass: val=-13.9 | tgt=-13.9 | ╬ö=0 | sev=OK
+  band:low_mid: val=-10.5 | tgt=-10.5 | ╬ö=0 | sev=OK
+  band:mid: val=-7 | tgt=-8.9 | ╬ö=1.9 | sev=OK
+  band:high_mid: val=-13.9 | tgt=-13.2 | ╬ö=-0.7 | sev=OK
+  band:brilho: val=-19.1 | tgt=-19.1 | ╬ö=0 | sev=OK
+  band:presenca: val=-23.5 | tgt=-25.5 | ╬ö=2 | sev=OK
+
+ÔÇó OH MOCA - DJ JAJA E MC DABLIO.wav
+  true_peak_dbtp: val=-11.66 | tgt=-10.86 | ╬ö=-0.8 | sev=OK
+  dr: val=6.8 | tgt=7.1 | ╬ö=-0.3 | sev=OK
+  lra: val=10 | tgt=9.9 | ╬ö=0.1 | sev=OK
+  stereo_width: val=0.25 | tgt=0.2 | ╬ö=0.05 | sev=OK
+  band:sub: val=-26.4 | tgt=-15.5 | ╬ö=-10.9 | sev=alto
+  band:low_bass: val=-19.1 | tgt=-12.1 | ╬ö=-7 | sev=moderado
+  band:upper_bass: val=-22 | tgt=-13.9 | ╬ö=-8.1 | sev=alto
+  band:low_mid: val=-8.8 | tgt=-10.5 | ╬ö=1.7 | sev=OK
+  band:mid: val=-6.3 | tgt=-8.9 | ╬ö=2.6 | sev=OK
+  band:high_mid: val=-14.6 | tgt=-13.2 | ╬ö=-1.4 | sev=OK
+  band:brilho: val=-19.7 | tgt=-19.1 | ╬ö=-0.6 | sev=OK
+  band:presenca: val=-27 | tgt=-25.5 | ╬ö=-1.5 | sev=OK
+
+ÔÇó R├üDIO BAILE ] - 10 - ZN DOS DRAKE - DJ MARIACHI E DJ ELVIS MANKADA.wav
+  true_peak_dbtp: val=-9.29 | tgt=-10.86 | ╬ö=1.57 | sev=leve
+  dr: val=8.1 | tgt=7.1 | ╬ö=1 | sev=leve
+  lra: val=14.2 | tgt=9.9 | ╬ö=4.3 | sev=moderado
+  stereo_width: val=0.15 | tgt=0.2 | ╬ö=-0.05 | sev=OK
+  band:sub: val=-23.8 | tgt=-15.5 | ╬ö=-8.3 | sev=alto
+  band:low_bass: val=-11.5 | tgt=-12.1 | ╬ö=0.6 | sev=OK
+  band:upper_bass: val=-16.8 | tgt=-13.9 | ╬ö=-2.9 | sev=moderado
+  band:low_mid: val=-12.9 | tgt=-10.5 | ╬ö=-2.4 | sev=OK
+  band:mid: val=-8.9 | tgt=-8.9 | ╬ö=0 | sev=OK
+  band:high_mid: val=-13.2 | tgt=-13.2 | ╬ö=0 | sev=OK
+  band:brilho: val=-15.1 | tgt=-19.1 | ╬ö=4 | sev=leve
+  band:presenca: val=-25.5 | tgt=-25.5 | ╬ö=0 | sev=OK
+
+ÔÇó T├úo Natural Como a Luz do Dia - DJ Corr├¬a Original e MC Maguinho do Litoral.wav
+  true_peak_dbtp: val=-6.06 | tgt=-10.86 | ╬ö=4.8 | sev=alto
+  dr: val=11.6 | tgt=7.1 | ╬ö=4.5 | sev=alto
+  lra: val=9.9 | tgt=9.9 | ╬ö=0 | sev=OK
+  stereo_width: val=0.4 | tgt=0.2 | ╬ö=0.2 | sev=moderado
+  band:sub: val=-8.4 | tgt=-15.5 | ╬ö=7.1 | sev=moderado
+  band:low_bass: val=-8.5 | tgt=-12.1 | ╬ö=3.6 | sev=leve
+  band:upper_bass: val=-14.6 | tgt=-13.9 | ╬ö=-0.7 | sev=OK
+  band:low_mid: val=-12.7 | tgt=-10.5 | ╬ö=-2.2 | sev=OK
+  band:mid: val=-11.1 | tgt=-8.9 | ╬ö=-2.2 | sev=OK
+  band:high_mid: val=-16.9 | tgt=-13.2 | ╬ö=-3.7 | sev=moderado
+  band:brilho: val=-23.6 | tgt=-19.1 | ╬ö=-4.5 | sev=moderado
+  band:presenca: val=-31.5 | tgt=-25.5 | ╬ö=-6 | sev=moderado
+
+=== Agrega├º├Áes e proposta de toler├óncias ===
+- true_peak_dbtp: MAD=0.81 | ok_atual=64% | tol_atual=1.21 ÔåÆ tol_nova=1.21 | ok_previsto=64%
+- dr: MAD=0.4 | ok_atual=55% | tol_atual=0.8 ÔåÆ tol_nova=0.8 | ok_previsto=55%
+- lra: MAD=1.7 | ok_atual=73% | tol_atual=2.6 ÔåÆ tol_nova=2.6 | ok_previsto=73%
+- stereo_width: MAD=0.06 | ok_atual=82% | tol_atual=0.09 ÔåÆ tol_nova=0.09 | ok_previsto=82%
+- band:sub: MAD=3.7 | ok_atual=45% | tol_atual=3 ÔåÆ tol_nova=3 | ok_previsto=45%
+- band:low_bass: MAD=2 | ok_atual=64% | tol_atual=3 ÔåÆ tol_nova=3 | ok_previsto=64%
+- band:upper_bass: MAD=0.9 | ok_atual=55% | tol_atual=1.3 ÔåÆ tol_nova=1.3 | ok_previsto=55%
+- band:low_mid: MAD=1.6 | ok_atual=82% | tol_atual=2.4 ÔåÆ tol_nova=2.4 | ok_previsto=82%
+- band:mid: MAD=1.9 | ok_atual=100% | tol_atual=2.8 ÔåÆ tol_nova=2.8 | ok_previsto=100%
+- band:high_mid: MAD=1.4 | ok_atual=55% | tol_atual=2.1 ÔåÆ tol_nova=2.1 | ok_previsto=55%
+- band:brilho: MAD=3.5 | ok_atual=45% | tol_atual=3 ÔåÆ tol_nova=3 | ok_previsto=45%
+- band:presenca: MAD=2.7 | ok_atual=55% | tol_atual=3 ÔåÆ tol_nova=3 | ok_previsto=55%
+
+=== Cobertura OK com toler├óncias atuais ===
+- true_peak_dbtp: 64% OK
+- dr: 55% OK
+- lra: 73% OK
+- stereo_width: 82% OK
+- band:sub: 45% OK
+- band:low_bass: 64% OK
+- band:upper_bass: 55% OK
+- band:low_mid: 82% OK
+- band:mid: 100% OK
+- band:high_mid: 55% OK
+- band:brilho: 45% OK
+- band:presenca: 55% OK
+
+%OK geral (atual): 64.4%
+%OK geral (proposto): 64.4%
+
+ÔÜá´©Å Cobertura proposta abaixo do limiar. Poss├¡veis bloqueios:
+- Bandas cr├¡ticas: sub=45%, brilho=45%, upper_bass=55%
+- Par├ómetros cr├¡ticos: dr=55%, true_peak_dbtp=64%
+- Poss├¡veis outliers:
+  ÔÇó AUTOMOTIVO VIAGEM COSMICA - DJ JAJA.wav (score=6)
+  ÔÇó OH MOCA - DJ JAJA E MC DABLIO.wav (score=5)
+  ÔÇó 8 Marshmello, Tropkillaz, Mu540, Mc GW - Movimenta  (Official Music Video) (1).wav (score=4)
+- Sugest├Áes: remova/sep. outliers, considere subestilos, adicione mais faixas equilibradas.
+
+Ôä╣´©Å Use --write para aplicar as novas tol_* no JSON.
+Ôä╣´©Å --auto-write ativo, mas %OK atual (64.4%) < min-ok (80%), ent├úo n├úo foi aplicado.

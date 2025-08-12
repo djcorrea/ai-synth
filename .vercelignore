@@ -1,0 +1,6 @@
+refs/
+*.wav
+*.mp3
+*.zip
+*.rar
+node_modules/
