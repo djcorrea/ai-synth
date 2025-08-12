@@ -13,6 +13,28 @@ let __activeRefData = null; // dados do gênero atual
 let __genreManifest = null; // manifesto de gêneros (opcional)
 let __activeRefGenre = null; // chave do gênero atualmente carregado em __activeRefData
 
+// Carregar dinamicamente o fallback embutido se necessário
+async function ensureEmbeddedRefsReady(timeoutMs = 2500) {
+    try {
+        if (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) return true;
+        // Injetar script apenas uma vez
+        if (typeof document !== 'undefined' && !document.getElementById('embeddedRefsScript')) {
+            const s = document.createElement('script');
+            s.id = 'embeddedRefsScript';
+            s.src = '/refs/embedded-refs.js?v=' + Date.now();
+            s.async = true;
+            document.head.appendChild(s);
+        }
+        // Esperar até ficar disponível ou timeout
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            if (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) return true;
+            await new Promise(r => setTimeout(r, 100));
+        }
+        return (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) ? true : false;
+    } catch { return false; }
+}
+
 // Helper: buscar JSON tentando múltiplos caminhos (resiliente a diferenças local x produção)
 async function fetchRefJsonWithFallback(paths) {
     let lastErr = null;
@@ -59,6 +81,8 @@ async function loadGenreManifest() {
     } catch (e) {
         __dwrn('Manifesto de gêneros não disponível (tentando EMBEDDED fallback):', e.message || e);
         try {
+            // Garantir que o fallback embutido esteja disponível
+            await ensureEmbeddedRefsReady();
             const emb = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.manifest) || null;
             if (emb && Array.isArray(emb.genres)) {
                 __genreManifest = emb.genres;
@@ -150,6 +174,7 @@ async function loadReferenceData(genre) {
         console.warn('Falha ao carregar referências', genre, e);
         // Fallback: tentar EMBEDDED
         try {
+            await ensureEmbeddedRefsReady();
             const embMap = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) || {};
             const emb = embMap && embMap[genre];
             if (emb && typeof emb === 'object') {
@@ -159,6 +184,15 @@ async function loadReferenceData(genre) {
                 window.PROD_AI_REF_DATA = emb;
                 updateRefStatus('✔ referências embutidas', '#0d6efd');
                 return emb;
+            }
+            // Se o gênero específico não existir, usar um padrão seguro (trance) se disponível
+            if (embMap && embMap.trance) {
+                __refDataCache['trance'] = embMap.trance;
+                __activeRefData = embMap.trance;
+                __activeRefGenre = 'trance';
+                window.PROD_AI_REF_DATA = embMap.trance;
+                updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
+                return embMap.trance;
             }
         } catch(_) {}
         updateRefStatus('⚠ falha refs', '#992222');
