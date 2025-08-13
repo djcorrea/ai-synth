@@ -6,8 +6,10 @@ import cors from 'cors';
 const corsMiddleware = cors({
   origin: (origin, callback) => {
     const fixedOrigin = 'https://prod-ai-teste.vercel.app';
-    const vercelPreviewRegex = /^https:\/\/prod-ai-teste-[a-z0-9\-]+\.vercel\.app$/;
-    
+    const prodFrontend = 'https://ai-synth.vercel.app';
+    const apiPreviewRegex = /^https:\/\/prod-ai-teste-[a-z0-9\-]+\.vercel\.app$/;
+    const frontendPreviewRegex = /^https:\/\/ai-synth(?:-[a-z0-9\-]+)?\.vercel\.app$/;
+
     // Adicionar suporte para desenvolvimento local
     const localOrigins = [
       'http://localhost:3000',
@@ -19,9 +21,11 @@ const corsMiddleware = cors({
     ];
 
     // Permitir origens locais, Vercel e file://
-    if (!origin || 
-        origin.includes(fixedOrigin) || 
-        vercelPreviewRegex.test(origin) ||
+    if (!origin ||
+        origin === fixedOrigin ||
+        origin === prodFrontend ||
+        apiPreviewRegex.test(origin) ||
+        frontendPreviewRegex.test(origin) ||
         localOrigins.includes(origin) ||
         origin.startsWith('file://')) {
       callback(null, true);
@@ -30,7 +34,8 @@ const corsMiddleware = cors({
       callback(new Error('Not allowed by CORS: ' + origin));
     }
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 });
 

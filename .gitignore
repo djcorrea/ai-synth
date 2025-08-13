@@ -3,3 +3,9 @@
 .vercel
 
 .vercel
+
+.vercel
+
+# Ignorar samples de referência (áudio pesado não versionado)
+refs/*/samples/
+refs/*/samples/**

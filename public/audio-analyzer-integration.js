@@ -982,8 +982,9 @@ function renderReferenceComparisons(analysis) {
             <td class="${within?'ok':'warn'}">${diff>0?'+':''}${nf(diff)}${unit}</td>
         </tr>`);
     };
-    pushRow('LUFS Int.', tech.lufsIntegrated ?? tech.rms, ref.lufs_target, ref.tol_lufs, '');
-    pushRow('True Peak', tech.truePeakDbtp ?? tech.peak, ref.true_peak_target, ref.tol_true_peak, '');
+    // Usar somente métricas reais (sem fallback para RMS/Peak, que têm unidades e conceitos distintos)
+    pushRow('LUFS Int.', tech.lufsIntegrated, ref.lufs_target, ref.tol_lufs, '');
+    pushRow('True Peak', tech.truePeakDbtp, ref.true_peak_target, ref.tol_true_peak, ' dBTP');
     pushRow('DR', tech.dynamicRange, ref.dr_target, ref.tol_dr, '');
     pushRow('LRA', tech.lra, ref.lra_target, ref.tol_lra, '');
     pushRow('Stereo Corr.', tech.stereoCorrelation, ref.stereo_target, ref.tol_stereo, '');
@@ -1063,9 +1064,9 @@ function updateReferenceSuggestions(analysis) {
         });
     };
     // Aplicar checks principais
-    const lufsVal = Number.isFinite(tech.lufsIntegrated) ? tech.lufsIntegrated : tech.rms;
+    const lufsVal = Number.isFinite(tech.lufsIntegrated) ? tech.lufsIntegrated : null;
     addRefSug(lufsVal, ref.lufs_target, ref.tol_lufs, 'reference_loudness', 'LUFS', '');
-    const tpVal = Number.isFinite(tech.truePeakDbtp) ? tech.truePeakDbtp : tech.peak;
+    const tpVal = Number.isFinite(tech.truePeakDbtp) ? tech.truePeakDbtp : null;
     addRefSug(tpVal, ref.true_peak_target, ref.tol_true_peak, 'reference_true_peak', 'True Peak', ' dBTP');
     addRefSug(tech.dynamicRange, ref.dr_target, ref.tol_dr, 'reference_dynamics', 'DR', ' dB');
     if (Number.isFinite(tech.lra)) addRefSug(tech.lra, ref.lra_target, ref.tol_lra, 'reference_lra', 'LRA', ' dB');
@@ -1355,4 +1356,33 @@ document.addEventListener('DOMContentLoaded', function() {
 if (document.readyState !== 'loading') {
     // se DOM já pronto, inicializar uma vez
     initializeAudioAnalyzerIntegration();
+}
+
+// Utilitário opcional: testar consistência das métricas com reanálises repetidas do mesmo arquivo
+// Uso (dev): window.__testConsistency(file, 3).then(console.log)
+if (typeof window !== 'undefined' && !window.__testConsistency) {
+    window.__testConsistency = async function(file, runs = 3) {
+        const out = { runs: [], deltas: {} };
+        for (let i = 0; i < runs; i++) {
+            const t0 = performance.now();
+            const res = await window.audioAnalyzer.analyzeAudioFile(file);
+            const t1 = performance.now();
+            out.runs.push({
+                idx: i+1,
+                lufs: res?.technicalData?.lufsIntegrated ?? res?.metrics?.lufs ?? null,
+                truePeakDbtp: res?.technicalData?.truePeakDbtp ?? res?.metrics?.truePeakDbtp ?? null,
+                dr: res?.technicalData?.dynamicRange ?? res?.metrics?.dynamicRange ?? null,
+                lra: res?.technicalData?.lra ?? null,
+                processingMs: res?.processingMs ?? (t1 - t0)
+            });
+        }
+        // calcular deltas
+        const vals = (key) => out.runs.map(r => r[key]).filter(v => Number.isFinite(v));
+        const stats = (arr) => arr.length ? { min: Math.min(...arr), max: Math.max(...arr), spread: Math.max(...arr)-Math.min(...arr) } : null;
+        out.deltas.lufs = stats(vals('lufs'));
+        out.deltas.truePeakDbtp = stats(vals('truePeakDbtp'));
+        out.deltas.dr = stats(vals('dr'));
+        out.deltas.lra = stats(vals('lra'));
+        return out;
+    };
 }
