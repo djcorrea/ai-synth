@@ -20,13 +20,19 @@ let isDesktop = window.innerWidth > 768;
 /* ============ CONFIGURAÇÃO DA API (Sistema Antigo) ============ */
 const API_CONFIG = {
   baseURL: (() => {
-    if (window.location.hostname === 'localhost') {
-      return 'https://prod-ai-teste.vercel.app/api';
-    } else if (window.location.hostname.includes('vercel.app')) {
-      return 'https://prod-ai-teste.vercel.app/api'; 
-    } else {
-      return 'https://prod-ai-teste.vercel.app/api'; // Forçar URL da Vercel para testes
+    const host = window.location.hostname || '';
+    // Produção/preview no domínio do frontend -> usar mesma origem para evitar CORS
+    const isVercel = host.endsWith('vercel.app');
+    const isAiSynthProject = isVercel && host.toLowerCase().startsWith('ai-synth');
+    if (isAiSynthProject || host === 'ai-synth.vercel.app') {
+      return '/api';
     }
+    // Ambiente local mantém uso do backend dedicado atual
+    if (host === 'localhost' || host.startsWith('127.0.0.1')) {
+      return 'https://prod-ai-teste.vercel.app/api';
+    }
+    // Demais casos: manter backend dedicado atual
+    return 'https://prod-ai-teste.vercel.app/api';
   })(),
 
   get chatEndpoint() {
