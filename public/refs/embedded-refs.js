@@ -26,9 +26,61 @@
     }
   }, overrides);
   window.__EMBEDDED_REFS__.byGenre['funk_mandela']   = window.__EMBEDDED_REFS__.byGenre['funk_mandela']   || minimal({ stereo_target: 0.2 });
+  // Novo dataset Funk Mandela (padrão atual)
+  window.__EMBEDDED_REFS__.byGenre['funk_mandela'] = {
+    lufs_target: -5, tol_lufs: 1.91,
+    true_peak_target: -1.9, tol_true_peak: 0.5,
+    dr_target: 7.2, tol_dr: 1.37,
+    lra_target: 7.6, tol_lra: 2.9,
+    stereo_target: null, tol_stereo: 0.07,
+    bands: {
+      sub: { target_db: null, tol_db: 1.78 },
+      low_bass: { target_db: 15.3, tol_db: 1.9 },
+      upper_bass: { target_db: 10, tol_db: 2.9 },
+      low_mid: { target_db: 9.3, tol_db: 3.29 },
+      mid: { target_db: 4.8, tol_db: 1.2 },
+      high_mid: { target_db: -3, tol_db: 4 },
+      brilho: { target_db: -13.7, tol_db: 4 },
+      presenca: { target_db: -23.6, tol_db: 4 }
+    }
+  };
+  // Variante legacy preservada
+  window.__EMBEDDED_REFS__.byGenre['funk_mandela_legacy'] = window.__EMBEDDED_REFS__.byGenre['funk_mandela_legacy'] || {
+    lufs_target: -14, tol_lufs: 0.5,
+    true_peak_target: -10.86, tol_true_peak: 1.21,
+    dr_target: 7.1, tol_dr: 0.8,
+    lra_target: 9.9, tol_lra: 2.6,
+    stereo_target: 0.2, tol_stereo: 0.09,
+    bands: {
+      sub: { target_db: -15.5, tol_db: 3 },
+      low_bass: { target_db: -12.1, tol_db: 3 },
+      upper_bass: { target_db: -13.9, tol_db: 1.3 },
+      low_mid: { target_db: -10.5, tol_db: 2.4 },
+      mid: { target_db: -8.9, tol_db: 2.8 },
+      high_mid: { target_db: -13.2, tol_db: 2.1 },
+      brilho: { target_db: -19.1, tol_db: 3 },
+      presenca: { target_db: -25.5, tol_db: 3 }
+    }
+  };
   window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  = window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  || minimal({ lufs_target: -10 });
   window.__EMBEDDED_REFS__.byGenre['eletronico']     = window.__EMBEDDED_REFS__.byGenre['eletronico']     || minimal({ lra_target: 8 });
-  window.__EMBEDDED_REFS__.byGenre['eletrofunk']     = window.__EMBEDDED_REFS__.byGenre['eletrofunk']     || minimal({ lufs_target: -9 });
+  window.__EMBEDDED_REFS__.byGenre['eletrofunk']     = window.__EMBEDDED_REFS__.byGenre['eletrofunk']     || {
+    lufs_target: -8.3, tol_lufs: 1.22,
+    true_peak_target: -1.9, tol_true_peak: 0.5,
+    dr_target: 10.1, tol_dr: 1.35,
+    lra_target: 8.4, tol_lra: 2.54,
+    stereo_target: null, tol_stereo: 0.07,
+    bands: {
+      sub: { target_db: null, tol_db: 1.78 },
+      low_bass: { target_db: 13.3, tol_db: 2.36 },
+      upper_bass: { target_db: 11.5, tol_db: 2.02 },
+      low_mid: { target_db: 8.8, tol_db: 2.07 },
+      mid: { target_db: 2.5, tol_db: 1.81 },
+      high_mid: { target_db: -6.7, tol_db: 1.52 },
+      brilho: { target_db: -13.1, tol_db: 2.38 },
+      presenca: { target_db: -22.7, tol_db: 3.47 }
+    }
+  };
   window.__EMBEDDED_REFS__.byGenre['funk_consciente']= window.__EMBEDDED_REFS__.byGenre['funk_consciente']|| minimal({ dr_target: 10 });
   window.__EMBEDDED_REFS__.byGenre['trap']           = window.__EMBEDDED_REFS__.byGenre['trap']           || minimal({ sub: { target_db: -16, tol_db: 4 } });
 })();
