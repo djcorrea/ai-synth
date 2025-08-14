@@ -1,27 +1,27 @@
 {
   "funk_mandela": {
     "version": "1.0",
-    "generated_at": "2025-08-13T02:14:30.995Z",
-    "num_tracks": 30,
-    "lufs_target": -5,
-    "tol_lufs": 1.91,
+    "generated_at": "2025-08-14T00:58:20.017Z",
+    "num_tracks": 62,
+    "lufs_target": -5.6,
+    "tol_lufs": 1.92,
     "true_peak_target": -1.9,
     "tol_true_peak": 0.5,
-    "dr_target": 7.2,
-    "tol_dr": 1.37,
-    "lra_target": 7.6,
-    "tol_lra": 2.9,
+    "dr_target": 8.8,
+    "tol_dr": 1.12,
+    "lra_target": 7.5,
+    "tol_lra": 3.34,
     "stereo_target": null,
     "tol_stereo": 0.07,
     "bands": {
       "sub": { "target_db": null, "tol_db": 1.78 },
-      "low_bass": { "target_db": 15.3, "tol_db": 1.9 },
-      "upper_bass": { "target_db": 10, "tol_db": 2.9 },
-      "low_mid": { "target_db": 9.3, "tol_db": 3.29 },
-      "mid": { "target_db": 4.8, "tol_db": 1.2 },
-      "high_mid": { "target_db": -3, "tol_db": 4 },
-      "brilho": { "target_db": -13.7, "tol_db": 4 },
-      "presenca": { "target_db": -23.6, "tol_db": 4 }
+      "low_bass": { "target_db": 15.4, "tol_db": 1.66 },
+      "upper_bass": { "target_db": 10.8, "tol_db": 2.02 },
+      "low_mid": { "target_db": 7.5, "tol_db": 2.19 },
+      "mid": { "target_db": 3.3, "tol_db": 2.3 },
+      "high_mid": { "target_db": -3.8, "tol_db": 2.54 },
+      "brilho": { "target_db": -11.1, "tol_db": 2.47 },
+      "presenca": { "target_db": -20.4, "tol_db": 4 }
     }
   }
 }

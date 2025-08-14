@@ -18,7 +18,6 @@ const __INLINE_EMBEDDED_REFS__ = {
     manifest: { genres: [
         { key: 'trance', label: 'Trance' },
         { key: 'funk_mandela', label: 'Funk Mandela' },
-    { key: 'funk_mandela_legacy', label: 'Funk Mandela (Legacy)' },
         { key: 'funk_bruxaria', label: 'Funk Bruxaria' },
         { key: 'eletronico', label: 'Eletrônico' },
         { key: 'eletrofunk', label: 'Eletrofunk' },
@@ -27,10 +26,8 @@ const __INLINE_EMBEDDED_REFS__ = {
     ]},
     byGenre: {
         trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:1}, low_bass:{target_db:-14.6,tol_db:2.8}, upper_bass:{target_db:-14.8,tol_db:1}, low_mid:{target_db:-12.6,tol_db:2.2}, mid:{target_db:-12,tol_db:2.5}, high_mid:{target_db:-20.2,tol_db:2.1}, brilho:{target_db:-24.7,tol_db:1}, presenca:{target_db:-32.1,tol_db:2.1} } },
-    // Novo padrão Funk Mandela
-    funk_mandela:   { lufs_target: -5, tol_lufs: 1.91,  true_peak_target: -1.9, tol_true_peak: 0.5, dr_target: 7.2, tol_dr: 1.37, lra_target: 7.6, tol_lra: 2.9, stereo_target: null,  tol_stereo: 0.07, bands: { sub:{target_db:null,tol_db:1.78}, low_bass:{target_db:15.3,tol_db:1.9}, upper_bass:{target_db:10,tol_db:2.9}, low_mid:{target_db:9.3,tol_db:3.29}, mid:{target_db:4.8,tol_db:1.2}, high_mid:{target_db:-3,tol_db:4}, brilho:{target_db:-13.7,tol_db:4}, presenca:{target_db:-23.6,tol_db:4} } },
-    // Variante legacy preservada
-    funk_mandela_legacy:   { lufs_target: -14, tol_lufs: 0.5,  true_peak_target: -10.86, tol_true_peak: 1.21, dr_target: 7.1, tol_dr: 0.8, lra_target: 9.9, tol_lra: 2.6, stereo_target: 0.2,  tol_stereo: 0.09, bands: { sub:{target_db:-15.5,tol_db:3}, low_bass:{target_db:-12.1,tol_db:3}, upper_bass:{target_db:-13.9,tol_db:1.3}, low_mid:{target_db:-10.5,tol_db:2.4}, mid:{target_db:-8.9,tol_db:2.8}, high_mid:{target_db:-13.2,tol_db:2.1}, brilho:{target_db:-19.1,tol_db:3}, presenca:{target_db:-25.5,tol_db:3} } },
+    // Perfil atualizado Funk Mandela (62 faixas)
+    funk_mandela:   { lufs_target: -5.6, tol_lufs: 1.92,  true_peak_target: -1.9, tol_true_peak: 0.5, dr_target: 8.8, tol_dr: 1.12, lra_target: 7.5, tol_lra: 3.34, stereo_target: null,  tol_stereo: 0.07, bands: { sub:{target_db:null,tol_db:1.78}, low_bass:{target_db:15.4,tol_db:1.66}, upper_bass:{target_db:10.8,tol_db:2.02}, low_mid:{target_db:7.5,tol_db:2.19}, mid:{target_db:3.3,tol_db:2.3}, high_mid:{target_db:-3.8,tol_db:2.54}, brilho:{target_db:-11.1,tol_db:2.47}, presenca:{target_db:-20.4,tol_db:4} } },
         funk_bruxaria:  { lufs_target: -10, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
         eletronico:     { lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 8, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
         eletrofunk:     { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
