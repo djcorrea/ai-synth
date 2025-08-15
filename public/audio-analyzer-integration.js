@@ -925,7 +925,7 @@ function displayModalResults(analysis) {
             row('LRA', (advancedReady && Number.isFinite(analysis.technicalData.lra)) ? `${safeFixed(analysis.technicalData.lra)} dB` : (advancedReady? '—':'⏳'), 'lra')
             ].join('') + (
                 Number.isFinite(analysis.technicalData.loudnessOffsetDb) ?
-                row('Offset -23LUFS', `${safeFixed(analysis.technicalData.loudnessOffsetDb,1)} dB`, 'loudnessOffsetDb') : ''
+                row('Δ vs -23 LUFS', `${analysis.technicalData.loudnessOffsetDb>0?'+':''}${safeFixed(analysis.technicalData.loudnessOffsetDb,1)} LU`, 'loudnessOffsetDb') : ''
             );
 
         const col2 = [
@@ -1183,6 +1183,7 @@ function displayModalResults(analysis) {
 
         technicalData.innerHTML = `
             <div class="kpi-row">${scoreKpi}${timeKpi}</div>
+                ${renderSmartSummary(analysis) }
                     <div class="cards-grid">
                         <div class="card">
                     <div class="card-title">🎛️ Métricas Principais</div>
@@ -1213,7 +1214,207 @@ function displayModalResults(analysis) {
         `;
     
     try { renderReferenceComparisons(analysis); } catch(e){ console.warn('ref compare fail', e);}    
+        try { if (window.CAIAR_ENABLED) injectValidationControls(); } catch(e){ console.warn('validation controls fail', e); }
     __dbg('📊 Resultados exibidos no modal');
+}
+
+    // === Controles de Validação (Suite Objetiva + Subjetiva) ===
+    function injectValidationControls(){
+        if (document.getElementById('validationControlsBar')) return;
+        const host = document.getElementById('modalTechnicalData');
+        if (!host) return;
+        const bar = document.createElement('div');
+        bar.id='validationControlsBar';
+        bar.style.cssText='margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#0f1826;padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;font-size:12px;';
+        bar.innerHTML = `
+            <strong style="letter-spacing:.5px;color:#9fc9ff;font-weight:600;">Validação Auditiva</strong>
+            <button id="runValidationSuiteBtn" style="background:#10365a;color:#fff;border:1px solid #1e4d7a;padding:6px 10px;font-size:12px;border-radius:6px;cursor:pointer;">Rodar Suite (10)</button>
+            <button id="openSubjectiveFormBtn" style="background:#1c2c44;color:#d6e7ff;border:1px solid #284362;padding:6px 10px;font-size:12px;border-radius:6px;cursor:pointer;" disabled>Subjetivo 1–5</button>
+            <button id="downloadValidationReportBtn" style="background:#224d37;color:#c5ffe9;border:1px solid #2f6e4e;padding:6px 10px;font-size:12px;border-radius:6px;cursor:pointer;" disabled>Baixar Relatório</button>
+            <span id="validationStatusMsg" style="margin-left:auto;font-size:11px;opacity:.75;">Pronto</span>
+        `;
+        host.prepend(bar);
+        // Handlers
+        const btnRun = bar.querySelector('#runValidationSuiteBtn');
+        const btnForm = bar.querySelector('#openSubjectiveFormBtn');
+        const btnDownload = bar.querySelector('#downloadValidationReportBtn');
+        const statusEl = bar.querySelector('#validationStatusMsg');
+        btnRun.onclick = async ()=>{
+            btnRun.disabled = true; btnRun.textContent = 'Rodando...'; statusEl.textContent = 'Executando suite...';
+            try {
+                const mod = await import(`../lib/audio/validation/validation-suite.js?c=${Date.now()}`);
+                const summary = await mod.runValidationSuite({});
+                statusEl.textContent = summary? `Cobertura média Δ ${(summary.avgDelta*100).toFixed(1)}%` : 'Sem dados';
+                btnRun.textContent = 'Suite OK';
+                btnForm.disabled = false; btnDownload.disabled = false;
+                // Área dinâmica para formulário
+                ensureValidationPanel();
+            } catch(err){ console.error('Erro suite validação', err); statusEl.textContent='Erro'; btnRun.textContent='Erro'; btnRun.disabled=false; }
+        };
+        btnForm.onclick = async ()=>{
+            try { const mod = await import(`../lib/audio/validation/validation-suite.js?c=${Date.now()}`); ensureValidationPanel(); mod.renderSubjectiveForm('validationPanelInner'); statusEl.textContent='Formulário subjetivo aberto'; } catch(e){ console.warn(e); }
+        };
+        btnDownload.onclick = async ()=>{
+            try { const mod = await import(`../lib/audio/validation/validation-suite.js?c=${Date.now()}`); const rep = mod.generateValidationReport(); if(rep){ downloadObjectAsJson(rep, 'prodai_validation_report.json'); statusEl.textContent = rep?.subjective?.pctImproved!=null? `Subj ${(rep.subjective.pctImproved*100).toFixed(0)}%`:'Relatório gerado'; } } catch(e){ console.warn(e); }
+        };
+    }
+
+    function ensureValidationPanel(){
+        if (document.getElementById('validationPanel')) return;
+        const container = document.createElement('div');
+        container.id='validationPanel';
+        container.style.cssText='margin-top:12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:#0d141f;padding:10px 12px;';
+        container.innerHTML = `<div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:#9fc9ff;margin-bottom:6px;">Resultados da Validação</div><div id='validationPanelInner' style='font-size:11px;'></div>`;
+        const host = document.getElementById('modalTechnicalData');
+        if (host) host.appendChild(container);
+        // estilos mínimos tabela subjetiva
+        if (!document.getElementById('validationStyles')){
+            const st=document.createElement('style'); st.id='validationStyles'; st.textContent=`
+                .subjective-table{border-collapse:collapse;width:100%;margin-top:6px;font-size:11px;}
+                .subjective-table th,.subjective-table td{border:1px solid rgba(255,255,255,.08);padding:4px 6px;text-align:center;}
+                .subjective-table th{background:#132132;color:#c9e4ff;font-weight:500;letter-spacing:.4px;}
+                .subjective-table select{min-width:42px;}
+            `; document.head.appendChild(st);
+        }
+    }
+
+    function downloadObjectAsJson(obj, filename){
+        try { const blob = new Blob([JSON.stringify(obj,null,2)], {type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 250); } catch(e){ console.warn('download json fail', e); }
+    }
+
+// ===== Painel Resumo Inteligente (top 3 problemas + top 3 ações) =====
+function renderSmartSummary(analysis){
+    try {
+        if (!(typeof window !== 'undefined' && window.CAIAR_ENABLED) || !analysis) return '';
+        // Garantir plano explain (caso ainda não anexado)
+        if (!analysis.caiarExplainPlan && window.audioAnalyzer && typeof analysis === 'object') {
+            try {
+                // se módulo ainda não carregado, importar dinamicamente
+                if (!window.__CAIAR_EXPLAIN_LOADING__) {
+                    window.__CAIAR_EXPLAIN_LOADING__ = import('/lib/audio/features/caiar-explain.js?v=' + Date.now()).then(mod=>{
+                        if (mod && typeof mod.generateExplainPlan === 'function') mod.generateExplainPlan(analysis);
+                    }).catch(()=>null);
+                }
+            } catch {}
+        }
+        const problems = Array.isArray(analysis.problems) ? analysis.problems.slice(0,3) : [];
+        // Selecionar ações: usar passos do plano explain se existir, senão derivar das sugestões
+        let steps = (analysis.caiarExplainPlan && Array.isArray(analysis.caiarExplainPlan.passos)) ? analysis.caiarExplainPlan.passos.slice(0,6) : [];
+        if (steps.length === 0) {
+            const sugg = Array.isArray(analysis.suggestions) ? analysis.suggestions.slice() : [];
+            // Ordenar por prioridade se houver
+            sugg.sort((a,b)=> (a.priority||999)-(b.priority||999));
+            steps = sugg.slice(0,6).map((s,i)=>({
+                ordem:i+1,
+                titulo:s.message||'Ação',
+                acao:s.action||'',
+                porque:s.details||s.rationale? JSON.stringify(s.rationale):'Otimização recomendada',
+                condicao:s.condition||s.condicao||'Aplicar quando perceptível',
+                origem:s.source||s.type,
+                stem:s.targetStem||null,
+                parametroPrincipal: s.freqHz? (Math.round(s.freqHz)+' Hz'): (s.band||null)
+            }));
+        }
+        const topActions = steps.slice(0,3);
+        const clean = (v, fallback='') => {
+            if (v === null || v === undefined) return fallback;
+            if (typeof v === 'boolean') return fallback; // evita 'true'/'false' visíveis
+            const s = String(v).trim();
+            return s.length ? s : fallback;
+        };
+        const actionItems = topActions.map(a=>{
+            const titulo = clean(a.titulo, 'Ação');
+            const stemTxt = clean(a.stem, '');
+            const paramTxt = clean(a.parametroPrincipal, '');
+            const condTxt = clean(a.condicao, '');
+            const porqueTxt = clean(a.porque, 'Melhora coerência sonora.');
+            const stem = stemTxt ? `<span class="ss-stem">${stemTxt}</span>` : '';
+            const param = paramTxt ? `<span class="ss-param">${paramTxt}</span>` : '';
+            const cond = condTxt ? `<span class="ss-cond">${condTxt}</span>` : '';
+            const whyId = 'why_'+Math.random().toString(36).slice(2);
+            return `<div class="ss-action-item">
+                <div class="ss-line-main">
+                    <span class="ss-title">${titulo}</span>
+                    ${stem}
+                    ${param}
+                </div>
+                <div class="ss-line-meta">
+                    ${cond}
+                    <button type="button" class="ss-why-btn" data-why-target="${whyId}">Por que?</button>
+                </div>
+                <div class="ss-why" id="${whyId}">${porqueTxt}</div>
+            </div>`;
+        }).join('');
+        const problemItems = problems.map(p=>`<div class="ss-prob-item"><span class="ss-prob-msg">${p.message||''}</span></div>`).join('');
+        // Expand/Collapse container
+        const html = `<div class="smart-summary-card" id="smartSummaryCard">
+            <div class="ss-header">
+                <div class="ss-title-block">⚡ Resumo Inteligente</div>
+                <button type="button" class="ss-toggle" data-expanded="true">Colapsar</button>
+            </div>
+            <div class="ss-content" data-collapsible="body">
+                <div class="ss-section">
+                    <div class="ss-section-title">Top 3 Problemas</div>
+                    ${problemItems || '<div class="ss-empty">Nenhum problema crítico</div>'}
+                </div>
+                <div class="ss-section">
+                    <div class="ss-section-title">Top 3 Ações</div>
+                    ${actionItems || '<div class="ss-empty">Nenhuma ação prioritária</div>'}
+                </div>
+                <div class="ss-hint">Execute as ações na ordem. Tempo de entendimento < 30s.</div>
+            </div>
+        </div>`;
+        // Injetar estilos apenas uma vez
+        if (!document.getElementById('smartSummaryStyles')) {
+            const st = document.createElement('style');
+            st.id = 'smartSummaryStyles';
+            st.textContent = `
+            .smart-summary-card{margin:12px 0 4px 0;padding:14px 16px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:linear-gradient(145deg,#0f1623,#101b2e);box-shadow:0 4px 14px -4px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,0.03);font-size:13px;}
+            .smart-summary-card .ss-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+            .smart-summary-card .ss-title-block{font-weight:600;letter-spacing:.5px;color:#e5f1ff;font-size:13px;}
+            .smart-summary-card .ss-toggle{background:#18263a;color:#d2e6ff;border:1px solid #24364e;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;letter-spacing:.4px;transition:background .25s,border-color .25s;}
+            .smart-summary-card .ss-toggle:hover{background:#203148;}
+            .smart-summary-card .ss-section{margin-top:10px;}
+            .smart-summary-card .ss-section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:#86b4ff;margin-bottom:6px;}
+            .smart-summary-card .ss-prob-item{background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.25);padding:6px 8px;border-radius:8px;margin-bottom:6px;line-height:1.3;}
+            .smart-summary-card .ss-prob-item:last-child{margin-bottom:0;}
+            .smart-summary-card .ss-action-item{background:#152132;border:1px solid rgba(255,255,255,.08);padding:8px 10px;border-radius:10px;margin-bottom:8px;}
+            .smart-summary-card .ss-action-item:last-child{margin-bottom:0;}
+            .smart-summary-card .ss-line-main{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;}
+            .smart-summary-card .ss-title{font-weight:600;color:#fff;font-size:13px;}
+            .smart-summary-card .ss-stem{background:#24364e;color:#9ac9ff;padding:2px 6px;font-size:10px;border-radius:6px;letter-spacing:.4px;}
+            .smart-summary-card .ss-param{background:#1c2c44;color:#d6ecff;padding:2px 6px;font-size:10px;border-radius:6px;letter-spacing:.4px;}
+            .smart-summary-card .ss-cond{font-size:10px;background:#223347;color:#cfe8ff;padding:2px 6px;border-radius:6px;letter-spacing:.3px;}
+            .smart-summary-card .ss-line-meta{display:flex;align-items:center;gap:10px;}
+            .smart-summary-card .ss-why-btn{background:none;border:0;color:#53b4ff;font-size:11px;cursor:pointer;padding:0 2px;}
+            .smart-summary-card .ss-why{display:none;margin-top:6px;font-size:11px;line-height:1.4;background:#101c2b;padding:6px 8px;border:1px solid rgba(255,255,255,.05);border-radius:8px;color:#c7d8eb;}
+            .smart-summary-card .ss-why.open{display:block;}
+            .smart-summary-card .ss-hint{margin-top:10px;font-size:10px;opacity:.55;letter-spacing:.4px;}
+            .smart-summary-card .ss-empty{opacity:.6;font-size:12px;padding:4px 2px;}
+            .smart-summary-card[data-collapsed='true'] .ss-content{display:none;}
+            @media (max-width:560px){.smart-summary-card{padding:12px 12px;} .smart-summary-card .ss-title{font-size:12px;} }
+            `;
+            document.head.appendChild(st);
+            // Delegated listeners
+            document.addEventListener('click', (e)=>{
+                const btn = e.target.closest('.ss-toggle');
+                if (btn){
+                    const card = btn.closest('.smart-summary-card');
+                    const expanded = btn.getAttribute('data-expanded') === 'true';
+                    btn.setAttribute('data-expanded', expanded? 'false':'true');
+                    btn.textContent = expanded? 'Expandir':'Colapsar';
+                    if (expanded) card.setAttribute('data-collapsed','true'); else card.removeAttribute('data-collapsed');
+                }
+                const why = e.target.closest('.ss-why-btn');
+                if (why){
+                    const id = why.getAttribute('data-why-target');
+                    const block = document.getElementById(id);
+                    if (block){ block.classList.toggle('open'); }
+                }
+            }, { passive:true });
+        }
+        return html;
+    } catch (e) { console.warn('smart summary fail', e); return ''; }
 }
 
 function renderReferenceComparisons(analysis) {

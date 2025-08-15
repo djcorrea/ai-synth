@@ -10,9 +10,12 @@ class AudioAnalyzer {
     this.isAnalyzing = false;
     this._v2Loaded = false;
     this._v2LoadingPromise = null;
+  // CAIAR: log construção
+  try { (window.__caiarLog||function(){})('INIT','AudioAnalyzer instanciado'); } catch {}
     
     console.log('🎯 AudioAnalyzer V1 construído - ponte para V2');
     this._preloadV2();
+  this._pipelineVersion = 'CAIAR_PIPELINE_0.4';
   }
 
   // 🚀 Pre-carregar V2 imediatamente
@@ -75,6 +78,27 @@ class AudioAnalyzer {
   // 📁 Analisar arquivo de áudio
   async analyzeAudioFile(file) {
     const tsStart = new Date().toISOString();
+  const disableCache = (typeof window !== 'undefined' && window.DISABLE_ANALYSIS_CACHE === true);
+  // ====== CACHE POR HASH (somente leitura de conteúdo) ======
+  let fileHash = null;
+  try {
+    if (file && file.arrayBuffer) {
+      const buf = await file.arrayBuffer();
+      const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+      fileHash = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,40);
+      // Cache global
+      const cacheMap = (window.__AUDIO_ANALYSIS_CACHE__ = window.__AUDIO_ANALYSIS_CACHE__ || new Map());
+  if (!disableCache && cacheMap.has(fileHash)) {
+        const cached = cacheMap.get(fileHash);
+        try { (window.__caiarLog||function(){})('CACHE_HIT','Reuso análise por hash', { hash:fileHash, ageMs: Date.now()-cached._ts }); } catch {}
+        // Deep clone leve para evitar mutações externas
+        return JSON.parse(JSON.stringify(cached.analysis));
+      }
+      // Recriar FileReader usando buffer já lido (evitar reler)
+      file._cachedArrayBufferForHash = buf;
+    }
+  } catch(e){ try { (window.__caiarLog||function(){})('CACHE_HASH_ERROR','Falha gerar hash',{ err:e?.message}); } catch {} }
+  try { (window.__caiarLog||function(){})('INPUT','Arquivo recebido para análise', { name: file?.name, size: file?.size }); } catch {}
   if (window.DEBUG_ANALYZER === true) console.log('🛰️ [Telemetry] Front antes do fetch (modo local, sem fetch):', {
       route: '(client-only) audio-analyzer.js',
       method: 'N/A',
@@ -88,6 +112,24 @@ class AudioAnalyzer {
       await this.initializeAnalyzer();
     }
 
+    // Se já temos o ArrayBuffer (hash) podemos pular FileReader para reduzir latência
+    if (file._cachedArrayBufferForHash && file._cachedArrayBufferForHash.byteLength) {
+      try {
+        const directBuf = file._cachedArrayBufferForHash;
+        return await new Promise(async (resolve, reject)=>{
+          const timeout = setTimeout(()=> reject(new Error('Timeout decode (direct path)')), 30000);
+          try {
+            const audioBuffer = await this.audioContext.decodeAudioData(directBuf.slice(0));
+            clearTimeout(timeout);
+            const analysis = await this._pipelineFromDecodedBuffer(audioBuffer, file, { fileHash });
+            // Cache store
+            try { if (fileHash && !disableCache) { const cacheMap = (window.__AUDIO_ANALYSIS_CACHE__ = window.__AUDIO_ANALYSIS_CACHE__ || new Map()); cacheMap.set(fileHash, { analysis: JSON.parse(JSON.stringify(analysis)), _ts: Date.now() }); } } catch{}
+            resolve(analysis);
+          } catch(e){ clearTimeout(timeout); reject(e); }
+        });
+      } catch(e){ console.warn('Direct decode fallback para FileReader', e); }
+    }
+
     return new Promise((resolve, reject) => {
       // Timeout de 30 segundos
       const timeout = setTimeout(() => {
@@ -96,35 +138,104 @@ class AudioAnalyzer {
 
       const reader = new FileReader();
       
-      reader.onload = async (e) => {
+    reader.onload = async (e) => {
         try {
-          if (window.DEBUG_ANALYZER === true) console.log('� Decodificando áudio...');
-          const audioData = e.target.result;
-          const audioBuffer = await this.audioContext.decodeAudioData(audioData);
+      if (window.DEBUG_ANALYZER === true) console.log('� Decodificando áudio...');
+          let audioData = e.target.result;
+          if (!audioData && file._cachedArrayBufferForHash) audioData = file._cachedArrayBufferForHash;
+          const audioBuffer = await this.audioContext.decodeAudioData(audioData.slice ? audioData.slice(0) : audioData);
+          try { (window.__caiarLog||function(){})('DECODE_OK','Buffer decodificado', { duration: audioBuffer.duration, sr: audioBuffer.sampleRate, channels: audioBuffer.numberOfChannels }); } catch {}
+          // ===== Context Detector (BPM / Key / Densidade) =====
+          try {
+            const ctxMod = await import('/lib/audio/features/context-detector.js?v=' + Date.now()).catch(()=>null);
+            if (ctxMod && typeof ctxMod.detectAudioContext === 'function') {
+              const ctxRes = await ctxMod.detectAudioContext(audioBuffer, {});
+              if (ctxRes) {
+                // Expor sempre global (para uso futuro) sem alterar UI
+                try { if (typeof window !== 'undefined') window.__AUDIO_CONTEXT_DETECTION = ctxRes; } catch {}
+                // Só anexar ao objeto de análise quando CAIAR_ENABLED estiver ativo para evitar mudanças no objeto final padrão
+                if (typeof window !== 'undefined' && window.CAIAR_ENABLED) {
+                  (analysis || (analysis={}))._contextDetection = ctxRes;
+                }
+              }
+            }
+          } catch (ctxErr) { try { (window.__caiarLog||function(){})('CTX_INTEGRATION_ERROR','Erro integrando context detector', { error: ctxErr?.message||String(ctxErr) }); } catch {} }
           
           if (window.DEBUG_ANALYZER === true) console.log('🔬 Realizando análise completa...');
           // Análise completa do áudio (V1)
-          let analysis = this.performFullAnalysis(audioBuffer);
+          const t0Full = (performance&&performance.now)?performance.now():Date.now();
+          // Modo de qualidade: 'fast' ou 'full' (default 'full' se CAIAR_ENABLED e window.ANALYSIS_QUALITY!='fast')
+          const qualityMode = (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full' : 'fast';
+          let analysis = this.performFullAnalysis(audioBuffer, { qualityMode });
+          analysis.qualityMode = qualityMode;
+          try { (window.__caiarLog||function(){})('METRICS_V1_DONE','Métricas V1 calculadas', { keys: Object.keys(analysis.technicalData||{}) }); } catch {}
 
           // Enriquecimento Fase 2 (sem alterar UI): tenta carregar V2 e mapear novas métricas
           try {
+            try { (window.__caiarLog||function(){})('METRICS_V2_START','Enriquecimento Fase 2 iniciado'); } catch {}
             analysis = await this._enrichWithPhase2Metrics(audioBuffer, analysis, file);
+            try { (window.__caiarLog||function(){})('METRICS_V2_DONE','Enriquecimento Fase 2 concluído', { techKeys: Object.keys(analysis.technicalData||{}), suggestions: (analysis.suggestions||[]).length }); } catch {}
           } catch (enrichErr) {
             console.warn('⚠️ Falha ao enriquecer com métricas Fase 2:', enrichErr?.message || enrichErr);
+            try { (window.__caiarLog||function(){})('METRICS_V2_ERROR','Falha Fase 2', { error: enrichErr?.message||String(enrichErr) }); } catch {}
           }
+
+          // ===== Stems (bass/drums/vocals/other) – somente com CAIAR_ENABLED ativo =====
+          try {
+            if (typeof window !== 'undefined' && window.CAIAR_ENABLED) {
+              // Ajustar concorrência dinâmica se modo rápido
+              if (qualityMode === 'fast') { try { window.STEMS_MAX_CONCURRENCY = 1; } catch{} }
+              const { enqueueJob } = await import('/lib/audio/features/job-queue.js?v=' + Date.now()).catch(()=>({enqueueJob: null}));
+              (window.__caiarLog||function(){})('STEMS_CHAIN_START','Iniciando cadeia de stems');
+              const stemsMod = await import('/lib/audio/features/stems.js?v=' + Date.now()).catch(()=>null);
+              if (stemsMod && typeof stemsMod.separateStems === 'function') {
+                const jobFn = ()=> Promise.race([
+                  stemsMod.separateStems(audioBuffer, { quality: qualityMode }),
+                  new Promise(res=> setTimeout(()=>res({_timeout:true}), qualityMode==='fast'?40000:90000))
+                ]);
+                let stemsRes;
+                if (enqueueJob) {
+                  stemsRes = await enqueueJob(jobFn, { label:'stems:'+ (fileHash||file.name), priority: qualityMode==='fast'?4:2, timeoutMs: qualityMode==='fast'?45000:95000 });
+                } else {
+                  stemsRes = await jobFn();
+                }
+                if (stemsRes && !stemsRes._timeout) {
+                  try { if (typeof window !== 'undefined') window.__LAST_STEMS = stemsRes; } catch {}
+                  analysis._stems = {
+                    method: stemsRes.method,
+                    totalMs: stemsRes.totalMs,
+                    metrics: stemsRes.metrics
+                  };
+                  // Construir matriz de análise (mix + stems) antes de descartar buffers pesados
+                  try {
+                    this._computeAnalysisMatrix(audioBuffer, analysis, stemsRes.stems);
+                  } catch (mxErr) { (window.__caiarLog||function(){})('MATRIX_ERROR','Falha construir analysis_matrix', { error: mxErr?.message||String(mxErr) }); }
+                  (window.__caiarLog||function(){})('STEMS_CHAIN_DONE','Stems anexados', { ms: stemsRes.totalMs, method: stemsRes.method });
+                  // Liberar referências de buffers crus para GC (não anexar à análise principal)
+                  try { stemsRes.stems = null; } catch {}
+                } else if (stemsRes && stemsRes._timeout) {
+                  (window.__caiarLog||function(){})('STEMS_TIMEOUT','Timeout stems (>90s)');
+                  // Mesmo sem stems, ainda podemos gerar matriz apenas do mix
+                  try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch {}
+                } else {
+                  (window.__caiarLog||function(){})('STEMS_FALLBACK','Stems não disponíveis');
+                  try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch {}
+                }
+              }
+              else {
+                // Sem módulo de stems: ainda gerar matriz do mix
+                try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch {}
+              }
+            }
+          } catch (stErr) { (window.__caiarLog||function(){})('STEMS_CHAIN_ERROR','Erro cadeia stems', { error: stErr?.message||String(stErr) }); }
           
           clearTimeout(timeout);
-          if (window.DEBUG_ANALYZER === true) console.log('✅ Análise concluída com sucesso!');
-          // Telemetria pós-json: chaves de 1º nível
-          try {
-            const topKeys = analysis ? Object.keys(analysis) : [];
-            const techKeys = analysis?.technicalData ? Object.keys(analysis.technicalData) : [];
-            if (window.DEBUG_ANALYZER === true) console.log('🛰️ [Telemetry] Front após "json" (obj pronto):', { topLevelKeys: topKeys, technicalKeys: techKeys });
-          } catch {}
-          resolve(analysis);
+          const finalAnalysis = await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache });
+          resolve(finalAnalysis);
         } catch (error) {
           clearTimeout(timeout);
           console.error('❌ Erro na decodificação:', error);
+          try { (window.__caiarLog||function(){})('DECODE_ERROR','Erro ao decodificar', { error: error?.message||String(error) }); } catch {}
           reject(new Error(`Erro ao decodificar áudio: ${error.message}`));
         }
       };
@@ -135,10 +246,77 @@ class AudioAnalyzer {
         reject(new Error('Erro ao ler arquivo de áudio'));
       };
       
-      reader.readAsArrayBuffer(file);
+      if (file._cachedArrayBufferForHash) {
+        // se já temos o buffer (por hashing), simular FileReader concluído
+        setTimeout(()=> reader.onload({ target: { result: file._cachedArrayBufferForHash } }), 0);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
     });
   }
 
+  async _pipelineFromDecodedBuffer(audioBuffer, file, { fileHash }) {
+    const t0Full = (performance&&performance.now)?performance.now():Date.now();
+    // Replicação da lógica existente (refatorada para reutilização)
+    // Context + V1 + Phase2 + Stems + Matrix
+    let analysis = this.performFullAnalysis(audioBuffer, { qualityMode: (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast' });
+    analysis.qualityMode = analysis.qualityMode || ((window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast');
+    try { (window.__caiarLog||function(){})('METRICS_V1_DONE','Métricas V1 calculadas(direct)'); } catch {}
+    try {
+      analysis = await this._enrichWithPhase2Metrics(audioBuffer, analysis, file);
+    } catch(e){ (window.__caiarLog||function(){})('METRICS_V2_ERROR','Falha Fase 2 direct',{err:e?.message}); }
+    // Stems (respeitar duração para evitar travamento)
+    try {
+      if (typeof window !== 'undefined' && window.CAIAR_ENABLED) {
+        const dur = audioBuffer.duration;
+        if (window.STEMS_MODE === 'off' || dur > (window.STEMS_MAX_DURATION_SEC||360)) {
+          (window.__caiarLog||function(){})('STEMS_SKIP','Stems pulados',{duration:dur});
+          try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch{}
+        } else {
+          const { enqueueJob } = await import('/lib/audio/features/job-queue.js?v=' + Date.now()).catch(()=>({enqueueJob:null}));
+          const stemsMod = await import('/lib/audio/features/stems.js?v=' + Date.now()).catch(()=>null);
+          if (stemsMod && stemsMod.separateStems) {
+            const qualityMode = analysis.qualityMode;
+            const jobFn = ()=> Promise.race([
+              stemsMod.separateStems(audioBuffer, { quality: qualityMode }),
+              new Promise(res=> setTimeout(()=>res({_timeout:true}), qualityMode==='fast'?40000:90000))
+            ]);
+            const stemsRes = enqueueJob? await enqueueJob(jobFn,{label:'stems:'+ (fileHash||file?.name), priority: qualityMode==='fast'?4:2, timeoutMs: qualityMode==='fast'?45000:95000 }): await jobFn();
+            if (stemsRes && !stemsRes._timeout) {
+              analysis._stems = { method: stemsRes.method, totalMs: stemsRes.totalMs, metrics: stemsRes.metrics };
+              try { this._computeAnalysisMatrix(audioBuffer, analysis, stemsRes.stems); } catch{}
+            } else {
+              try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch{}
+            }
+          }
+        }
+      }
+    } catch(e){ (window.__caiarLog||function(){})('STEMS_CHAIN_ERROR','Erro stems direct',{err:e?.message}); }
+    return await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache: (typeof window!=='undefined' && window.DISABLE_ANALYSIS_CACHE) });
+  }
+
+  async _finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache }) {
+    try {
+      const t1Full=(performance&&performance.now)?performance.now():Date.now();
+      (window.__caiarLog||function(){})('OUTPUT','Análise final pronta', { totalMs: +(t1Full - t0Full).toFixed(1), problems: (analysis.problems||[]).length, suggestions: (analysis.suggestions||[]).length, scorePct: analysis.mixScorePct });
+    } catch {}
+    try { analysis.pipelineVersion = this._pipelineVersion; } catch {}
+    if (fileHash && !disableCache) {
+      try {
+        const cacheMap = (window.__AUDIO_ANALYSIS_CACHE__ = window.__AUDIO_ANALYSIS_CACHE__ || new Map());
+        cacheMap.set(fileHash, { analysis: JSON.parse(JSON.stringify(analysis)), _ts: Date.now() });
+        if (cacheMap.size > 30) {
+          const keys = Array.from(cacheMap.keys());
+            for (let i=0;i<keys.length-30;i++) cacheMap.delete(keys[i]);
+        }
+        (window.__caiarLog||function(){})('CACHE_STORE','Análise salva em cache',{hash:fileHash});
+      } catch{}
+    }
+    return analysis;
+  }
+
+
+// (utilitário de invalidação de cache movido para após o fechamento da classe)
   // 🔌 Enriquecer com métricas da Fase 2 usando motor V2 (já pré-carregado)
   async _enrichWithPhase2Metrics(audioBuffer, baseAnalysis, fileRef) {
     const __DEBUG_ANALYZER__ = (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true);
@@ -254,10 +432,23 @@ class AudioAnalyzer {
     setIfValid('lufsMomentary', loud.lufs_momentary, 'v2:loudness');
           // ===== Pontuação final (Mix Scoring) =====
           try {
+            // Reference Matcher (antes do score) – gera adaptiveReference sem quebrar a referência atual
+            try {
+              if (typeof window !== 'undefined' && window.CAIAR_ENABLED) {
+                const refMatchMod = await import('/lib/audio/features/reference-matcher.js?v=' + Date.now()).catch(()=>null);
+                if (refMatchMod && typeof refMatchMod.applyAdaptiveReference === 'function') {
+                  refMatchMod.applyAdaptiveReference(baseAnalysis);
+                }
+              }
+            } catch (rmErr) { (window.__caiarLog||function(){})('REF_MATCH_INTEGRATION_ERROR','Erro matcher', { error: rmErr?.message||String(rmErr) }); }
             const enableScoring = (typeof window === 'undefined' || window.ENABLE_MIX_SCORING !== false);
             if (enableScoring) {
               let activeRef = null;
-              try { activeRef = (typeof window !== 'undefined' && window.PROD_AI_REF_DATA) ? window.PROD_AI_REF_DATA : null; } catch {}
+              try {
+                if (typeof window !== 'undefined') {
+                  activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null;
+                }
+              } catch {}
               let scorerMod = null;
               try { scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null); } catch {}
               if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
@@ -278,11 +469,74 @@ class AudioAnalyzer {
                   if (scoreRes.highlights?.needsAttention) {
                     for (const key of scoreRes.highlights.needsAttention) {
                       if (!sug.some(s => s && s.type === 'score_attention' && s.metric === key)) {
-                        sug.push({ type: 'score_attention', metric: key, message: `Métrica '${key}' abaixo do ideal para subir de nível`, action: 'Ajuste processamento (EQ/dinâmica) para alinhar à referência' });
+                        sug.push({ type: 'score_attention', metric: key, message: `Métrica '${key}' abaixo do ideal para subir de nível`, action: 'Ajuste processamento (EQ/dinâmica) para alinhar à referência', source: 'score:v2' });
                       }
                     }
                   }
                 } catch {}
+                // Reconciliação de sugestões (remover conflitos e duplicatas) se não desativada
+                try {
+                  if (typeof window === 'undefined' || window.SUGGESTION_RECONCILE !== false) {
+                    baseAnalysis.suggestions = (function reconcileSuggestions(a){
+                      const list = Array.isArray(a.suggestions)? a.suggestions.slice():[];
+                      const byType = new Map();
+                      const keep = [];
+                      for (const s of list) {
+                        if (!s || typeof s !== 'object') continue;
+                        const key = s.type + '|' + (s.metric||'');
+                        if (!byType.has(key)) { byType.set(key, s); keep.push(s); }
+                        else {
+                          // Preferir score_attention sobre genérica, e sugestões com source 'score:' ou 'v2:' sobre 'v1:'
+                          const prev = byType.get(key);
+                          const rank = (x)=> /score:/.test(x.source||'') ? 3 : (/v2:/.test(x.source||'')?2:(/v1:/.test(x.source||'')?1:0));
+                          if (rank(s) > rank(prev)) { const idx = keep.indexOf(prev); if (idx>=0) keep[idx]=s; byType.set(key,s); }
+                        }
+                      }
+                      // Remover combinações ilógicas: ex: low_end_excess & bass_deficient simultâneos
+                      const types = new Set(keep.map(s=>s.type));
+                      const removeSet = new Set();
+                      if (types.has('low_end_excess') && types.has('bass_deficient')) {
+                        // Escolher o que tem source mais confiável
+                        const choose = (t)=> keep.filter(s=>s.type===t).sort((a,b)=> (b.source||'').localeCompare(a.source||''))[0];
+                        const chosen = choose('low_end_excess').message.length >= choose('bass_deficient').message.length ? 'low_end_excess':'bass_deficient';
+                        for (const s of keep) if (s.type !== chosen && (s.type==='low_end_excess'||s.type==='bass_deficient')) removeSet.add(s);
+                      }
+                      return keep.filter(s=>!removeSet.has(s));
+                    })(baseAnalysis);
+                  }
+                } catch (recErr) { if (window.DEBUG_ANALYZER) console.warn('Reconciliação sugestões falhou', recErr); }
+                // ===== Contextual Rules Engine (CAIAR) =====
+                try {
+                  if (typeof window !== 'undefined' && window.CAIAR_ENABLED) {
+                    (window.__caiarLog||function(){})('RULES_START','Invocando rules-engine contextual');
+                    const rulesMod = await import('/lib/audio/features/rules-engine.js?v=' + Date.now()).catch(()=>null);
+                    if (rulesMod && typeof rulesMod.generateContextualCorrections === 'function') {
+                      const before = (baseAnalysis.suggestions||[]).length;
+                      rulesMod.generateContextualCorrections(baseAnalysis);
+                      const after = (baseAnalysis.suggestions||[]).length;
+                      (window.__caiarLog||function(){})('RULES_APPLIED','Rules-engine aplicado', { before, after });
+                      // Snapshot opcional para UI futura sem alterar layout legado
+                      try { baseAnalysis.suggestionsSnapshot = baseAnalysis.suggestions.slice(); } catch {}
+                      // ===== CAIAR Explain (plano de ação auditivo) =====
+                      try {
+                        (window.__caiarLog||function(){})('EXPLAIN_INVOKE','Gerando plano de ação');
+                        const explainMod = await import('/lib/audio/features/caiar-explain.js?v=' + Date.now()).catch(()=>null);
+                        if (explainMod && typeof explainMod.generateExplainPlan === 'function') {
+                          explainMod.generateExplainPlan(baseAnalysis);
+                          (window.__caiarLog||function(){})('EXPLAIN_ATTACHED','Plano anexado', { passos: baseAnalysis.caiarExplainPlan?.totalPassos });
+                        } else {
+                          (window.__caiarLog||function(){})('EXPLAIN_MODULE_MISSING','Módulo explain ausente');
+                        }
+                      } catch (exErr) {
+                        (window.__caiarLog||function(){})('EXPLAIN_ERROR','Falha explain', { error: exErr?.message||String(exErr) });
+                      }
+                    } else {
+                      (window.__caiarLog||function(){})('RULES_MODULE_MISSING','Módulo rules-engine indisponível');
+                    }
+                  }
+                } catch (reErr) {
+                  (window.__caiarLog||function(){})('RULES_ERROR','Falha rules-engine', { error: reErr?.message||String(reErr) });
+                }
               }
             }
           } catch (esc) { if (debug) console.warn('⚠️ Scoring falhou:', esc?.message || esc); }
@@ -540,6 +794,8 @@ class AudioAnalyzer {
 
   // 🔬 Realizar análise completa
   performFullAnalysis(audioBuffer) {
+  const _caiarLog = (window && window.__caiarLog) ? window.__caiarLog : function(){};
+  _caiarLog('METRICS_V1_START','Iniciando cálculo métricas V1', { duration: audioBuffer?.duration, sr: audioBuffer?.sampleRate });
     const analysis = {
       duration: audioBuffer.duration,
       sampleRate: audioBuffer.sampleRate,
@@ -602,7 +858,10 @@ class AudioAnalyzer {
     analysis.technicalData.dynamicRange = this.calculateDynamicRange(leftChannel);
     // 🔬 Nova métrica de dinâmica estatística (dr_stat) – não substitui dynamicRange legacy
     try {
-      const enableDRRedef = (typeof window !== 'undefined') && window.AUDIT_MODE === true && window.DR_REDEF !== false;
+      const enableDRRedef = (typeof window !== 'undefined') && (
+        (window.AUDIT_MODE === true && window.DR_REDEF !== false) ||
+        window.FORCE_SCORING_V2 === true || window.AUTO_SCORING_V2 === true
+      );
       if (enableDRRedef && !analysis.technicalData.dr_stat) {
         const sampleRate = audioBuffer.sampleRate || 48000;
         const winMs = 300; const hopMs = 100;
@@ -700,6 +959,7 @@ class AudioAnalyzer {
 
     // 💡 Gerar Sugestões Técnicas
     this.generateTechnicalSuggestions(analysis);
+  try { (window.__caiarLog||function(){})('SUGGESTIONS_V1_DONE','Sugestões V1 geradas', { count: (analysis.suggestions||[]).length }); } catch {}
 
     // 🔒 Validação final dos arrays essenciais
     analysis.problems = Array.isArray(analysis.problems) ? analysis.problems : [];
@@ -917,6 +1177,7 @@ class AudioAnalyzer {
 
   // 💡 Gerar sugestões técnicas
   generateTechnicalSuggestions(analysis) {
+  try { (window.__caiarLog||function(){})('SUGGESTIONS_V1_START','Gerando sugestões V1'); } catch {}
     const { peak, rms, dominantFrequencies, spectralCentroid, lufsIntegrated } = analysis.technicalData;
 
     // Sugestões baseadas no LUFS integrado real (quando disponível)
@@ -1055,6 +1316,11 @@ class AudioAnalyzer {
         action: `Optimize a faixa ${Math.round(funkKickRange[0].frequency)}Hz para mais punch`
       });
     }
+    // Tag de origem v1 se ainda não marcada
+    try {
+      analysis.suggestions = (analysis.suggestions||[]).map(s=> (s && typeof s==='object' && !s.source) ? ({...s, source:'v1:rules'}) : s);
+    } catch {}
+  try { (window.__caiarLog||function(){})('SUGGESTIONS_V1_POST','Sugestões V1 pós-processadas', { total: (analysis.suggestions||[]).length }); } catch {}
   }
 
   // 🎯 Gerar prompt personalizado para IA
@@ -1086,9 +1352,10 @@ class AudioAnalyzer {
       prompt += `\n`;
     }
 
-    if (analysis.suggestions.length > 0) {
-      prompt += `💡 SUGESTÕES AUTOMÁTICAS:\n`;
-      analysis.suggestions.forEach(suggestion => {
+    const sugList = analysis.suggestionsSnapshot || analysis.suggestions || [];
+    if (sugList.length > 0) {
+      prompt += `💡 SUGESTÕES AUTOMÁTICAS (snapshot reconciliado):\n`;
+      sugList.forEach(suggestion => {
         prompt += `• ${suggestion.message}\n`;
         prompt += `  Ação: ${suggestion.action}\n`;
       });
@@ -1102,9 +1369,143 @@ class AudioAnalyzer {
     prompt += `Se o volume está inadequado, me diga os valores exatos de compressão e limitação para corrigir.`;
 
   // ⚠️ Regra obrigatória para reforçar uso dos dados do JSON na resposta da IA
-  prompt += `\n\n⚠️ REGRA OBRIGATÓRIA: Use obrigatoriamente todos os valores de Peak, RMS, Dinâmica e Frequências Dominantes fornecidos no JSON para criar recomendações técnicas reais e específicas de EQ, compressão, limitação, saturação e outros processamentos. Sempre inclua valores exatos nas recomendações.`;
+  prompt += `\n\n⚠️ REGRAS OBRIGATÓRIAS:\n`;
+  prompt += `1. Use TODOS os valores de Peak, RMS, Dinâmica (dynamicRange e dr_stat se existir), LUFS, True Peak, LRA, THD (se houver), centroid e frequências dominantes.\n`;
+  prompt += `2. NÃO contradiga as sugestões listadas; apenas complemente com [EXTRA] se necessário e justifique com dados.\n`;
+  prompt += `3. Sempre forneça valores numéricos específicos (dB, Hz, ratios, ms).\n`;
+  prompt += `4. Se uma métrica estiver fora do alvo, priorize ações que movam ela para dentro da tolerância.\n`;
+  try {
+    const attach = {
+      mixScore: analysis.mixScore?.scorePct,
+      classification: analysis.mixScore?.classification,
+      scoreMode: analysis.mixScore?.scoreMode,
+      categories: analysis.mixScore?.categories,
+      perMetric: analysis.mixScore?.perMetric?.slice(0,40),
+      suggestions: (analysis.suggestionsSnapshot||analysis.suggestions)||[],
+      problems: analysis.problems||[],
+      technical: {
+        peak: analysis.technicalData.peak,
+        rms: analysis.technicalData.rms,
+        dynamicRange: analysis.technicalData.dynamicRange,
+        dr_stat: analysis.technicalData.dr_stat,
+        lufsIntegrated: analysis.technicalData.lufsIntegrated,
+        lra: analysis.technicalData.lra,
+        truePeakDbtp: analysis.technicalData.truePeakDbtp,
+        spectralCentroid: analysis.technicalData.spectralCentroid,
+        thdPercent: analysis.technicalData.thdPercent,
+        dcOffset: analysis.technicalData.dcOffset
+      }
+    };
+    prompt += `\n\n### BLOCO_ESTRUTURADO_JSON\n` + JSON.stringify(attach, null, 2) + `\n### FIM_BLOCO_JSON`;
+  } catch {}
 
     return prompt;
+  }
+
+  // ====== MATRIX: Métricas por banda e por stem (aprox) ======
+  _computeAnalysisMatrix(mainBuffer, analysis, stemBuffersOrNull) {
+    if (typeof window === 'undefined' || !window.CAIAR_ENABLED) return; // somente modo CAIAR
+    const log = window.__caiarLog||function(){};
+    log('MATRIX_START','Construindo analysis_matrix');
+    const bandsDef = {
+      sub: [20,60],
+      low: [60,250],
+      mid: [250,4000],
+      high: [4000,12000]
+    };
+    const maxSeconds = 30; // limitar custo
+    const procWindow = 2048;
+    const hop = 1024;
+    const toDb = v=> v>0 ? 20*Math.log10(v) : -Infinity;
+    const percentile = (arr,p)=> { if(!arr.length) return null; const a=arr.slice().sort((x,y)=>x-y); const i=Math.min(a.length-1, Math.max(0, Math.floor(p*(a.length-1)))); return a[i]; };
+    const processBuffer = (buf)=> {
+      try {
+        const sr = buf.sampleRate||48000;
+        const lenLimit = Math.min(buf.length, sr*maxSeconds);
+        const chL = buf.getChannelData(0);
+        const chR = buf.numberOfChannels>1 ? buf.getChannelData(1) : chL;
+        // Mid channel simplificado
+        const mid = new Float32Array(lenLimit);
+        for (let i=0;i<lenLimit;i++) mid[i] = 0.5*(chL[i]+chR[i]);
+        // Janelas FFT
+        const bandEnergyTotal = {}; const bandWindowEnergies = {}; const bandMaxEnergy = {}; const bandWindowRmsDbSeries = {};
+        Object.keys(bandsDef).forEach(b=> { bandEnergyTotal[b]=0; bandWindowEnergies[b]=[]; bandMaxEnergy[b]=0; bandWindowRmsDbSeries[b]=[]; });
+        for (let start=0; start+procWindow<=lenLimit; start+=hop) {
+          const slice = mid.subarray(start, start+procWindow);
+            const spec = this.simpleFFT ? this.simpleFFT(slice) : [];
+            const half = spec.length/2;
+            if (!half) continue;
+            const binHz = (sr/procWindow);
+            // Convert spec to magnitude (if complex output assumed real-imag pairs we need adaptation; aqui simpleFFT retorna magnitudes já no código existente)
+            for (const [band, [fLo,fHi]] of Object.entries(bandsDef)) {
+              let e = 0; let bins=0;
+              const kStart = Math.max(1, Math.floor(fLo / binHz));
+              const kEnd = Math.min(half-1, Math.floor(fHi / binHz));
+              for (let k=kStart; k<=kEnd; k++) { const m = spec[k]; if (Number.isFinite(m)) { e += m*m; bins++; } }
+              if (bins>0) {
+                bandEnergyTotal[band] += e;
+                if (e > bandMaxEnergy[band]) bandMaxEnergy[band] = e;
+                bandWindowEnergies[band].push(e);
+                const rms = Math.sqrt(e / Math.max(1,bins));
+                bandWindowRmsDbSeries[band].push(toDb(rms));
+              }
+            }
+        }
+        const outBands = {};
+        for (const band of Object.keys(bandsDef)) {
+          const energies = bandWindowEnergies[band];
+          if (!energies.length) { outBands[band] = null; continue; }
+          const totalE = bandEnergyTotal[band];
+          const maxE = bandMaxEnergy[band];
+          const meanE = totalE / energies.length;
+          const rms = Math.sqrt(meanE / (procWindow/2)); // normalização aproximada
+          const peakAmp = Math.sqrt(maxE / (procWindow/2));
+          const rmsDb = toDb(rms);
+          const peakDb = toDb(peakAmp);
+          const crest = Number.isFinite(rmsDb) && Number.isFinite(peakDb) ? parseFloat((peakDb - rmsDb).toFixed(2)) : null;
+          const series = bandWindowRmsDbSeries[band].filter(v=>Number.isFinite(v));
+          const p95 = percentile(series,0.95); const p10 = percentile(series,0.10);
+          const lraApprox = (Number.isFinite(p95) && Number.isFinite(p10)) ? parseFloat((p95-p10).toFixed(2)) : null;
+          const stWindows = series.slice(-3);
+          const stMean = stWindows.length? (stWindows.reduce((a,b)=>a+b,0)/stWindows.length): null;
+          outBands[band] = {
+            rmsDb: Number.isFinite(rmsDb)? parseFloat(rmsDb.toFixed(2)) : null,
+            truePeakDbtpApprox: Number.isFinite(peakDb)? parseFloat(peakDb.toFixed(2)) : null,
+            crestFactor: crest,
+            lraApprox,
+            lufsIntegratedApprox: Number.isFinite(rmsDb)? parseFloat(rmsDb.toFixed(2)) : null,
+            lufsShortTermApprox: Number.isFinite(stMean)? parseFloat(stMean.toFixed(2)) : null,
+            windows: energies.length
+          };
+        }
+        // Overall metrics (reuse existing if available)
+        let overall = {};
+        try {
+          const td = analysis.technicalData||{};
+          overall = {
+            lufsIntegrated: td.lufsIntegrated ?? null,
+            lufsShortTerm: td.lufsShortTerm ?? null,
+            truePeakDbtp: td.truePeakDbtp ?? null,
+            crestFactor: td.crestFactor ?? (Number.isFinite(td.peak) && Number.isFinite(td.rms)? parseFloat((td.peak-td.rms).toFixed(2)) : null),
+            lra: td.lra ?? null
+          };
+        } catch {}
+        return { bands: outBands, overall };
+      } catch (e) { log('MATRIX_BUFFER_ERROR','Erro processando buffer', { error: e?.message||String(e) }); return null; }
+    };
+    const stems = {};
+    // Mix principal
+    stems.mix = processBuffer(mainBuffer);
+    if (stemBuffersOrNull && typeof stemBuffersOrNull === 'object') {
+      for (const [k,buf] of Object.entries(stemBuffersOrNull)) {
+        if (buf) stems[k] = processBuffer(buf);
+      }
+    }
+    analysis.analysis_matrix = {
+      stems,
+      meta: { version: '1.0.0', bands: bandsDef, approximations: true, generatedAt: new Date().toISOString() }
+    };
+    log('MATRIX_DONE','analysis_matrix pronta', { stems: Object.keys(stems).length });
   }
 }
 
@@ -1144,6 +1545,18 @@ async function sendAudioAnalysisToChat(prompt, analysis) {
 }
 
 console.log('🎵 Audio Analyzer carregado com sucesso!');
+
+// Utilitário global para invalidar cache manualmente (fora da classe)
+if (typeof window !== 'undefined' && !window.invalidateAudioAnalysisCache) {
+  window.invalidateAudioAnalysisCache = function(){
+    try {
+      const map = window.__AUDIO_ANALYSIS_CACHE__;
+      if (map && typeof map.clear === 'function') map.clear();
+      (window.__caiarLog||function(){})('CACHE_INVALIDATE','Cache de análises limpo manualmente');
+      console.log('[AudioAnalyzer] Cache limpo. Próxima análise será recalculada.');
+    } catch(e){ console.warn('Falha ao invalidar cache', e); }
+  };
+}
 
 // === Extensão: análise direta de AudioBuffer (uso interno / testes) ===
 if (!AudioAnalyzer.prototype.analyzeAudioBufferDirect) {
@@ -1467,10 +1880,30 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                 // Usar valor normalizado se disponível
                 const refTarget = (refBandTargetsNormalized && Number.isFinite(refBandTargetsNormalized[band])) ? refBandTargetsNormalized[band] : refBand.target_db;
                 const diff = data.rms_db - refTarget;
-                const outOfRange = Math.abs(diff) > refBand.tol_db;
+                // Suporte a tolerância assimétrica: tol_min / tol_max. Compat: usar tol_db se não existirem.
+                const tolMin = Number.isFinite(refBand.tol_min) ? refBand.tol_min : refBand.tol_db;
+                const tolMax = Number.isFinite(refBand.tol_max) ? refBand.tol_max : refBand.tol_db;
+                const highLimit = refTarget + tolMax;
+                const lowLimit = refTarget - tolMin;
+                let status = 'OK';
+                if (data.rms_db < lowLimit) status = 'BAIXO'; else if (data.rms_db > highLimit) status = 'ALTO';
+                const outOfRange = status !== 'OK';
                 if (outOfRange) {
-                  const direction = diff > 0 ? 'reduzir' : 'aumentar';
-                  const action = diff > 0 ? `Cortar ${band} em ~${Math.abs(diff).toFixed(1)}dB (target ${refTarget.toFixed(1)}±${refBand.tol_db})` : `Boost ${band} em ~${Math.abs(diff).toFixed(1)}dB`;
+                  const direction = status === 'ALTO' ? 'reduzir' : 'aumentar';
+                  const baseMag = Math.abs(diff);
+                  const sideTol = diff > 0 ? tolMax : tolMin;
+                  const n = sideTol>0 ? baseMag / sideTol : 0;
+                  const severity = n <= 1 ? 'leve' : (n <= 2 ? 'media' : 'alta');
+                  let action;
+                  if (status === 'ALTO') {
+                    // Mensagens diferenciadas para bandas específicas de aspereza/brilho/presença
+                    if (band === 'high_mid') action = `High-mid acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${Math.min(baseMag, sideTol).toFixed(1)} dB em 2–6 kHz`;
+                    else if (band === 'brilho') action = `Brilho/agudos acima do alvo (+${baseMag.toFixed(1)}dB). Aplique shelf suave >8–10 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
+                    else if (band === 'presenca') action = `Presença acima do ideal (+${baseMag.toFixed(1)}dB). Suavize 3–6 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
+                    else action = `Cortar ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB (target ${refTarget.toFixed(1)} +${tolMax} / -${tolMin})`;
+                  } else {
+                    action = diff > 0 ? `Cortar ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB` : `Boost ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB`;
+                  }
                   const key = `band:${band}`;
                   if (!existingKeys.has(key)) {
                     // Acrescentar faixa sugerida (Hz) nos detalhes, usando definição das bandas
@@ -1479,9 +1912,9 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                     sug.push({
                       type: 'band_adjust',
                       _bandKey: key,
-                      message: `Banda ${band} fora do alvo (${data.rms_db.toFixed(1)}dB vs ${refTarget.toFixed(1)}dB)` ,
+                      message: status === 'ALTO' ? `Banda ${band} acima do ideal` : `Banda ${band} abaixo do ideal`,
                       action,
-                      details: `Diferença ${diff>0?'+':''}${diff.toFixed(2)}dB | tolerância ±${refBand.tol_db}${rangeTxt}${refBandTargetsNormalized?' • escala normalizada':''}`
+                      details: `Valor ${data.rms_db.toFixed(2)}dB vs alvo ${refTarget.toFixed(2)}dB | dif ${diff>0?'+':''}${diff.toFixed(2)}dB | limites [${(refTarget-tolMin).toFixed(2)}, ${(refTarget+tolMax).toFixed(2)}] (${severity})${rangeTxt}${refBandTargetsNormalized?' • escala normalizada':''}`
                     });
                     existingKeys.add(key);
                     addedCount++;
