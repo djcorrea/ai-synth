@@ -252,6 +252,40 @@ class AudioAnalyzer {
     setIfValid('lufsIntegrated', loud.lufs_integrated, 'v2:loudness');
     setIfValid('lufsShortTerm', loud.lufs_short_term, 'v2:loudness');
     setIfValid('lufsMomentary', loud.lufs_momentary, 'v2:loudness');
+          // ===== Pontuação final (Mix Scoring) =====
+          try {
+            const enableScoring = (typeof window === 'undefined' || window.ENABLE_MIX_SCORING !== false);
+            if (enableScoring) {
+              let activeRef = null;
+              try { activeRef = (typeof window !== 'undefined' && window.PROD_AI_REF_DATA) ? window.PROD_AI_REF_DATA : null; } catch {}
+              let scorerMod = null;
+              try { scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null); } catch {}
+              if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
+                const scoreRes = scorerMod.computeMixScore(td, activeRef);
+                baseAnalysis.mixScore = scoreRes;
+                baseAnalysis.mixClassification = scoreRes.classification;
+                baseAnalysis.mixScorePct = scoreRes.scorePct;
+                try {
+                  if (typeof window !== 'undefined') {
+                    window.__LAST_FULL_ANALYSIS = baseAnalysis;
+                    if (window.DEBUG_SCORE === true) {
+                      console.log('[ANALYSIS] mixScorePct=', scoreRes.scorePct, 'mode=' + scoreRes.scoreMode, 'metrics=', scoreRes.perMetric?.length);
+                    }
+                  }
+                } catch {}
+                try {
+                  const sug = baseAnalysis.suggestions = Array.isArray(baseAnalysis.suggestions) ? baseAnalysis.suggestions : [];
+                  if (scoreRes.highlights?.needsAttention) {
+                    for (const key of scoreRes.highlights.needsAttention) {
+                      if (!sug.some(s => s && s.type === 'score_attention' && s.metric === key)) {
+                        sug.push({ type: 'score_attention', metric: key, message: `Métrica '${key}' abaixo do ideal para subir de nível`, action: 'Ajuste processamento (EQ/dinâmica) para alinhar à referência' });
+                      }
+                    }
+                  }
+                } catch {}
+              }
+            }
+          } catch (esc) { if (debug) console.warn('⚠️ Scoring falhou:', esc?.message || esc); }
     setIfValid('lra', loud.lra, 'v2:loudness');
     setIfValid('headroomDb', loud.headroom_db, 'v2:loudness');
     // True Peak
@@ -261,6 +295,10 @@ class AudioAnalyzer {
     // Core / espectrais extra
     setIfValid('spectralCentroid', core.spectralCentroid, 'v2:spectral');
     setIfValid('spectralRolloff85', core.spectralRolloff85, 'v2:spectral');
+    if ((typeof window !== 'undefined' && window.AUDIT_MODE === true) || (typeof process !== 'undefined' && process.env.AUDIT_MODE==='1')) {
+      setIfValid('spectralRolloff50', core.spectralRolloff50, 'v2:spectral');
+      setIfValid('thdPercent', core.thdPercent, 'v2:spectral');
+    }
     setIfValid('spectralFlux', core.spectralFlux, 'v2:spectral');
     setIfValid('spectralFlatness', core.spectralFlatness, 'v2:spectral');
     setIfValid('dcOffset', core.dcOffset, 'v2:core');
@@ -314,6 +352,14 @@ class AudioAnalyzer {
   td.dcOffset = isFinite(core.dcOffset) ? core.dcOffset : null;
   td.clippingSamples = Number.isFinite(core.clippingEvents) ? core.clippingEvents : null;
   td.clippingPct = isFinite(core.clippingPercentage) ? core.clippingPercentage : null;
+  try {
+    if (Array.isArray(baseAnalysis.problems)) {
+      const tpv = td.truePeakDbtp;
+      if (Number.isFinite(tpv) && tpv < 0 && (td.clippingSamples === 0 || td.clippingSamples == null)) {
+        baseAnalysis.problems = baseAnalysis.problems.filter(p => p?.type !== 'clipping');
+      }
+    }
+  } catch {}
 
   // Scores de qualidade e tempo total de processamento
   baseAnalysis.qualityOverall = isFinite(metrics?.quality?.overall) ? metrics.quality.overall : null;
@@ -326,7 +372,7 @@ class AudioAnalyzer {
     }
 
     // Telemetria: chaves novas adicionadas
-  const added = ['lufsIntegrated','lufsShortTerm','lufsMomentary','headroomDb','lra','truePeakDbtp','samplePeakLeftDb','samplePeakRightDb','spectralCentroid','spectralRolloff85','spectralFlux','stereoCorrelation','balanceLR','tonalBalance','crestFactor','stereoWidth','monoCompatibility','spectralFlatness','dcOffset','clippingSamples','clippingPct','qualityOverall','processingMs'];
+  const added = ['lufsIntegrated','lufsShortTerm','lufsMomentary','headroomDb','lra','truePeakDbtp','samplePeakLeftDb','samplePeakRightDb','spectralCentroid','spectralRolloff85','spectralRolloff50','spectralFlux','stereoCorrelation','balanceLR','tonalBalance','crestFactor','stereoWidth','monoCompatibility','spectralFlatness','thdPercent','dcOffset','clippingSamples','clippingPct','qualityOverall','processingMs'];
 
     // ===== Fallback: calcular métricas espectrais se ainda ausentes =====
     try {
@@ -462,7 +508,9 @@ class AudioAnalyzer {
       lra: td.lra,
       truePeakDbtp: td.truePeakDbtp,
       spectralCentroid: td.spectralCentroid,
-      spectralRolloff85: td.spectralRolloff85,
+  spectralRolloff85: td.spectralRolloff85,
+  spectralRolloff50: td.spectralRolloff50,
+  thdPercent: td.thdPercent,
       spectralFlux: td.spectralFlux,
       stereoCorrelation: td.stereoCorrelation,
       balanceLR: td.balanceLR,
@@ -516,10 +564,82 @@ class AudioAnalyzer {
     const leftChannel = audioBuffer.getChannelData(0);
     const rightChannel = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : leftChannel;
 
+    // ===== SINGLE STAGE METRICS (feature flag) =====
+    try {
+      if (typeof window === 'undefined' || window.SINGLE_STAGE_METRICS === true) {
+        // Todas as métricas base calculadas aqui usarão exatamente o mesmo PCM bruto (sem ganhos posteriores)
+        const td = analysis.technicalData;
+        // Peak (dBFS) já será calculado abaixo; adiantamos se quisermos evitar duplicação
+        // Clipping sample-level unificado
+        let samplePeakL = 0, samplePeakR = 0, clipCount = 0;
+        const clipThresh = 0.99;
+        for (let i=0;i<leftChannel.length;i++) {
+          const a = Math.abs(leftChannel[i]);
+          if (a > samplePeakL) samplePeakL = a;
+          if (a >= clipThresh) clipCount++;
+        }
+        if (rightChannel !== leftChannel) {
+          for (let i=0;i<rightChannel.length;i++) {
+            const a = Math.abs(rightChannel[i]);
+            if (a > samplePeakR) samplePeakR = a;
+            if (a >= clipThresh) clipCount++;
+          }
+        } else samplePeakR = samplePeakL;
+        const toDb = v => v>0 ? 20*Math.log10(v) : -Infinity;
+        td._singleStage = {
+          samplePeakLeftDb: toDb(samplePeakL),
+            samplePeakRightDb: toDb(samplePeakR),
+            clippingSamples: clipCount,
+            clipThreshold: clipThresh,
+            source: 'single-stage:pcm'
+        };
+      }
+    } catch {}
+
     // 📊 Análise de Volume e Dinâmica
     analysis.technicalData.peak = this.findPeakLevel(leftChannel);
     analysis.technicalData.rms = this.calculateRMS(leftChannel);
     analysis.technicalData.dynamicRange = this.calculateDynamicRange(leftChannel);
+    // 🔬 Nova métrica de dinâmica estatística (dr_stat) – não substitui dynamicRange legacy
+    try {
+      const enableDRRedef = (typeof window !== 'undefined') && window.AUDIT_MODE === true && window.DR_REDEF !== false;
+      if (enableDRRedef && !analysis.technicalData.dr_stat) {
+        const sampleRate = audioBuffer.sampleRate || 48000;
+        const winMs = 300; const hopMs = 100;
+        const win = Math.max(1, Math.round(sampleRate * winMs / 1000));
+        const hop = Math.max(1, Math.round(sampleRate * hopMs / 1000));
+        // Construir mid para robustez stereo
+        const n = Math.min(leftChannel.length, rightChannel.length);
+        const mid = new Float32Array(n);
+        for (let i=0;i<n;i++) mid[i] = 0.5*(leftChannel[i] + rightChannel[i]);
+        // Sliding RMS
+        const rmsVals = [];
+        let sum = 0; let buf = new Float32Array(win); let bi=0; let filled=0;
+        for (let i=0;i<n;i++) {
+          const x = mid[i];
+          const prev = buf[bi];
+          buf[bi] = x; bi = (bi+1)%win;
+          if (filled < win) { sum += x*x; filled++; } else { sum += x*x - prev*prev; }
+          if (i+1 >= win && ((i - win) % hop === 0)) {
+            const ms = sum / win; rmsVals.push(ms>0 ? 20*Math.log10(Math.sqrt(ms)) : -Infinity);
+          }
+        }
+        const finite = rmsVals.filter(v => Number.isFinite(v)).sort((a,b)=>a-b);
+        if (finite.length > 5) { // garantir amostra mínima
+          const idx = (p)=> Math.min(finite.length-1, Math.max(0, Math.floor(finite.length * p)));
+          const p10 = finite[idx(0.10)];
+          const p95 = finite[idx(0.95)];
+          const drStat = (Number.isFinite(p95) && Number.isFinite(p10)) ? (p95 - p10) : null;
+          if (drStat != null) {
+            analysis.technicalData.dr_stat = parseFloat(drStat.toFixed(2));
+            analysis.technicalData.dr_stat_p95 = p95;
+            analysis.technicalData.dr_stat_p10 = p10;
+            analysis.technicalData.dr_stat_windows = rmsVals.length;
+            (analysis.technicalData._sources = analysis.technicalData._sources || {}).dr_stat = 'audit:dr_percentile';
+          }
+        }
+      }
+    } catch (e) { if (window && window.DEBUG_ANALYZER) console.warn('DR_STAT erro:', e); }
     // Garantir crestFactor base (peak - rms) já inicial
     if (Number.isFinite(analysis.technicalData.peak) && Number.isFinite(analysis.technicalData.rms)) {
       const cf = (analysis.technicalData.peak - analysis.technicalData.rms);
@@ -535,15 +655,34 @@ class AudioAnalyzer {
       let clipped = 0;
       const len = leftChannel.length;
       const clipThreshold = 0.95; // igual ao V2
+      let dcSumR = 0;
+      const useHPF = (typeof window !== 'undefined' && window.AUDIT_MODE===true && window.DC_HPF20===true) || (typeof process !== 'undefined' && process.env.AUDIT_MODE==='1' && process.env.DC_HPF20==='1');
+      // HPF estado
+      let aL=0,aR=0, xPrevL=0,yPrevL=0,xPrevR=0,yPrevR=0;
+      const sr = audioBuffer.sampleRate || 48000;
+      const fc=20; const w=2*Math.PI*fc/sr; const alpha = w/(w+1);
       for (let i = 0; i < len; i++) {
-        const s = leftChannel[i];
-        dcSum += s;
-        if (Math.abs(s) >= clipThreshold) clipped++;
+        let sL = leftChannel[i];
+        let sR = rightChannel[i] ?? sL;
+        if (useHPF) {
+          const yL = alpha*(yPrevL + sL - xPrevL); yPrevL = yL; xPrevL = sL; sL = yL;
+          const yR = alpha*(yPrevR + sR - xPrevR); yPrevR = yR; xPrevR = sR; sR = yR;
+        }
+        dcSum += sL;
+        dcSumR += sR;
+        if (Math.abs(sL) >= clipThreshold) clipped++;
       }
       const dcOffset = dcSum / Math.max(1, len);
+      const dcOffsetRight = dcSumR / Math.max(1, len);
       const clippingPct = (clipped / Math.max(1, len)) * 100;
       if (!Number.isFinite(analysis.technicalData.dcOffset)) {
         analysis.technicalData.dcOffset = dcOffset;
+      }
+      if ((typeof window !== 'undefined' && window.AUDIT_MODE===true) || (typeof process !== 'undefined' && process.env.AUDIT_MODE==='1')) {
+        analysis.technicalData.dcOffsetLeft = dcOffset;
+        analysis.technicalData.dcOffsetRight = dcOffsetRight;
+        (analysis.technicalData._sources = analysis.technicalData._sources || {}).dcOffsetLeft = useHPF? 'audit:hpf20' : 'audit:raw';
+        (analysis.technicalData._sources = analysis.technicalData._sources || {}).dcOffsetRight = useHPF? 'audit:hpf20' : 'audit:raw';
       }
       if (!Number.isFinite(analysis.technicalData.clippingSamples)) {
         analysis.technicalData.clippingSamples = clipped;
@@ -566,6 +705,34 @@ class AudioAnalyzer {
     analysis.problems = Array.isArray(analysis.problems) ? analysis.problems : [];
     analysis.suggestions = Array.isArray(analysis.suggestions) ? analysis.suggestions : [];
     analysis.technicalData.dominantFrequencies = Array.isArray(analysis.technicalData.dominantFrequencies) ? analysis.technicalData.dominantFrequencies : [];
+
+    // 🛡️ Invariants (audit)
+    try {
+      if ((typeof window !== 'undefined' && window.AUDIT_MODE === true) || (typeof process !== 'undefined' && process.env.AUDIT_MODE==='1')) {
+        // Lazy dynamic import se disponível
+  // Import dinâmico não disponível neste contexto sem bundler; placeholder para futura injeção.
+  const validator = (typeof window !== 'undefined' && window.__validateInvariants) ? window.__validateInvariants : null;
+  if (typeof validator === 'function') {
+          const inv = validator({
+            truePeakDbtp: analysis.technicalData.truePeakDbtp ?? analysis.technicalData.true_peak_dbtp,
+            samplePeakLeftDb: analysis.technicalData.samplePeakLeftDb,
+            samplePeakRightDb: analysis.technicalData.samplePeakRightDb,
+            lufsIntegrated: analysis.technicalData.lufsIntegrated,
+            crestFactor: analysis.technicalData.crestFactor,
+            dr_stat: analysis.technicalData.dr_stat,
+            thdPercent: analysis.technicalData.thdPercent
+          });
+          if (inv?.warnings?.length) {
+            analysis.auditInvariants = inv;
+            // Anexar warnings sem duplicar
+            const seen = new Set(analysis.problems.map(p=>p?.message||p));
+            for (const w of inv.warnings) {
+              if (!seen.has(w)) { analysis.problems.push({ type:'invariant', message:w }); seen.add(w); }
+            }
+          }
+        }
+      }
+    } catch (e) { if (window && window.DEBUG_ANALYZER) console.warn('Invariant validator erro', e); }
 
     return analysis;
   }
@@ -978,6 +1145,25 @@ async function sendAudioAnalysisToChat(prompt, analysis) {
 
 console.log('🎵 Audio Analyzer carregado com sucesso!');
 
+// === Extensão: análise direta de AudioBuffer (uso interno / testes) ===
+if (!AudioAnalyzer.prototype.analyzeAudioBufferDirect) {
+  AudioAnalyzer.prototype.analyzeAudioBufferDirect = async function(audioBuffer, label='synthetic') {
+    try {
+      if (!this.audioContext) {
+        await this.initializeAnalyzer();
+      }
+      let base = this.performFullAnalysis(audioBuffer);
+      // Enriquecer (fase 2 / avançado) – reutiliza pipeline existente
+      try { base = await this._enrichWithPhase2Metrics(audioBuffer, base, { name: label }); } catch {}
+      base.syntheticLabel = label;
+      return base;
+    } catch (e) {
+      console.warn('analyzeAudioBufferDirect falhou', e);
+      return null;
+    }
+  };
+}
+
 // 🔌 Adapter para métricas avançadas (LUFS/LRA ITU + True Peak oversampled) via módulos em /lib
 // - Seguro e opcional: só sobrescreve valores quando ausentes ou quando preferido via flag
 // - Cacheia módulos para evitar recarregamento
@@ -1043,7 +1229,12 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
         setIfBetter('lufsShortTerm', lres.lufs_short_term);
         setIfBetter('lufsMomentary', lres.lufs_momentary);
         setIfBetter('lra', lres.lra);
+        // headroom_db original (offset para -23 LUFS) mantido para compatibilidade
         setIfBetter('headroomDb', lres.headroom_db);
+        if (Number.isFinite(lres.loudness_offset_db)) {
+          td.loudnessOffsetDb = lres.loudness_offset_db;
+          (td._sources = td._sources || {}).loudnessOffsetDb = 'advanced:loudness';
+        }
         // Guardar meta-info útil
         baseAnalysis.advancedLoudness = {
           gating: lres.gating_stats,
@@ -1073,6 +1264,37 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
         setIfBetter('truePeakDbtp', tres.true_peak_dbtp);
         setIfBetter('samplePeakLeftDb', tres.sample_peak_left_db);
         setIfBetter('samplePeakRightDb', tres.sample_peak_right_db);
+        // === Clipping oversampled unificado (domínio True Peak) ===
+        try {
+          const enableUnifiedClip = (typeof window === 'undefined' || window.UNIFIED_TRUEPEAK_CLIP === true);
+          if (enableUnifiedClip && Number.isFinite(tres.true_peak_clipping_count)) {
+            td.clippingSamplesTruePeak = tres.true_peak_clipping_count;
+            (td._sources = td._sources || {}).clippingSamplesTruePeak = 'advanced:truepeak';
+            td.truePeakClipThresholdDbtp = tres.true_peak_clip_threshold_dbtp;
+            td.truePeakClipThresholdLinear = tres.true_peak_clip_threshold_linear;
+            // Se contagem legacy inexistente ou prefer avançado, substituir
+            if (td.clippingSamples == null || prefer) {
+              td.clippingSamples = tres.true_peak_clipping_count;
+              (td._sources = td._sources || {}).clippingSamples = 'advanced:truepeak';
+            }
+          }
+        } catch {}
+        // Derivar headroom real (pico até 0 dBTP) e ajustar se valor anterior incoerente
+        try {
+          const peaks = [tres.true_peak_dbtp, tres.sample_peak_left_db, tres.sample_peak_right_db].filter(v => Number.isFinite(v));
+          if (peaks.length) {
+            const maxPeak = Math.max(...peaks);
+            const headroomTrue = 0 - maxPeak;
+            if (Number.isFinite(headroomTrue)) {
+              td.headroomTruePeakDb = headroomTrue;
+              (td._sources = td._sources || {}).headroomTruePeakDb = 'derived:truepeak';
+              if (!Number.isFinite(td.headroomDb) || td.headroomDb < -40 || td.headroomDb > 60) {
+                td.headroomDb = headroomTrue;
+                (td._sources = td._sources || {}).headroomDb = 'derived:truepeak';
+              }
+            }
+          }
+        } catch {}
         // Info extra
         baseAnalysis.advancedTruePeak = {
           oversampling: tres.oversampling_factor,
@@ -1141,9 +1363,9 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                 // Converter para dB relativo ao total médio das magnitudes
                 const norm = lin / (totalEnergy / bins.length);
                 const db = 10 * Math.log10(norm || 1e-9);
-                bandEnergies[band] = { energy: lin, rms_db: db };
+                bandEnergies[band] = { energy: lin, rms_db: db, scale: 'log_ratio_db' };
               } else {
-                bandEnergies[band] = { energy: 0, rms_db: -Infinity };
+                bandEnergies[band] = { energy: 0, rms_db: -Infinity, scale: 'log_ratio_db' };
               }
             }
             td.bandEnergies = bandEnergies;
@@ -1168,10 +1390,13 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                 if (!(ratio>0)) ratio = 1e-9; // evitar -Inf
                 const db = 10 * Math.log10(ratio);
                 // manter shape compatível (usa rms_db)
-                bandEnergiesLog[band] = { rms_db: db, proportion: ratio };
+                bandEnergiesLog[band] = { rms_db: db, proportion: ratio, scale: 'log_proportion_db' };
               }
               td.bandEnergiesLog = bandEnergiesLog;
               (td._sources = td._sources || {}).bandEnergiesLog = 'advanced:spectrum:log';
+              // Metadados de escala global
+              td.bandScale = 'log_ratio_db';
+              td.bandLogScale = 'log_proportion_db';
             } catch (_) { /* não crítico */ }
             // Converter subconjunto para tonalBalance se ainda vazio (não substitui tonalBalance existente)
             if (!td.tonalBalance) {
@@ -1189,16 +1414,63 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               const existingKeys = new Set(sug.map(s => s && s._bandKey));
               let addedCount = 0;
               const maxBandSuggestions = (typeof window !== 'undefined' && Number.isFinite(window.MAX_BAND_SUGGESTIONS)) ? window.MAX_BAND_SUGGESTIONS : 6;
+              // === Normalização de escala de bandas (feature flag) ===
+              // Objetivo: quando referências possuem escala diferente (ex.: valores positivos grandes) alinhar ao espaço dos valores medidos (normalmente negativos em log_ratio_db)
+              let refBandTargetsNormalized = null;
+              try {
+                const enableNorm = (typeof window !== 'undefined' && window.ENABLE_REF_BAND_NORMALIZATION === true);
+                if (enableNorm && ref && ref.bands && td.bandEnergies) {
+                  const measuredVals = Object.values(td.bandEnergies).map(v => v && Number.isFinite(v.rms_db) ? v.rms_db : null).filter(v => v!=null);
+                  const refVals = Object.values(ref.bands).map(v => v && Number.isFinite(v.target_db) ? v.target_db : null).filter(v => v!=null);
+                  if (measuredVals.length >= 3 && refVals.length >= 3) {
+                    const measMin = Math.min(...measuredVals);
+                    const measMax = Math.max(...measuredVals);
+                    const refMin = Math.min(...refVals);
+                    const refMax = Math.max(...refVals);
+                    const posRefRatio = refVals.filter(v => v > 0).length / refVals.length;
+                    const allMeasuredNeg = measuredVals.every(v => v <= 0);
+                    if (allMeasuredNeg && posRefRatio > 0.6 && (refMax - refMin) > 1e-3 && (measMax - measMin) > 1e-3) {
+                      refBandTargetsNormalized = {};
+                      for (const [bk, rb] of Object.entries(ref.bands)) {
+                        if (rb && Number.isFinite(rb.target_db)) {
+                          const t = (rb.target_db - refMin) / (refMax - refMin);
+                          refBandTargetsNormalized[bk] = measMin + t * (measMax - measMin);
+                        }
+                      }
+                    }
+                  }
+                  // Construir estrutura norm com status (OK/OUT/NA)
+                  const normBands = {};
+                  for (const [bk, rb] of Object.entries(ref.bands)) {
+                    const measured = td.bandEnergies[bk];
+                    const hasTarget = rb && Number.isFinite(rb.target_db) && Number.isFinite(rb.tol_db);
+                    if (!hasTarget) {
+                      normBands[bk] = { rms_db: measured?.rms_db ?? null, status: 'NA' };
+                      continue;
+                    }
+                    const target = (refBandTargetsNormalized && Number.isFinite(refBandTargetsNormalized[bk])) ? refBandTargetsNormalized[bk] : rb.target_db;
+                    const tol = rb.tol_db;
+                    const val = measured && Number.isFinite(measured.rms_db) ? measured.rms_db : null;
+                    if (val == null) { normBands[bk] = { rms_db: null, target, tol, status: 'MISSING' }; continue; }
+                    const delta = val - target;
+                    normBands[bk] = { rms_db: val, target, tol, delta, status: Math.abs(delta) <= tol ? 'OK':'OUT' };
+                  }
+                  td.bandNorm = { bands: normBands, normalized: !!refBandTargetsNormalized };
+                  (td._sources = td._sources || {}).bandNorm = 'audit:band_norm';
+                }
+              } catch (eNorm) { if (window.DEBUG_ANALYZER) console.warn('[REF_SCALE] Falha normalização bandas', eNorm); }
               for (const [band, data] of Object.entries(bandEnergies)) {
                 if (addedCount >= maxBandSuggestions) break;
                 const refBand = ref?.bands?.[band];
                 if (!refBand || !Number.isFinite(refBand.target_db) || !Number.isFinite(refBand.tol_db)) continue;
                 if (!Number.isFinite(data.rms_db) || data.rms_db === -Infinity) continue;
-                const diff = data.rms_db - refBand.target_db;
+                // Usar valor normalizado se disponível
+                const refTarget = (refBandTargetsNormalized && Number.isFinite(refBandTargetsNormalized[band])) ? refBandTargetsNormalized[band] : refBand.target_db;
+                const diff = data.rms_db - refTarget;
                 const outOfRange = Math.abs(diff) > refBand.tol_db;
                 if (outOfRange) {
                   const direction = diff > 0 ? 'reduzir' : 'aumentar';
-                  const action = diff > 0 ? `Cortar ${band} em ~${Math.abs(diff).toFixed(1)}dB (target ${refBand.target_db.toFixed(1)}±${refBand.tol_db})` : `Boost ${band} em ~${Math.abs(diff).toFixed(1)}dB`;
+                  const action = diff > 0 ? `Cortar ${band} em ~${Math.abs(diff).toFixed(1)}dB (target ${refTarget.toFixed(1)}±${refBand.tol_db})` : `Boost ${band} em ~${Math.abs(diff).toFixed(1)}dB`;
                   const key = `band:${band}`;
                   if (!existingKeys.has(key)) {
                     // Acrescentar faixa sugerida (Hz) nos detalhes, usando definição das bandas
@@ -1207,9 +1479,9 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                     sug.push({
                       type: 'band_adjust',
                       _bandKey: key,
-                      message: `Banda ${band} fora do alvo (${data.rms_db.toFixed(1)}dB vs ${refBand.target_db.toFixed(1)}dB)` ,
+                      message: `Banda ${band} fora do alvo (${data.rms_db.toFixed(1)}dB vs ${refTarget.toFixed(1)}dB)` ,
                       action,
-                      details: `Diferença ${diff>0?'+':''}${diff.toFixed(2)}dB | tolerância ±${refBand.tol_db}${rangeTxt}`
+                      details: `Diferença ${diff>0?'+':''}${diff.toFixed(2)}dB | tolerância ±${refBand.tol_db}${rangeTxt}${refBandTargetsNormalized?' • escala normalizada':''}`
                     });
                     existingKeys.add(key);
                     addedCount++;
@@ -1356,6 +1628,59 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
         }
       }
     } catch (e) { if (debug) console.warn('⚠️ [ADV] Validação métricas falhou:', e?.message || e); }
+    // === Invariantes & saneamento (feature flag ENABLE_METRIC_INVARIANTS) ===
+    try {
+      if (typeof window === 'undefined' || window.ENABLE_METRIC_INVARIANTS === true) {
+        const tdv = baseAnalysis.technicalData || {};
+        const logWarn = (m,c={})=>{ if (typeof window !== 'undefined' && window.DEBUG_ANALYZER) console.warn('[INVARIANT]', m, c); };
+        // Consolidar sample peaks
+        if (Number.isFinite(tdv.samplePeakLeftDb) && Number.isFinite(tdv.samplePeakRightDb)) {
+          const maxPk = Math.max(tdv.samplePeakLeftDb, tdv.samplePeakRightDb);
+          if (!Number.isFinite(tdv.samplePeakDb)) tdv.samplePeakDb = maxPk;
+        }
+        // SamplePeak ≤ TruePeak ≤ 0
+        if (Number.isFinite(tdv.truePeakDbtp)) {
+          if (tdv.truePeakDbtp > 0.05) logWarn('TruePeak > 0dBTP', {tp: tdv.truePeakDbtp});
+          if (Number.isFinite(tdv.samplePeakDb) && tdv.samplePeakDb > tdv.truePeakDbtp + 0.1) {
+            tdv.truePeakDbtp = tdv.samplePeakDb;
+            logWarn('Ajustado truePeak para samplePeak', {newTruePeak: tdv.truePeakDbtp});
+          }
+          if (tdv.truePeakDbtp > 0) tdv.truePeakDbtp = 0; // clamp
+        }
+        // Headroom = 0 - TruePeak
+        if (Number.isFinite(tdv.truePeakDbtp)) {
+          const expHead = 0 - tdv.truePeakDbtp;
+            if (!Number.isFinite(tdv.headroomTruePeakDb) || Math.abs(tdv.headroomTruePeakDb - expHead) > 0.11) {
+              tdv.headroomTruePeakDb = expHead;
+            }
+          // Opcionalmente alinhar headroomDb ao headroomTruePeakDb (verdadeiro headroom em dBTP)
+          try {
+            const enforce = (typeof window === 'undefined' || window.ENFORCE_TRUEPEAK_HEADROOM === true);
+            if (enforce && (!Number.isFinite(tdv.headroomDb) || Math.abs(tdv.headroomDb - expHead) > 0.11)) {
+              tdv.headroomDb = expHead;
+              (tdv._sources = tdv._sources || {}).headroomDb = 'invariant:truepeak';
+            }
+          } catch {}
+        }
+        // Clipping problem consistente
+        try {
+          const tp = tdv.truePeakDbtp;
+          const clipSamples = tdv.clippingSamplesTruePeak ?? tdv.clippingSamples;
+          const should = (Number.isFinite(tp) && tp >= 0) || (Number.isFinite(clipSamples) && clipSamples > 0);
+          const probs = Array.isArray(baseAnalysis.problems) ? baseAnalysis.problems : (baseAnalysis.problems=[]);
+          const has = probs.some(p=>p.type==='clipping');
+          if (has && !should) baseAnalysis.problems = probs.filter(p=>p.type!=='clipping');
+          else if (!has && should) probs.push({type:'clipping', severity:'high', message:'Clipping detectado', solution:'Reduza ganho / limite picos'});
+        } catch {}
+        // LUFS ST plausível
+        if (Number.isFinite(tdv.lufsIntegrated) && Number.isFinite(tdv.lufsShortTerm) && Math.abs(tdv.lufsShortTerm - tdv.lufsIntegrated) > 25) {
+          logWarn('Invalid lufsShortTerm removed', {lufsIntegrated: tdv.lufsIntegrated, lufsShortTerm: tdv.lufsShortTerm});
+          delete tdv.lufsShortTerm;
+        }
+        // Anti-NaN
+        Object.entries(tdv).forEach(([k,v])=>{ if (typeof v==='number' && !Number.isFinite(v)) { delete tdv[k]; logWarn('Removed non-finite', {k}); }});
+      }
+    } catch (invErr) { if (typeof window !== 'undefined' && window.DEBUG_ANALYZER) console.warn('Falha invariants', invErr); }
 
     return baseAnalysis;
   } catch (err) {

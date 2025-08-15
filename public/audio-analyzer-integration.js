@@ -12,6 +12,83 @@ let __refDataCache = {}; // cache por gênero
 let __activeRefData = null; // dados do gênero atual
 let __genreManifest = null; // manifesto de gêneros (opcional)
 let __activeRefGenre = null; // chave do gênero atualmente carregado em __activeRefData
+let __refDerivedStats = {}; // estatísticas agregadas (ex: média stereo) por gênero
+
+// =============== ETAPA 2: Robustez & Completeness Helpers ===============
+// Central logging para métricas ausentes / NaN (evita console spam e facilita auditoria)
+function __logMetricAnomaly(kind, key, context={}) {
+    try {
+        if (typeof window === 'undefined') return;
+        const store = (window.__METRIC_ANOMALIES__ = window.__METRIC_ANOMALIES__ || []);
+        const stamp = Date.now();
+        store.push({ t: stamp, kind, key, ctx: context });
+        if (window.DEBUG_ANALYZER) console.warn('[METRIC_ANOMALY]', kind, key, context);
+        // Limitar tamanho
+        if (store.length > 500) store.splice(0, store.length - 500);
+    } catch {}
+}
+
+// Placeholder seguro para valores não finitos (exibe '—' e loga uma vez por chave por render)
+function safeDisplayNumber(val, key, decimals=2) {
+    if (!Number.isFinite(val)) { __logMetricAnomaly('non_finite', key); return '—'; }
+    return val.toFixed(decimals);
+}
+
+// Invalidação ampla de caches derivados quando gênero mudar
+function invalidateReferenceDerivedCaches() {
+    try {
+        if (typeof window === 'undefined') return;
+        delete window.PROD_AI_REF_DATA; // força reuso atualizado
+    } catch {}
+}
+
+// Enriquecimento de objeto de referência: preencher lacunas e padronizar escala
+function enrichReferenceObject(refObj, genreKey) {
+    try {
+        if (!refObj || typeof refObj !== 'object') return refObj;
+        // Feature flag geral
+        const enabled = (typeof window === 'undefined') || window.ENABLE_REF_ENRICHMENT !== false;
+        if (!enabled) return refObj;
+        // Definir escala default se ausente
+        if (!refObj.scale) refObj.scale = 'log_ratio_db';
+        // Preencher stereo_target se ausente usando estatísticas agregadas (Etapa 2)
+        if (refObj.stereo_target == null) {
+            try {
+                const g = (genreKey||'').toLowerCase();
+                const stat = __refDerivedStats[g];
+                if (stat && Number.isFinite(stat.avgStereo) && stat.countStereo >= 2) {
+                    refObj.stereo_target = stat.avgStereo;
+                    refObj.__stereo_filled = 'dataset_avg';
+                } else {
+                    // fallback heurístico
+                    refObj.stereo_target = g.includes('trance') ? 0.17 : (g.includes('funk') ? 0.12 : 0.15);
+                    refObj.__stereo_filled = 'heuristic';
+                }
+                refObj.tol_stereo = refObj.tol_stereo == null ? 0.08 : refObj.tol_stereo;
+            } catch { /* noop */ }
+        }
+        // Garantir tol_stereo razoável
+        if (refObj.tol_stereo == null) refObj.tol_stereo = 0.08;
+        // Bandas: marcar N/A para target_db null e permitir comparação ignorando
+        if (refObj.bands && typeof refObj.bands === 'object') {
+            for (const [k,v] of Object.entries(refObj.bands)) {
+                if (!v || typeof v !== 'object') continue;
+                if (v.target_db == null) {
+                    v._target_na = true; // flag para UI
+                }
+            }
+        }
+        // Normalização opcional antecipada (apenas ajuste de metadado; cálculo real feito no analyzer)
+        if (window && window.PRE_NORMALIZE_REF_BANDS === true && refObj.bands) {
+            const vals = Object.values(refObj.bands).map(b=>b&&Number.isFinite(b.target_db)?b.target_db:null).filter(v=>v!=null);
+            const negRatio = vals.filter(v=>v<0).length/Math.max(1,vals.length);
+            const posRatio = vals.filter(v=>v>0).length/Math.max(1,vals.length);
+            // Se maioria positiva mas queremos alinhar a negativos, apenas anotar
+            if (posRatio>0.7 && negRatio<0.3) refObj.__scale_mismatch_hint = 'positive_targets_vs_negative_measurements';
+        }
+    } catch (e) { console.warn('[refEnrich] falha', e); }
+    return refObj;
+}
 
 // Fallback embutido inline para evitar 404 em produção
 const __INLINE_EMBEDDED_REFS__ = {
@@ -35,6 +112,25 @@ const __INLINE_EMBEDDED_REFS__ = {
         trap:           { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-16,tol_db:4}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } }
     }
 };
+
+// Construir estatísticas agregadas (média stereo por gênero) a partir de refs carregadas
+function buildAggregatedRefStats() {
+    try {
+        const map = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) || __INLINE_EMBEDDED_REFS__.byGenre;
+        if (!map) return;
+        for (const [g, data] of Object.entries(map)) {
+            if (!data || typeof data !== 'object') continue;
+            // stereo_target já definido conta; se null ignorar
+            if (Number.isFinite(data.stereo_target)) {
+                const st = (__refDerivedStats[g] = __refDerivedStats[g] || { sumStereo:0, countStereo:0 });
+                st.sumStereo += data.stereo_target; st.countStereo += 1;
+            }
+        }
+        for (const [g, st] of Object.entries(__refDerivedStats)) {
+            if (st.countStereo > 0) st.avgStereo = st.sumStereo / st.countStereo;
+        }
+    } catch (e) { if (window.DEBUG_ANALYZER) console.warn('buildAggregatedRefStats fail', e); }
+}
 
 // Carregar dinamicamente o fallback embutido se necessário
 async function ensureEmbeddedRefsReady(timeoutMs = 2500) {
@@ -167,11 +263,16 @@ function ensureActiveGenreOption(selectEl, genreKey) {
 
 async function loadReferenceData(genre) {
     try {
-        if (__refDataCache[genre]) {
+        // Se feature flag de invalidar cache por troca de escala/gênero estiver ativa, ignorar cache salvo
+        const bypassCache = (typeof window !== 'undefined' && window.REFS_BYPASS_CACHE === true);
+        if (!bypassCache && __refDataCache[genre]) {
             __activeRefData = __refDataCache[genre];
             __activeRefGenre = genre;
-            updateRefStatus('✔ referências carregadas', '#0d6efd');
+            updateRefStatus('✔ referências (cache)', '#0d6efd');
             return __activeRefData;
+        }
+        if (bypassCache) {
+            delete __refDataCache[genre];
         }
         updateRefStatus('⏳ carregando...', '#996600');
         // 1) Preferir embutido (window), depois inline, antes de rede
@@ -179,12 +280,14 @@ async function loadReferenceData(genre) {
         const embInline = __INLINE_EMBEDDED_REFS__?.byGenre?.[genre] || null;
         const useData = embWin || embInline;
         if (useData && typeof useData === 'object') {
-            __refDataCache[genre] = useData;
-            __activeRefData = useData;
+            const enriched = enrichReferenceObject(structuredClone(useData), genre);
+            __refDataCache[genre] = enriched;
+            __activeRefData = enriched;
             __activeRefGenre = genre;
-            window.PROD_AI_REF_DATA = useData;
+            window.PROD_AI_REF_DATA = enriched;
             updateRefStatus('✔ referências embutidas', '#0d6efd');
-            return useData;
+            try { buildAggregatedRefStats(); } catch {}
+            return enriched;
         }
         // 2) Se permitido, tentar rede
         if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
@@ -197,22 +300,26 @@ async function loadReferenceData(genre) {
             const rootKey = Object.keys(json)[0];
             const data = json[rootKey];
             if (!data || typeof data !== 'object') throw new Error('JSON de referência inválido para ' + genre);
-            __refDataCache[genre] = data;
-            __activeRefData = data;
+            const enrichedNet = enrichReferenceObject(data, genre);
+            __refDataCache[genre] = enrichedNet;
+            __activeRefData = enrichedNet;
             __activeRefGenre = genre;
-            window.PROD_AI_REF_DATA = data;
+            window.PROD_AI_REF_DATA = enrichedNet;
             updateRefStatus('✔ referências aplicadas', '#0d6efd');
-            return data;
+            try { buildAggregatedRefStats(); } catch {}
+            return enrichedNet;
         }
         // 3) Último recurso: trance inline
         const fallback = __INLINE_EMBEDDED_REFS__?.byGenre?.trance;
         if (fallback) {
-            __refDataCache['trance'] = fallback;
-            __activeRefData = fallback;
+            const enrichedFb = enrichReferenceObject(structuredClone(fallback), 'trance');
+            __refDataCache['trance'] = enrichedFb;
+            __activeRefData = enrichedFb;
             __activeRefGenre = 'trance';
-            window.PROD_AI_REF_DATA = fallback;
+            window.PROD_AI_REF_DATA = enrichedFb;
             updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
-            return fallback;
+            try { buildAggregatedRefStats(); } catch {}
+            return enrichedFb;
         }
         throw new Error('Sem referências disponíveis');
     } catch (e) {
@@ -222,21 +329,25 @@ async function loadReferenceData(genre) {
             const embMap = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) || __INLINE_EMBEDDED_REFS__.byGenre || {};
             const emb = embMap[genre];
             if (emb && typeof emb === 'object') {
-                __refDataCache[genre] = emb;
-                __activeRefData = emb;
+                const enrichedEmb = enrichReferenceObject(structuredClone(emb), genre);
+                __refDataCache[genre] = enrichedEmb;
+                __activeRefData = enrichedEmb;
                 __activeRefGenre = genre;
-                window.PROD_AI_REF_DATA = emb;
+                window.PROD_AI_REF_DATA = enrichedEmb;
                 updateRefStatus('✔ referências embutidas', '#0d6efd');
-                return emb;
+                try { buildAggregatedRefStats(); } catch {}
+                return enrichedEmb;
             }
             // Se o gênero específico não existir, usar um padrão seguro (trance) se disponível
             if (embMap && embMap.trance) {
-                __refDataCache['trance'] = embMap.trance;
-                __activeRefData = embMap.trance;
+                const enrichedEmbTr = enrichReferenceObject(structuredClone(embMap.trance), 'trance');
+                __refDataCache['trance'] = enrichedEmbTr;
+                __activeRefData = enrichedEmbTr;
                 __activeRefGenre = 'trance';
-                window.PROD_AI_REF_DATA = embMap.trance;
+                window.PROD_AI_REF_DATA = enrichedEmbTr;
                 updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
-                return embMap.trance;
+                try { buildAggregatedRefStats(); } catch {}
+                return enrichedEmbTr;
             }
         } catch(_) {}
         updateRefStatus('⚠ falha refs', '#992222');
@@ -253,6 +364,11 @@ function applyGenreSelection(genre) {
     if (!genre) return Promise.resolve();
     window.PROD_AI_REF_GENRE = genre;
     localStorage.setItem('prodai_ref_genre', genre);
+    // Invalidação de cache opcional
+    if (typeof window !== 'undefined' && window.INVALIDATE_REF_CACHE_ON_GENRE_CHANGE === true) {
+        try { delete __refDataCache[genre]; } catch {}
+    invalidateReferenceDerivedCaches();
+    }
     // Carregar refs e, se já houver análise no modal, atualizar sugestões de referência e re-renderizar
     return loadReferenceData(genre).then(() => {
         try {
@@ -268,6 +384,111 @@ function applyGenreSelection(genre) {
 // Expor global
 if (typeof window !== 'undefined') {
     window.applyGenreSelection = applyGenreSelection;
+}
+
+// Health check utilitário (Etapa 2) – avalia estabilidade das métricas em múltiplos runs
+if (typeof window !== 'undefined' && !window.__audioHealthCheck) {
+    window.__audioHealthCheck = async function(file, opts = {}) {
+        const runs = opts.runs || 3;
+        const delayMs = opts.delayMs || 0;
+        const out = { runs: [], spreads: {}, anomalies: [] };
+        for (let i=0;i<runs;i++) {
+            const t0 = performance.now();
+            const res = await window.audioAnalyzer.analyzeAudioFile(file);
+            const t1 = performance.now();
+            out.runs.push({
+                idx: i+1,
+                lufsIntegrated: res?.technicalData?.lufsIntegrated,
+                truePeakDbtp: res?.technicalData?.truePeakDbtp,
+                dynamicRange: res?.technicalData?.dynamicRange,
+                lra: res?.technicalData?.lra,
+                stereoCorrelation: res?.technicalData?.stereoCorrelation,
+                processingMs: (res?.processingMs ?? (t1 - t0))
+            });
+            if (delayMs) await new Promise(r=>setTimeout(r, delayMs));
+        }
+        const collect = (key) => out.runs.map(r=>r[key]).filter(v=>Number.isFinite(v));
+        const stats = (arr) => arr.length?{min:Math.min(...arr),max:Math.max(...arr),spread:Math.max(...arr)-Math.min(...arr)}:null;
+        ['lufsIntegrated','truePeakDbtp','dynamicRange','lra','stereoCorrelation','processingMs'].forEach(k=>{
+            out.spreads[k] = stats(collect(k));
+        });
+        // Anomalias agrupadas (do logger central)
+        try { out.anomalies = (window.__METRIC_ANOMALIES__||[]).slice(-100); } catch {}
+        return out;
+    };
+}
+
+// ================== ACCEPTANCE TEST HARNESS (Etapa 3) ==================
+if (typeof window !== 'undefined' && !window.__runAcceptanceAudioTests) {
+    window.__runAcceptanceAudioTests = async function(opts = {}) {
+        if (window.ACCEPTANCE_TEST_MODE !== true) {
+            console.warn('Acceptance test mode desativado. Defina window.ACCEPTANCE_TEST_MODE = true antes de chamar.');
+            return { skipped: true };
+        }
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const sr = ctx.sampleRate;
+        const makeBuffer = (seconds, channels=2) => ctx.createBuffer(channels, Math.max(1, Math.floor(sr*seconds)), sr);
+        const toDb = v => v>0?20*Math.log10(v):-Infinity;
+        const results = [];
+        // 1. Silêncio 5s
+        const bufSilence = makeBuffer(5,2); // já zero
+        results.push({ name:'silence', analysis: await window.audioAnalyzer.analyzeAudioBufferDirect(bufSilence,'silence') });
+        // 2. Seno 1kHz -12dBFS 10s
+        const bufSine = makeBuffer(10,2); (['L','R']).forEach((_,ch)=>{ const chData = bufSine.getChannelData(ch); for(let i=0;i<chData.length;i++){ chData[i] = Math.sin(2*Math.PI*1000*i/sr)*Math.pow(10,-12/20); } });
+        results.push({ name:'sine_1k_-12dBFS', analysis: await window.audioAnalyzer.analyzeAudioBufferDirect(bufSine,'sine') });
+        // 3. Ruído rosa approx -14 LUFS (gerar ruído branco filtrado + normalizar)
+        const bufPink = makeBuffer(10,2); for (let ch=0; ch<2; ch++){ const d=bufPink.getChannelData(ch); let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0; for(let i=0;i<d.length;i++){ const white=Math.random()*2-1; b0=0.99886*b0+white*0.0555179; b1=0.99332*b1+white*0.0750759; b2=0.96900*b2+white*0.1538520; b3=0.86650*b3+white*0.3104856; b4=0.55000*b4+white*0.5329522; b5=-0.7616*b5-white*0.0168980; const pink = b0+b1+b2+b3+b4+b5+b6+white*0.5362; b6=white*0.115926; d[i]=pink*0.11; } }
+        // leve normalização amplitude
+        results.push({ name:'pink_noise_target', analysis: await window.audioAnalyzer.analyzeAudioBufferDirect(bufPink,'pink') });
+        // 4. Quase clipado (TP ≈ -0.1dB) -> seno 60Hz amplo -0.1
+        const bufAlmost = makeBuffer(5,2); const ampAlmost = Math.pow(10, -0.1/20); for (let ch=0; ch<2; ch++){ const d=bufAlmost.getChannelData(ch); for(let i=0;i<d.length;i++){ d[i]= Math.sin(2*Math.PI*60*i/sr)*ampAlmost; } }
+        results.push({ name:'almost_clipped', analysis: await window.audioAnalyzer.analyzeAudioBufferDirect(bufAlmost,'almostClip') });
+        // 5. Clipado (samples >= 1.0)
+        const bufClipped = makeBuffer(2,2); for (let ch=0; ch<2; ch++){ const d=bufClipped.getChannelData(ch); for(let i=0;i<d.length;i++){ const v=Math.sin(2*Math.PI*80*i/sr)*1.2; d[i]= Math.max(-1, Math.min(1, v)); } }
+        results.push({ name:'clipped', analysis: await window.audioAnalyzer.analyzeAudioBufferDirect(bufClipped,'clipped') });
+        // 6. Estéreo desequilibrado (L -3 dB, R 0 dB)
+        const bufImbalance = makeBuffer(5,2); const gainL = Math.pow(10,-3/20), gainR = 1; for(let i=0;i<bufImbalance.length;i++){ const t=i/sr; const s=Math.sin(2*Math.PI*440*t); bufImbalance.getChannelData(0)[i]=s*gainL; bufImbalance.getChannelData(1)[i]=s*gainR; }
+        results.push({ name:'stereo_imbalance', analysis: await window.audioAnalyzer.analyzeAudioBufferDirect(bufImbalance,'stereoImbalance') });
+        // === Avaliação de critérios ===
+        const evals = [];
+        const approx = (val, target, tol) => Number.isFinite(val) && Math.abs(val - target) <= tol;
+        for (const r of results) {
+            const td = r.analysis?.technicalData || {};
+            if (r.name==='silence') {
+                evals.push({ case:'silence_lufs', pass: !Number.isFinite(td.lufsIntegrated) || td.lufsIntegrated < -100, observed: td.lufsIntegrated });
+                evals.push({ case:'silence_tp', pass: !Number.isFinite(td.truePeakDbtp) || td.truePeakDbtp <= -90, observed: td.truePeakDbtp });
+                evals.push({ case:'silence_lra', pass: !Number.isFinite(td.lra) || td.lra <= 0.1, observed: td.lra });
+            }
+            if (r.name==='sine_1k_-12dBFS') {
+                evals.push({ case:'sine_peak', pass: approx(td.truePeakDbtp ?? td.peak, -12, 0.6), observed: td.truePeakDbtp ?? td.peak });
+                if (Number.isFinite(td.truePeakDbtp) && Number.isFinite(td.headroomTruePeakDb)) {
+                    evals.push({ case:'sine_headroom_match', pass: approx(td.headroomTruePeakDb, -td.truePeakDbtp, 0.11), observed: td.headroomTruePeakDb });
+                }
+                if (Number.isFinite(td.lufsIntegrated)) evals.push({ case:'sine_lufs', pass: approx(td.lufsIntegrated, -12, 0.7), observed: td.lufsIntegrated });
+                evals.push({ case:'sine_lra', pass: (td.lra??0) <= 0.6, observed: td.lra });
+            }
+            if (r.name==='pink_noise_target') {
+                if (Number.isFinite(td.lufsIntegrated)) evals.push({ case:'pink_lufs', pass: Math.abs(td.lufsIntegrated + 14) <= 1.0, observed: td.lufsIntegrated });
+                if (Number.isFinite(td.lufsShortTerm) && Number.isFinite(td.lufsIntegrated)) evals.push({ case:'pink_st_integrated_gap', pass: Math.abs(td.lufsShortTerm - td.lufsIntegrated) <= 0.5, observed: td.lufsShortTerm - td.lufsIntegrated });
+            }
+            if (r.name==='almost_clipped') {
+                if (Number.isFinite(td.truePeakDbtp)) evals.push({ case:'almost_headroom', pass: approx(td.headroomTruePeakDb, -td.truePeakDbtp, 0.11), observed: td.headroomTruePeakDb });
+                const hasClipProb = (r.analysis.problems||[]).some(p=>p.type==='clipping');
+                evals.push({ case:'almost_no_clip_problem', pass: !hasClipProb, observed: hasClipProb });
+            }
+            if (r.name==='clipped') {
+                const hasClipProb = (r.analysis.problems||[]).some(p=>p.type==='clipping');
+                evals.push({ case:'clipped_problem_present', pass: hasClipProb, observed: hasClipProb });
+                if (Number.isFinite(td.truePeakDbtp)) evals.push({ case:'clipped_tp_non_negative', pass: td.truePeakDbtp >= -0.05, observed: td.truePeakDbtp });
+            }
+            if (r.name==='stereo_imbalance') {
+                if (Number.isFinite(td.balanceLR)) evals.push({ case:'stereo_balance_sign', pass: td.balanceLR < 0, observed: td.balanceLR });
+            }
+        }
+        const summary = { results: results.map(r=>({ name:r.name, tp:r.analysis?.technicalData?.truePeakDbtp, lufs:r.analysis?.technicalData?.lufsIntegrated, headroom:r.analysis?.technicalData?.headroomTruePeakDb, lra:r.analysis?.technicalData?.lra, balance:r.analysis?.technicalData?.balanceLR })), evals, pass: evals.every(e=>e.pass) };
+        if (window.DEBUG_ANALYZER) console.log('ACCEPTANCE TEST SUMMARY', summary);
+        return summary;
+    };
 }
 
 // Inicializar quando DOM carregar
@@ -653,7 +874,14 @@ function displayModalResults(analysis) {
     // Mostrar resultados
     results.style.display = 'block';
     
-    // Helpers seguros
+    // Marcar se pacote avançado chegou (LUFS integrado + True Peak + LRA)
+    const advancedReady = (
+        Number.isFinite(analysis?.technicalData?.lufsIntegrated) &&
+        Number.isFinite(analysis?.technicalData?.truePeakDbtp)
+    );
+    if (typeof window !== 'undefined') window.__AUDIO_ADVANCED_READY__ = advancedReady;
+
+    // Helpers seguros com bloqueio de fallback se advanced não pronto
     const safeFixed = (v, d=1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
     const safeHz = (v) => (Number.isFinite(v) ? `${Math.round(v)} Hz` : '—');
     const pct = (v, d=0) => (Number.isFinite(v) ? `${(v*100).toFixed(d)}%` : '—');
@@ -692,10 +920,13 @@ function displayModalResults(analysis) {
             row('RMS', `${safeFixed(analysis.technicalData.rms)} dB`, 'rms'),
             row('Dinâmica', `${safeFixed(analysis.technicalData.dynamicRange)} dB`, 'dynamicRange'),
             row('Crest Factor', `${safeFixed(analysis.technicalData.crestFactor)}`, 'crestFactor'),
-            row('True Peak', Number.isFinite(analysis.technicalData.truePeakDbtp) ? `${safeFixed(analysis.technicalData.truePeakDbtp)} dBTP` : '—', 'truePeakDbtp'),
-            row('LUFS (Int.)', Number.isFinite(analysis.technicalData.lufsIntegrated) ? `${safeFixed(analysis.technicalData.lufsIntegrated)} LUFS` : '—', 'lufsIntegrated'),
-            row('LRA', Number.isFinite(analysis.technicalData.lra) ? `${safeFixed(analysis.technicalData.lra)} dB` : '—', 'lra')
-        ].join('');
+            row('True Peak', (advancedReady && Number.isFinite(analysis.technicalData.truePeakDbtp)) ? `${safeFixed(analysis.technicalData.truePeakDbtp)} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
+            row('LUFS (Int.)', (advancedReady && Number.isFinite(analysis.technicalData.lufsIntegrated)) ? `${safeFixed(analysis.technicalData.lufsIntegrated)} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
+            row('LRA', (advancedReady && Number.isFinite(analysis.technicalData.lra)) ? `${safeFixed(analysis.technicalData.lra)} dB` : (advancedReady? '—':'⏳'), 'lra')
+            ].join('') + (
+                Number.isFinite(analysis.technicalData.loudnessOffsetDb) ?
+                row('Offset -23LUFS', `${safeFixed(analysis.technicalData.loudnessOffsetDb,1)} dB`, 'loudnessOffsetDb') : ''
+            );
 
         const col2 = [
             row('Correlação', Number.isFinite(analysis.technicalData.stereoCorrelation) ? safeFixed(analysis.technicalData.stereoCorrelation, 2) : '—', 'stereoCorrelation'),
@@ -708,25 +939,48 @@ function displayModalResults(analysis) {
             row('Flatness', Number.isFinite(analysis.technicalData.spectralFlatness) ? safeFixed(analysis.technicalData.spectralFlatness, 3) : '—', 'spectralFlatness')
         ].join('');
 
+            const col3Extras = (()=>{
+                let extra='';
+                try {
+                    const list = Array.isArray(analysis.technicalData.dominantFrequencies) ? analysis.technicalData.dominantFrequencies.slice() : [];
+                    if (list.length>1) {
+                        list.sort((a,b)=> (b.occurrences||0)-(a.occurrences||0) || a.frequency - b.frequency);
+                        const filtered=[];
+                        for (const f of list) {
+                            if (!Number.isFinite(f.frequency)) continue;
+                            if (filtered.some(x=> Math.abs(x.frequency - f.frequency) < 40)) continue;
+                            filtered.push(f); if (filtered.length>=5) break;
+                        }
+                        extra = filtered.slice(1,4).map(f=>`${Math.round(f.frequency)}Hz`).join(', ');
+                    }
+                } catch {}
+                return extra ? row('Top Freq. adicionais', `<span style="opacity:.9">${extra}</span>`) : '';
+            })();
             const col3 = [
                 row('Tonal Balance', analysis.technicalData?.tonalBalance ? tonalSummary(analysis.technicalData.tonalBalance) : '—', 'tonalBalance'),
                 (analysis.technicalData.dominantFrequencies.length > 0 ? row('Freq. Dominante', `${Math.round(analysis.technicalData.dominantFrequencies[0].frequency)} Hz`) : ''),
                 row('Problemas', analysis.problems.length > 0 ? `<span class="tag tag-danger">${analysis.problems.length} detectado(s)</span>` : '—'),
-                row('Sugestões', analysis.suggestions.length > 0 ? `<span class="tag tag-success">${analysis.suggestions.length} disponível(s)</span>` : '—')
+                row('Sugestões', analysis.suggestions.length > 0 ? `<span class="tag tag-success">${analysis.suggestions.length} disponível(s)</span>` : '—'),
+                col3Extras
             ].join('');
 
             // Card extra: Métricas Avançadas (novo card)
             const advancedMetricsCard = () => {
                 const rows = [];
                 // LUFS ST/M e Headroom
-                if (Number.isFinite(analysis.technicalData?.lufsShortTerm)) {
+                if (advancedReady && Number.isFinite(analysis.technicalData?.lufsShortTerm)) {
                     rows.push(row('LUFS (Short‑Term)', `${safeFixed(analysis.technicalData.lufsShortTerm, 1)} LUFS`, 'lufsShortTerm'));
                 }
-                if (Number.isFinite(analysis.technicalData?.lufsMomentary)) {
+                if (advancedReady && Number.isFinite(analysis.technicalData?.lufsMomentary)) {
                     rows.push(row('LUFS (Momentary)', `${safeFixed(analysis.technicalData.lufsMomentary, 1)} LUFS`, 'lufsMomentary'));
                 }
                 if (Number.isFinite(analysis.technicalData?.headroomDb)) {
-                    rows.push(row('Headroom', `${safeFixed(analysis.technicalData.headroomDb, 1)} dB`, 'headroomDb'));
+                    // Mostrar headroom real se calculado a partir do pico, senão offset de loudness
+                    const hrReal = Number.isFinite(analysis.technicalData.headroomTruePeakDb) ? analysis.technicalData.headroomTruePeakDb : null;
+                    if (hrReal != null) {
+                        rows.push(row('Headroom (Pico)', `${safeFixed(hrReal, 1)} dB`, 'headroomTruePeakDb'));
+                    }
+                    rows.push(row('Offset Loudness', `${safeFixed(analysis.technicalData.headroomDb, 1)} dB`, 'headroomDb'));
                 }
                 // Picos por canal
                 if (Number.isFinite(analysis.technicalData?.samplePeakLeftDb)) {
@@ -738,6 +992,9 @@ function displayModalResults(analysis) {
                 // Clipping (%)
                 if (Number.isFinite(analysis.technicalData?.clippingPct)) {
                     rows.push(row('Clipping (%)', `${safeFixed(analysis.technicalData.clippingPct, 2)}%`, 'clippingPct'));
+                }
+                if (Number.isFinite(analysis.technicalData?.clippingSamplesTruePeak)) {
+                    rows.push(row('Clipping (TP)', `${analysis.technicalData.clippingSamplesTruePeak} samples`, 'clippingSamplesTruePeak'));
                 }
                 // Frequências dominantes extras
                 if (Array.isArray(analysis.technicalData?.dominantFrequencies) && analysis.technicalData.dominantFrequencies.length > 1) {
@@ -969,14 +1226,27 @@ function renderReferenceComparisons(analysis) {
     const rows = [];
     const nf = (n, d=2) => Number.isFinite(n) ? n.toFixed(d) : '—';
     const pushRow = (label, val, target, tol, unit='') => {
-        if (!Number.isFinite(val) || !Number.isFinite(target)) return;
-        const diff = val - target;
-        const within = Number.isFinite(tol) ? Math.abs(diff) <= tol : false;
+        // Tratar target null ou NaN como N/A explicitamente
+        const targetIsNA = (target == null || target === '' || (typeof target==='number' && !Number.isFinite(target)));
+        if (!Number.isFinite(val) && targetIsNA) return; // nada útil
+        if (targetIsNA) {
+            rows.push(`<tr>
+                <td>${label}</td>
+                <td>${Number.isFinite(val)?nf(val)+unit:'—'}</td>
+                <td colspan="2" style="opacity:.55">N/A</td>
+            </tr>`);
+            return;
+        }
+        const diff = Number.isFinite(val) && Number.isFinite(target) ? (val - target) : null;
+        const within = Number.isFinite(diff) && Number.isFinite(tol) ? Math.abs(diff) <= tol : false;
+        const diffCell = Number.isFinite(diff)
+            ? `<td class="${within?'ok':'warn'}">${diff>0?'+':''}${nf(diff)}${unit}</td>`
+            : '<td class="na" style="opacity:.55">—</td>';
         rows.push(`<tr>
             <td>${label}</td>
-            <td>${nf(val)}${unit}</td>
-            <td>${nf(target)}${unit}${tol!=null?`<span class="tol">±${nf(tol,2)}</span>`:''}</td>
-            <td class="${within?'ok':'warn'}">${diff>0?'+':''}${nf(diff)}${unit}</td>
+            <td>${Number.isFinite(val)?nf(val)+unit:'—'}</td>
+            <td>${Number.isFinite(target)?nf(target)+unit:'N/A'}${tol!=null?`<span class="tol">±${nf(tol,2)}</span>`:''}</td>
+            ${diffCell}
         </tr>`);
     };
     // Usar somente métricas reais (sem fallback para RMS/Peak, que têm unidades e conceitos distintos)
@@ -989,10 +1259,15 @@ function renderReferenceComparisons(analysis) {
     const preferLog = (typeof window !== 'undefined' && window.USE_LOG_BAND_ENERGIES === true);
     const bandEnergies = (preferLog ? (tech.bandEnergiesLog || tech.bandEnergies) : tech.bandEnergies) || null;
     if (bandEnergies && ref.bands) {
+        const normMap = (analysis?.technicalData?.refBandTargetsNormalized?.mapping) || null;
+        const showNorm = (typeof window !== 'undefined' && window.SHOW_NORMALIZED_REF_TARGETS === true && normMap);
         for (const [band, refBand] of Object.entries(ref.bands)) {
             const bLocal = bandEnergies[band];
             if (bLocal && Number.isFinite(bLocal.rms_db)) {
-                pushRow(band, bLocal.rms_db, refBand.target_db, refBand.tol_db);
+                let tgt = null;
+                if (!refBand._target_na && Number.isFinite(refBand.target_db)) tgt = refBand.target_db;
+                if (showNorm && normMap && Number.isFinite(normMap[band])) tgt = normMap[band];
+                pushRow(band, bLocal.rms_db, tgt, refBand.tol_db);
             }
         }
     } else {
