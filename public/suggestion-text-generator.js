@@ -54,6 +54,73 @@ class SuggestionTextGenerator {
             
             // Padrões normais (azul/verde)
             normal: [
+                // PADRÕES PARA BANDAS DE FREQUÊNCIA ESPECÍFICAS
+                {
+                    match: /banda.*low_bass|low_bass.*acima|low_bass.*abaixo/i,
+                    title: "🔉 Sub-Graves (60-120Hz)",
+                    explanation: "Os sub-graves são a fundação do seu mix, responsáveis pela sensação de 'peso' e impacto físico. Quando estão desbalanceados, podem deixar o áudio 'pesado' demais ou sem corpo.",
+                    action: "Ajuste a região de 60-120Hz com EQ suave ou filtragem controlada",
+                    rationale: "Sub-graves bem dosados criam impacto sem mascarar outras frequências",
+                    technical: "Banda low_bass detectada fora dos parâmetros ideais para o gênero"
+                },
+                {
+                    match: /banda.*upper_bass|upper_bass.*acima|upper_bass.*abaixo/i,
+                    title: "🔊 Graves (120-250Hz)",
+                    explanation: "Esta região define a 'pegada' dos instrumentos graves como kick e baixo. Excesso aqui deixa o som 'embolado', enquanto falta remove a energia e groove da música.",
+                    action: "Balance a região de 120-250Hz com cortes/boosts precisos",
+                    rationale: "Graves equilibrados mantêm a energia sem comprometer a clareza",
+                    technical: "Banda upper_bass apresenta desvio significativo do target de referência"
+                },
+                {
+                    match: /banda.*low_mid|low_mid.*acima|low_mid.*abaixo/i,
+                    title: "🎸 Médios-Graves (250-500Hz)",
+                    explanation: "Região crucial para o 'corpo' dos instrumentos. Problemas aqui causam sensação de 'caixa' ou som 'oco'. É onde muitos instrumentos competem por espaço.",
+                    action: "Ajuste 250-500Hz com precisão para resolver conflitos entre instrumentos",
+                    rationale: "Médios-graves limpos separam instrumentos e criam profundidade",
+                    technical: "Banda low_mid com acúmulo/deficiência que afeta a definição instrumental"
+                },
+                {
+                    match: /banda.*mid[^_]|(?:^|\s)mid.*acima|(?:^|\s)mid.*abaixo/i,
+                    title: "🎤 Médios (500Hz-2kHz)",
+                    explanation: "O coração da música! Esta região define a presença e inteligibilidade dos vocais e instrumentos melódicos. É onde nosso ouvido é mais sensível.",
+                    action: "Trabalhe 500Hz-2kHz com cuidado - pequenos ajustes fazem grande diferença",
+                    rationale: "Médios balanceados garantem clareza vocal e presença instrumental",
+                    technical: "Banda mid central apresenta desequilíbrio que afeta a presença geral"
+                },
+                {
+                    match: /banda.*high_mid|high_mid.*acima|high_mid.*abaixo/i,
+                    title: "✨ Médios-Agudos (2-6kHz)",
+                    explanation: "Região da 'presença' e 'brilho' dos instrumentos. Excesso causa fadiga auditiva e sons 'duros', enquanto falta deixa o áudio 'apagado' e sem vida.",
+                    action: "Ajuste 2-6kHz para equilibrar presença sem agressividade",
+                    rationale: "Médios-agudos controlados criam presença agradável e definição",
+                    technical: "Banda high_mid com energia excessiva/insuficiente para o estilo musical"
+                },
+                {
+                    match: /banda.*brilho|brilho.*acima|brilho.*abaixo/i,
+                    title: "💎 Agudos/Brilho (6-12kHz)",
+                    explanation: "Responsáveis pelo 'ar' e 'brilho' do mix. Esta região adiciona clareza e espacialidade, mas excesso causa sibilância e fadiga. É crucial para a percepção de qualidade.",
+                    action: "Balance os agudos (6-12kHz) com shelving suave ou EQ cirúrgico",
+                    rationale: "Agudos bem dosados adicionam clareza sem causar fadiga auditiva",
+                    technical: "Banda de brilho com desvio que afeta a percepção de qualidade e espacialidade"
+                },
+                {
+                    match: /graves.*várias.*bandas|várias.*bandas.*graves/i,
+                    title: "🔥 Região Grave Geral",
+                    explanation: "Múltiplas bandas graves estão desbalanceadas, afetando toda a fundação do seu mix. Isso pode causar problemas de tradução em diferentes sistemas de reprodução.",
+                    action: "Revise toda a região grave (60-500Hz) com EQ global ou multiband",
+                    rationale: "Graves bem distribuídos criam base sólida e tradução consistente",
+                    technical: "Múltiplas bandas graves fora dos parâmetros ideais detectadas"
+                },
+                {
+                    match: /médios.*várias.*bandas|várias.*bandas.*médios/i,
+                    title: "🎯 Região Média Geral",
+                    explanation: "Várias bandas de frequências médias precisam de atenção. Esta é a região mais importante para clareza vocal e separação instrumental.",
+                    action: "Trabalhe toda a região média (250Hz-6kHz) para melhorar clareza",
+                    rationale: "Médios equilibrados são essenciais para mix profissional e inteligibilidade",
+                    technical: "Múltiplas bandas médias apresentam desequilíbrios significativos"
+                },
+                
+                // PADRÕES GERAIS DE EQ E DINÂMICA
                 {
                     match: /eq|equaliz|frequên/i,
                     title: "🎛️ Ajuste de EQ Sugerido",
