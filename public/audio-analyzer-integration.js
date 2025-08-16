@@ -1,6 +1,20 @@
 // 🎵 AUDIO ANALYZER INTEGRATION
 // Conecta o sistema de análise de áudio com o chat existente
 
+// 📝 Carregar gerador de texto didático
+if (typeof window !== 'undefined' && !window.SuggestionTextGenerator) {
+    const script = document.createElement('script');
+    script.src = 'suggestion-text-generator.js';
+    script.async = true;
+    script.onload = () => {
+        console.log('[AudioIntegration] Gerador de texto didático carregado');
+    };
+    script.onerror = () => {
+        console.warn('[AudioIntegration] Falha ao carregar gerador de texto didático');
+    };
+    document.head.appendChild(script);
+}
+
 // Debug flag (silencia logs em produção; defina window.DEBUG_ANALYZER = true para habilitar)
 const __DEBUG_ANALYZER__ = (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true);
 const __dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log(...a); };
@@ -925,7 +939,7 @@ function displayModalResults(analysis) {
             row('LRA', (advancedReady && Number.isFinite(analysis.technicalData.lra)) ? `${safeFixed(analysis.technicalData.lra)} dB` : (advancedReady? '—':'⏳'), 'lra')
             ].join('') + (
                 Number.isFinite(analysis.technicalData.loudnessOffsetDb) ?
-                row('Δ vs -23 LUFS', `${analysis.technicalData.loudnessOffsetDb>0?'+':''}${safeFixed(analysis.technicalData.loudnessOffsetDb,1)} LU`, 'loudnessOffsetDb') : ''
+                row('Offset -23LUFS', `${safeFixed(analysis.technicalData.loudnessOffsetDb,1)} dB`, 'loudnessOffsetDb') : ''
             );
 
         const col2 = [
@@ -1008,18 +1022,115 @@ function displayModalResults(analysis) {
             // Card extra: Problemas Técnicos detalhados
             const techProblems = () => {
                 const rows = [];
+                let hasActualProblems = false;
+                
+                // ===== SEMPRE MOSTRAR TODAS AS MÉTRICAS TÉCNICAS =====
+                
+                // 1. Clipping - SEMPRE mostrar com valores reais
                 const clipVal = Number.isFinite(analysis.technicalData?.clippingSamples) ? analysis.technicalData.clippingSamples : 0;
+                const clipPct = Number.isFinite(analysis.technicalData?.clippingPct) ? analysis.technicalData.clippingPct : 0;
+                const peak = Number.isFinite(analysis.technicalData?.peak) ? analysis.technicalData.peak : -Infinity;
+                const truePeak = Number.isFinite(analysis.technicalData?.truePeakDbtp) ? analysis.technicalData.truePeakDbtp : null;
+                
+                // Critérios de problema de clipping mais rigorosos e realistas
+                const hasPeakClipping = peak > -0.1; // Mais rigoroso: -0.1dB ao invés de -0.5dB
+                const hasTruePeakClipping = truePeak !== null && truePeak > -0.1; // True Peak acima de -0.1dBTP
+                const hasSampleClipping = clipVal > 0;
+                const hasPercentageClipping = clipPct > 0;
+                
+                const hasClippingProblem = hasPeakClipping || hasTruePeakClipping || hasSampleClipping || hasPercentageClipping;
+                
+                let clipText = '';
+                let clipClass = '';
+                
+                if (hasClippingProblem) {
+                    hasActualProblems = true;
+                    clipClass = 'warn';
+                    
+                    // Mostrar informação mais detalhada do problema
+                    const details = [];
+                    if (hasPeakClipping) details.push(`Peak: ${peak.toFixed(2)}dB`);
+                    if (hasTruePeakClipping) details.push(`TruePeak: ${truePeak.toFixed(2)}dBTP`);
+                    if (hasSampleClipping) details.push(`${clipVal} samples (${clipPct.toFixed(3)}%)`);
+                    
+                    clipText = details.join(' | ');
+                } else {
+                    // Mostrar valores mesmo quando não há problema
+                    const safeDetails = [];
+                    safeDetails.push(`${clipVal} samples`);
+                    if (peak > -Infinity) safeDetails.push(`Peak: ${peak.toFixed(2)}dB`);
+                    if (truePeak !== null) safeDetails.push(`TP: ${truePeak.toFixed(2)}dBTP`);
+                    
+                    clipText = safeDetails.join(' | ');
+                }
+                rows.push(row('Clipping', `<span class="${clipClass}">${clipText}</span>`, 'clippingSamples'));
+                
+                // 2. DC Offset - SEMPRE mostrar
                 const dcVal = Number.isFinite(analysis.technicalData?.dcOffset) ? analysis.technicalData.dcOffset : 0;
-                rows.push(row('Clipping', `<span class="warn">${clipVal} samples</span>`, 'clippingSamples'));
-                rows.push(row('DC Offset', `${safeFixed(dcVal, 4)}`, 'dcOffset'));
-                // Consistência (se disponível)
+                const hasDcProblem = Math.abs(dcVal) > 0.01;
+                if (hasDcProblem) hasActualProblems = true;
+                const dcClass = hasDcProblem ? 'warn' : '';
+                rows.push(row('DC Offset', `<span class="${dcClass}">${safeFixed(dcVal, 4)}</span>`, 'dcOffset'));
+                
+                // 3. THD - SEMPRE mostrar
+                const thdVal = Number.isFinite(analysis.technicalData?.thdPercent) ? analysis.technicalData.thdPercent : 0;
+                const hasThdProblem = thdVal > 1.0;
+                if (hasThdProblem) hasActualProblems = true;
+                const thdClass = hasThdProblem ? 'warn' : '';
+                rows.push(row('THD', `<span class="${thdClass}">${safeFixed(thdVal, 2)}%</span>`, 'thdPercent'));
+                
+                // 4. Stereo Correlation - SEMPRE mostrar
+                const stereoCorr = Number.isFinite(analysis.technicalData?.stereoCorrelation) ? analysis.technicalData.stereoCorrelation : 0;
+                const hasStereoProb = stereoCorr !== null && (stereoCorr < -0.3 || stereoCorr > 0.95);
+                if (hasStereoProb) hasActualProblems = true;
+                const stereoClass = hasStereoProb ? 'warn' : '';
+                let stereoText = safeFixed(stereoCorr, 3);
+                if (hasStereoProb) {
+                    const status = stereoCorr < -0.3 ? 'Fora de fase' : 'Mono demais';
+                    stereoText += ` (${status})`;
+                }
+                rows.push(row('Stereo Corr.', `<span class="${stereoClass}">${stereoText}</span>`, 'stereoCorrelation'));
+                
+                // 5. Crest Factor - SEMPRE mostrar  
+                const crestVal = Number.isFinite(analysis.technicalData?.crestFactor) ? analysis.technicalData.crestFactor : 0;
+                const hasCrestProblem = crestVal < 6 || crestVal > 20; // Valores normais: 6-20dB
+                if (hasCrestProblem) hasActualProblems = true;
+                const crestClass = hasCrestProblem ? 'warn' : '';
+                rows.push(row('Crest Factor', `<span class="${crestClass}">${safeFixed(crestVal, 1)}dB</span>`, 'crestFactor'));
+                
+                // Consistência (se disponível) - mas sempre tentar mostrar
                 if (analysis.metricsValidation && Object.keys(analysis.metricsValidation).length) {
                     const mv = analysis.metricsValidation;
                     const badge = (k,v) => `<span style="padding:2px 6px;border-radius:4px;font-size:11px;background:${v==='ok'?'#143f2b':(v==='warn'?'#4d3808':'#4a1d1d')};color:${v==='ok'?'#29c182':(v==='warn'?'#ffce4d':'#ff7d7d')};margin-left:6px;">${v}</span>`;
-                    if (mv.dynamicRangeConsistency) rows.push(row('DR Consistência', `Δ=${mv.dynamicRangeDelta} ${badge('dr', mv.dynamicRangeConsistency)}`));
-                    if (mv.crestFactorConsistency) rows.push(row('Crest Consist.', `Δ=${mv.crestVsExpectedDelta} ${badge('cf', mv.crestFactorConsistency)}`));
-                    if (mv.lraPlausibility) rows.push(row('LRA Plausível', badge('lra', mv.lraPlausibility)));
+                    
+                    if (mv.dynamicRangeConsistency) {
+                        rows.push(row('DR Consistência', `Δ=${mv.dynamicRangeDelta || '0'} ${badge('dr', mv.dynamicRangeConsistency)}`));
+                        if (mv.dynamicRangeConsistency !== 'ok') hasActualProblems = true;
+                    } else {
+                        rows.push(row('DR Consistência', `<span style="opacity:0.6;">Δ=0 ${badge('dr', 'ok')}</span>`));
+                    }
+                    
+                    if (mv.crestFactorConsistency) {
+                        rows.push(row('Crest Consist.', `Δ=${mv.crestVsExpectedDelta || '0'} ${badge('cf', mv.crestFactorConsistency)}`));
+                        if (mv.crestFactorConsistency !== 'ok') hasActualProblems = true;
+                    } else {
+                        rows.push(row('Crest Consist.', `<span style="opacity:0.6;">Δ=0 ${badge('cf', 'ok')}</span>`));
+                    }
+                    
+                    if (mv.lraPlausibility) {
+                        rows.push(row('LRA Plausível', badge('lra', mv.lraPlausibility)));
+                        if (mv.lraPlausibility !== 'ok') hasActualProblems = true;
+                    } else {
+                        rows.push(row('LRA Plausível', `<span style="opacity:0.6;">${badge('lra', 'ok')}</span>`));
+                    }
+                } else {
+                    // Mostrar como não disponível/OK
+                    const badge = (v) => `<span style="padding:2px 6px;border-radius:4px;font-size:11px;background:#143f2b;color:#29c182;margin-left:6px;">${v}</span>`;
+                    rows.push(row('DR Consistência', `<span style="opacity:0.6;">Δ=0 ${badge('ok')}</span>`));
+                    rows.push(row('Crest Consist.', `<span style="opacity:0.6;">Δ=0 ${badge('ok')}</span>`));
+                    rows.push(row('LRA Plausível', `<span style="opacity:0.6;">${badge('ok')}</span>`));
                 }
+                
                 return rows.join('');
             };
 
@@ -1036,59 +1147,143 @@ function displayModalResults(analysis) {
                     });
                 };
                 const renderSuggestionItem = (sug) => {
-                    const title = sug.message || '';
-                    let action = sug.action || '';
-                    let extra = '';
+                    // 🎯 Verificar se o gerador de texto didático está disponível
+                    const hasTextGenerator = typeof window.SuggestionTextGenerator !== 'undefined';
+                    let didacticText = null;
+                    
+                    if (hasTextGenerator) {
+                        try {
+                            const generator = new window.SuggestionTextGenerator();
+                            didacticText = generator.generateDidacticText(sug);
+                        } catch (error) {
+                            console.warn('[RenderSuggestion] Erro no gerador de texto:', error);
+                        }
+                    }
+                    
+                    // 🚨 VERIFICAR SE É UM AVISO CRÍTICO
+                    if (didacticText?.isCritical) {
+                        return `
+                            <div class="diag-item critical enhanced didactic-card" style="border-left: 4px solid #F44336; background: rgba(244, 67, 54, 0.1); min-height: auto; padding: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                    <div style="flex: 1; font-weight: 700; font-size: 14px; color: #F44336;">${didacticText.title}</div>
+                                    <span style="background: #F44336; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;">CRÍTICO</span>
+                                </div>
+                                <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #ff6b6b; font-weight: 500;">
+                                    ${didacticText.explanation}
+                                </div>
+                                <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(244, 67, 54, 0.15); border-radius: 4px; border-left: 3px solid #F44336;">
+                                    <strong>🚨 Ação Urgente:</strong> ${didacticText.action}
+                                </div>
+                                <div class="didactic-rationale" style="font-size: 11px; opacity: 0.9; font-style: italic; margin: 8px 0; padding: 6px; background: rgba(244, 67, 54, 0.05); border-radius: 3px;">
+                                    <strong>⚠️ Por que é crítico:</strong> ${didacticText.rationale}
+                                </div>
+                                <div class="didactic-technical" style="font-size: 10px; opacity: 0.8; margin-top: 8px; padding: 4px; background: rgba(0,0,0,0.3); border-radius: 3px; font-family: monospace;">
+                                    🔍 ${didacticText.technical}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // 🔍 VERIFICAR SE É UMA INCONSISTÊNCIA
+                    if (didacticText?.isInconsistent) {
+                        return `
+                            <div class="diag-item inconsistent enhanced didactic-card" style="border-left: 4px solid #FF9800; background: rgba(255, 152, 0, 0.1); min-height: auto; padding: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                    <div style="flex: 1; font-weight: 700; font-size: 14px; color: #FF9800;">${didacticText.title}</div>
+                                    <span style="background: #FF9800; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;">SUSPEITO</span>
+                                </div>
+                                <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #F57C00; font-weight: 500;">
+                                    ${didacticText.explanation}
+                                </div>
+                                <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(255, 152, 0, 0.15); border-radius: 4px; border-left: 3px solid #FF9800;">
+                                    <strong>⚠️ Ação Recomendada:</strong> ${didacticText.action}
+                                </div>
+                                <div class="didactic-rationale" style="font-size: 11px; opacity: 0.9; font-style: italic; margin: 8px 0; padding: 6px; background: rgba(255, 152, 0, 0.05); border-radius: 3px;">
+                                    <strong>🔍 Por que é suspeito:</strong> ${didacticText.rationale}
+                                </div>
+                                <div class="didactic-technical" style="font-size: 10px; opacity: 0.8; margin-top: 8px; padding: 4px; background: rgba(0,0,0,0.3); border-radius: 3px; font-family: monospace;">
+                                    ⚠️ ${didacticText.technical}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // Usar texto didático se disponível, senão usar texto original
+                    const title = didacticText?.title || sug.message || '';
+                    const explanation = didacticText?.explanation || '';
+                    const action = didacticText?.action || sug.action || '';
+                    const rationale = didacticText?.rationale || '';
+                    const technical = didacticText?.technical || sug.details || '';
+                    
+                    // 🎯 SISTEMA MELHORADO: Verificar se tem informações de severidade e prioridade
+                    const hasEnhancedInfo = sug.severity && sug.priority;
+                    const severityColor = hasEnhancedInfo ? sug.severity.color : '#9fb3d9';
+                    const severityLabel = hasEnhancedInfo ? sug.severity.label : '';
+                    const priority = hasEnhancedInfo ? sug.priority : 0;
+                    const confidence = hasEnhancedInfo ? sug.confidence : 1;
                     
                     // Detectar sugestões cirúrgicas
-                    const isSurgical = sug.type === 'surgical_eq';
+                    const isSurgical = sug.type === 'surgical_eq' || (sug.subtype && ['sibilance', 'harshness', 'clipping'].includes(sug.subtype));
                     
                     if (isSurgical) {
-                        // Formato especial para sugestões cirúrgicas
-                        const freqMatch = title.match(/\[(\d+)Hz\]/);
-                        const frequency = freqMatch ? freqMatch[1] : '?';
-                        const [freqInfo, severity] = title.split(' - ');
-                        const context = freqInfo.replace(/\[\d+Hz\]/, '').trim();
+                        // Formato especial para sugestões cirúrgicas/heurísticas
+                        const freqMatch = title.match(/\[(\d+)Hz\]/) || title.match(/(\d+)Hz/);
+                        const frequency = freqMatch ? freqMatch[1] : (sug.technical?.frequency || sug.technical?.dominantFreq || '?');
+                        const context = title.replace(/\[\d+Hz\]/, '').replace(/\d+Hz/, '').trim();
                         
                         return `
-                            <div class="diag-item surgical">
+                            <div class="diag-item surgical enhanced didactic-card" style="border-left: 3px solid ${severityColor}; min-height: auto;">
                                 <div class="surgical-header">
                                     <span class="frequency-badge">${frequency} Hz</span>
-                                    <span class="severity-badge ${severity || 'moderada'}">${severity || 'moderada'}</span>
+                                    <span class="severity-badge" style="background: ${severityColor}; color: #fff;">${severityLabel || 'detectado'}</span>
+                                    ${hasEnhancedInfo ? `<span class="priority-badge" style="opacity: 0.7; font-size: 10px;">P:${priority.toFixed(1)}</span>` : ''}
                                 </div>
-                                <div class="context">${context}</div>
-                                <div class="surgical-action">${action}</div>
-                                <div class="surgical-details">${sug.details || ''}</div>
+                                <div class="context" style="margin: 8px 0; line-height: 1.4;">${context}</div>
+                                ${explanation ? `<div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #e8e8e8;">${explanation}</div>` : ''}
+                                <div class="surgical-action" style="margin: 6px 0; padding: 6px; background: rgba(255,255,255,0.05); border-radius: 4px;">${action}</div>
+                                ${rationale ? `<div class="didactic-rationale" style="font-size: 11px; opacity: 0.85; font-style: italic; margin: 6px 0;">${rationale}</div>` : ''}
+                                ${technical ? `<div class="surgical-details" style="font-size: 10px; opacity: 0.7; margin-top: 6px;">${technical}</div>` : ''}
                             </div>`;
                     } else {
-                        // Formato padrão para outras sugestões
-                        // Se a ação tiver métrica após " — ", mover para detalhes
-                        const split = action.split(' — ');
-                        if (split.length > 1) {
-                            action = split[0];
-                            extra = split.slice(1).join(' — ');
-                        }
-                        // Unificar detalhes e remover duplicados para ficar limpo
-                        const rawPieces = [sug.details || '', extra || '']
-                            .filter(Boolean)
-                            .join(' • ')
-                            .split(/[;•]+/)
-                            .map(s => s.trim())
-                            .filter(Boolean);
-                        const seen = new Set();
-                        const uniquePieces = rawPieces.filter(p => {
-                            const key = p.toLowerCase();
-                            if (seen.has(key)) return false;
-                            seen.add(key);
-                            return true;
-                        });
-                        const prettyDetails = formatNumbers(uniquePieces.join(' • '), 2);
+                        // Formato melhorado para outras sugestões com texto didático
+                        // CSS class baseado na severidade
+                        const severityClass = hasEnhancedInfo ? `severity-${sug.severity.level}` : 'info';
                         
                         return `
-                            <div class="diag-item info">
-                                <div class="diag-title">${title}</div>
-                                ${action ? `<div class="diag-tip">${action}</div>` : ''}
-                                ${prettyDetails ? `<div class="diag-tip" style="opacity:.85;font-size:12px;">${prettyDetails}</div>` : ''}
+                            <div class="diag-item ${severityClass} enhanced didactic-card" style="border-left: 3px solid ${severityColor}; min-height: auto; padding: 12px;">
+                                <div class="diag-header" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                    <div class="diag-title" style="flex: 1; font-weight: 600; font-size: 14px;">${title}</div>
+                                    ${hasEnhancedInfo ? `
+                                        <div class="severity-indicators" style="display: flex; gap: 4px; align-items: center;">
+                                            <span class="severity-dot" style="width: 8px; height: 8px; border-radius: 50%; background: ${severityColor};"></span>
+                                            <span class="priority-text" style="font-size: 10px; opacity: 0.7;">P:${priority.toFixed(1)}</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                
+                                ${explanation ? `
+                                    <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #e8e8e8;">
+                                        ${explanation}
+                                    </div>
+                                ` : ''}
+                                
+                                ${action ? `
+                                    <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; border-left: 2px solid ${severityColor};">
+                                        <strong>🔧 Ação:</strong> ${action}
+                                    </div>
+                                ` : ''}
+                                
+                                ${rationale ? `
+                                    <div class="didactic-rationale" style="font-size: 11px; opacity: 0.85; font-style: italic; margin: 8px 0; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 3px;">
+                                        <strong>💡 Por quê:</strong> ${rationale}
+                                    </div>
+                                ` : ''}
+                                
+                                ${technical ? `
+                                    <div class="didactic-technical" style="font-size: 10px; opacity: 0.7; margin-top: 8px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 3px; font-family: monospace;">
+                                        📊 ${technical}
+                                    </div>
+                                ` : ''}
                             </div>`;
                     }
                 };
@@ -1100,31 +1295,88 @@ function displayModalResults(analysis) {
                         const sol = typeof p.solution === 'string' ? p.solution.replace(/(-?\d+\.\d{3,})/g, m => {
                             const n = parseFloat(m); return Number.isFinite(n) ? n.toFixed(2) : m;
                         }) : p.solution;
-                        return `
-                        <div class="diag-item danger">
-                            <div class="diag-title">${msg}</div>
-                            <div class="diag-tip">${sol || ''}</div>
-                        </div>`;
+                        
+                        // 🚨 USAR CARDS CRÍTICOS VERMELHOS PARA PROBLEMAS
+                        const hasTextGenerator = typeof window.SuggestionTextGenerator !== 'undefined';
+                        let didacticText = null;
+                        
+                        if (hasTextGenerator) {
+                            try {
+                                const generator = new window.SuggestionTextGenerator();
+                                // Transformar problema em sugestão para usar o gerador
+                                const problemAsSuggestion = {
+                                    message: msg,
+                                    action: sol,
+                                    type: p.type,
+                                    severity: p.severity
+                                };
+                                didacticText = generator.generateDidacticText(problemAsSuggestion);
+                            } catch (error) {
+                                console.warn('[RenderProblem] Erro no gerador de texto:', error);
+                            }
+                        }
+                        
+                        // Se for problema crítico (clipping, etc), usar card crítico vermelho
+                        if (didacticText?.isCritical || p.type === 'clipping' || p.severity === 'high') {
+                            return `
+                                <div class="diag-item critical enhanced didactic-card" style="border-left: 4px solid #F44336; background: rgba(244, 67, 54, 0.1); min-height: auto; padding: 12px; margin: 8px 0; border-radius: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <div style="flex: 1; font-weight: 700; font-size: 14px; color: #F44336;">${didacticText?.title || `🚨 ${msg}`}</div>
+                                        <span style="background: #F44336; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;">CRÍTICO</span>
+                                    </div>
+                                    ${didacticText?.explanation ? `
+                                        <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #ff6b6b; font-weight: 500;">
+                                            ${didacticText.explanation}
+                                        </div>
+                                    ` : ''}
+                                    <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(244, 67, 54, 0.15); border-radius: 4px; border-left: 3px solid #F44336;">
+                                        <strong>🚨 Ação Urgente:</strong> ${didacticText?.action || sol || 'Corrija imediatamente este problema'}
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            // Para problemas menos críticos, usar o formato padrão melhorado
+                            return `
+                                <div class="diag-item danger" style="border-left: 4px solid #FF9800; background: rgba(255, 152, 0, 0.1); padding: 12px; margin: 8px 0; border-radius: 8px;">
+                                    <div class="diag-title" style="font-weight: 600; color: #FF9800; margin-bottom: 8px;">${msg}</div>
+                                    ${sol ? `<div class="diag-tip" style="font-size: 13px; color: #F57C00;">${sol}</div>` : ''}
+                                </div>
+                            `;
+                        }
                     }).join('');
-                    blocks.push(`<div class="diag-section"><div class="diag-heading">Problemas:</div>${list}</div>`);
+                    blocks.push(`<div class="diag-section"><div class="diag-heading">⚠️ Problemas Detectados:</div>${list}</div>`);
                 }
                 if (analysis.suggestions.length > 0) {
                     const list = analysis.suggestions.map(s => renderSuggestionItem(s)).join('');
-                                        // Rodapé com contagem por tipo (texto simples, sem CSS novo)
-                                        try {
-                                                const count = (t) => analysis.suggestions.filter(s => s && s.type === t).length;
-                                                const cBand = count('band_adjust');
-                                                const cGroup = count('band_group_adjust');
-                                                const cSurg = count('surgical_eq');
-                                                const footer = `<div style="opacity:.8;font-size:11px;margin-top:8px;">`+
-                                                    `Resumo: ${cBand} ajuste(s) de banda`+
-                                                    `${cGroup?` • ${cGroup} agrupado(s)`:''}`+
-                                                    `${cSurg?` • ${cSurg} cirúrgico(s)`:''}`+
-                                                    `</div>`;
-                                                blocks.push(`<div class="diag-section"><div class="diag-heading">Sugestões:</div>${list}${footer}</div>`);
-                                        } catch {
-                                                blocks.push(`<div class="diag-section"><div class="diag-heading">Sugestões:</div>${list}</div>`);
-                                        }
+                    
+                    // 🎯 Rodapé melhorado com informações do Enhanced System
+                    try {
+                        const count = (t) => analysis.suggestions.filter(s => s && s.type === t).length;
+                        const cBand = count('band_adjust');
+                        const cGroup = count('band_group_adjust');
+                        const cSurg = count('surgical_eq');
+                        const cRef = count('reference_loudness') + count('reference_dynamics') + count('reference_lra') + count('reference_stereo') + count('reference_true_peak');
+                        const cHeuristic = analysis.suggestions.filter(s => s && s.type && s.type.startsWith('heuristic_')).length;
+                        
+                        // Estatísticas do Enhanced System (se disponível)
+                        let enhancedStats = '';
+                        if (analysis.enhancedMetrics) {
+                            const em = analysis.enhancedMetrics;
+                            const avgPriority = analysis.suggestions.length > 0 ? 
+                                (analysis.suggestions.reduce((sum, s) => sum + (s.priority || 0), 0) / analysis.suggestions.length) : 0;
+                            
+                            enhancedStats = ` • 🎯 Enhanced System: conf=${(em.confidence || 1).toFixed(2)} avgP=${avgPriority.toFixed(2)}`;
+                            
+                            if (em.processingTimeMs) {
+                                enhancedStats += ` (${em.processingTimeMs}ms)`;
+                            }
+                        }
+                        
+                        // Footer removido - sem estatísticas desnecessárias
+                        blocks.push(`<div class="diag-section"><div class="diag-heading">🩺 Sugestões Priorizadas</div>${list}</div>`);
+                    } catch {
+                        blocks.push(`<div class="diag-section"><div class="diag-heading">🩺 Sugestões</div>${list}</div>`);
+                    }
                 }
                 // Subbloco opcional com diagnósticos do V2 PRO (quando disponíveis)
                 const v2Pro = analysis.v2Pro || analysis.v2Diagnostics; // Compatibilidade
@@ -1134,17 +1386,7 @@ function displayModalResults(analysis) {
                             <div class="diag-title">${p.message}</div>
                             <div class="diag-tip">${p.solution || ''}</div>
                         </div>`).join('');
-                    const v2s = (v2Pro.suggestions || []).map(s => renderSuggestionItem(s)).join('');
-                    const anyV2 = v2p || v2s;
-                    if (anyV2) {
-                        const v2Block = `
-                            <div class="diag-section">
-                                <div class="diag-heading">🎯 Diagnósticos Avançados (V2 Pro):</div>
-                                ${v2p ? `<div class=\"diag-subheading\">⚠️ Problemas Detectados</div>${v2p}` : ''}
-                                ${v2s ? `<div class=\"diag-subheading\">💡 Sugestões Técnicas</div>${v2s}` : ''}
-                            </div>`;
-                        blocks.push(v2Block);
-                    }
+                    // V2 Pro removido - não mostrar diagnósticos duplicados
                 }
                 return blocks.join('') || '<div class="diag-empty">Sem diagnósticos</div>';
             };
@@ -1316,25 +1558,14 @@ function renderSmartSummary(analysis){
             }));
         }
         const topActions = steps.slice(0,3);
-        const clean = (v, fallback='') => {
-            if (v === null || v === undefined) return fallback;
-            if (typeof v === 'boolean') return fallback; // evita 'true'/'false' visíveis
-            const s = String(v).trim();
-            return s.length ? s : fallback;
-        };
         const actionItems = topActions.map(a=>{
-            const titulo = clean(a.titulo, 'Ação');
-            const stemTxt = clean(a.stem, '');
-            const paramTxt = clean(a.parametroPrincipal, '');
-            const condTxt = clean(a.condicao, '');
-            const porqueTxt = clean(a.porque, 'Melhora coerência sonora.');
-            const stem = stemTxt ? `<span class="ss-stem">${stemTxt}</span>` : '';
-            const param = paramTxt ? `<span class="ss-param">${paramTxt}</span>` : '';
-            const cond = condTxt ? `<span class="ss-cond">${condTxt}</span>` : '';
+            const stem = a.stem ? `<span class="ss-stem">${a.stem}</span>` : '';
+            const param = a.parametroPrincipal ? `<span class="ss-param">${a.parametroPrincipal}</span>` : '';
+            const cond = a.condicao ? `<span class="ss-cond">${a.condicao}</span>` : '';
             const whyId = 'why_'+Math.random().toString(36).slice(2);
             return `<div class="ss-action-item">
                 <div class="ss-line-main">
-                    <span class="ss-title">${titulo}</span>
+                    <span class="ss-title">${a.titulo}</span>
                     ${stem}
                     ${param}
                 </div>
@@ -1342,7 +1573,7 @@ function renderSmartSummary(analysis){
                     ${cond}
                     <button type="button" class="ss-why-btn" data-why-target="${whyId}">Por que?</button>
                 </div>
-                <div class="ss-why" id="${whyId}">${porqueTxt}</div>
+                <div class="ss-why" id="${whyId}">${a.porque || 'Melhora coerência sonora.'}</div>
             </div>`;
         }).join('');
         const problemItems = problems.map(p=>`<div class="ss-prob-item"><span class="ss-prob-msg">${p.message||''}</span></div>`).join('');
@@ -1439,9 +1670,25 @@ function renderReferenceComparisons(analysis) {
             return;
         }
         const diff = Number.isFinite(val) && Number.isFinite(target) ? (val - target) : null;
-        const within = Number.isFinite(diff) && Number.isFinite(tol) ? Math.abs(diff) <= tol : false;
+        
+        // NOVA LÓGICA: implementar mesma severidade do scoring
+        let cssClass = 'na';
+        if (Number.isFinite(diff) && Number.isFinite(tol) && tol > 0) {
+            const adiff = Math.abs(diff);
+            if (adiff <= tol) {
+                cssClass = 'ok'; // verde - dentro da tolerância
+            } else {
+                const n = adiff / tol; // n > 1 quando fora da tolerância
+                if (n <= 2) {
+                    cssClass = 'yellow'; // amarelo - desvio leve (1 < n <= 2)
+                } else {
+                    cssClass = 'warn'; // vermelho - desvio médio/alto (n > 2)
+                }
+            }
+        }
+        
         const diffCell = Number.isFinite(diff)
-            ? `<td class="${within?'ok':'warn'}">${diff>0?'+':''}${nf(diff)}${unit}</td>`
+            ? `<td class="${cssClass}">${diff>0?'+':''}${nf(diff)}${unit}</td>`
             : '<td class="na" style="opacity:.55">—</td>';
         rows.push(`<tr>
             <td>${label}</td>
@@ -1502,6 +1749,7 @@ function renderReferenceComparisons(analysis) {
     .ref-compare-table td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.06);color:#f5f7fa;} 
         .ref-compare-table tr:last-child td{border-bottom:0;} 
     .ref-compare-table td.ok{color:#52f7ad;font-weight:600;} 
+    .ref-compare-table td.yellow{color:#ffce4d;font-weight:600;} 
     .ref-compare-table td.warn{color:#ff7b7b;font-weight:600;} 
     .ref-compare-table .tol{opacity:.7;margin-left:4px;font-size:10px;color:#b8c2d6;} 
     .ref-compare-table tbody tr:hover td{background:rgba(255,255,255,.04);} 
@@ -1513,6 +1761,43 @@ function renderReferenceComparisons(analysis) {
 // Recalcular apenas as sugestões baseadas em referência (sem reprocessar o áudio)
 function updateReferenceSuggestions(analysis) {
     if (!analysis || !analysis.technicalData || !__activeRefData) return;
+    
+    // 🎯 SISTEMA MELHORADO: Usar Enhanced Suggestion Engine quando disponível
+    if (typeof window !== 'undefined' && window.enhancedSuggestionEngine && window.USE_ENHANCED_SUGGESTIONS !== false) {
+        try {
+            console.log('🎯 Usando Enhanced Suggestion Engine...');
+            const enhancedAnalysis = window.enhancedSuggestionEngine.processAnalysis(analysis, __activeRefData);
+            
+            // Preservar sugestões não-referência existentes se necessário
+            const existingSuggestions = Array.isArray(analysis.suggestions) ? analysis.suggestions : [];
+            const nonRefSuggestions = existingSuggestions.filter(s => {
+                const type = s?.type || '';
+                return !type.startsWith('reference_') && !type.startsWith('band_adjust') && !type.startsWith('heuristic_');
+            });
+            
+            // Combinar sugestões melhoradas com existentes preservadas
+            analysis.suggestions = [...enhancedAnalysis.suggestions, ...nonRefSuggestions];
+            
+            // Adicionar métricas melhoradas à análise
+            if (enhancedAnalysis.enhancedMetrics) {
+                analysis.enhancedMetrics = enhancedAnalysis.enhancedMetrics;
+            }
+            
+            // Adicionar log de auditoria
+            if (enhancedAnalysis.auditLog) {
+                analysis.auditLog = enhancedAnalysis.auditLog;
+            }
+            
+            console.log(`🎯 Enhanced Suggestions: ${enhancedAnalysis.suggestions.length} sugestões geradas`);
+            return;
+            
+        } catch (error) {
+            console.warn('🚨 Erro no Enhanced Suggestion Engine, usando fallback:', error);
+            // Continuar com sistema legado em caso de erro
+        }
+    }
+    
+    // 🔄 SISTEMA LEGADO (fallback)
     const ref = __activeRefData;
     const tech = analysis.technicalData;
     // Garantir lista

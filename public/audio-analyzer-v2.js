@@ -1,7 +1,7 @@
-// 🎵 AUDIO ANALYZER V2 - VERSÃO FINAL COM REFERÊNCIAS SÍNCRONAS E SEM CONFLITOS
+// 🎵 AUDIO ANALYZER V2 - VERSÃO FINAL SEM "MUITO ALTO"
 class AudioAnalyzerV2 {
     constructor() {
-        this.__buildVersion = 'v2.5.0-FINAL-REFERENCIAS-SEM-CONFLITOS-2025';
+        this.__buildVersion = 'v2.5.1-NO-HIGH-LEVEL-WARNING';
         this.audioContext = null;
         this.isInitialized = false;
         
@@ -157,14 +157,7 @@ class AudioAnalyzerV2 {
             }
         }
 
-        // Verificar problemas básicos
-        if (metrics.lufs > -6) {
-            problems.push({
-                type: 'loudness_too_high',
-                severity: 'high',
-                message: 'Áudio muito alto - pode causar distorção'
-            });
-        }
+        // Verificar problemas básicos - clipping já detectado pelo sistema principal
         
         if (metrics.lufs < -30) {
             problems.push({

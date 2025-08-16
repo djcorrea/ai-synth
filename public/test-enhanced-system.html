@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Teste Enhanced Suggestion System</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #ffffff; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; background: #2a2a2a; }
+        .test-title { font-size: 18px; margin-bottom: 10px; color: #4CAF50; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; font-family: monospace; }
+        .pass { background: #1B5E20; border-left: 4px solid #4CAF50; }
+        .fail { background: #B71C1C; border-left: 4px solid #F44336; }
+        .info { background: #1A237E; border-left: 4px solid #2196F3; }
+        .warning { background: #E65100; border-left: 4px solid #FF9800; }
+        
+        /* Estilos para sugestões */
+        .suggestion-item { 
+            margin: 8px 0; 
+            padding: 12px; 
+            border-radius: 6px; 
+            border-left: 4px solid #555;
+            background: #333;
+        }
+        .suggestion-item.green { border-left-color: #4CAF50; }
+        .suggestion-item.yellow { border-left-color: #FFC107; }
+        .suggestion-item.orange { border-left-color: #FF9800; }
+        .suggestion-item.red { border-left-color: #F44336; }
+        
+        .severity-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .severity-green { background: #4CAF50; }
+        .severity-yellow { background: #FFC107; }
+        .severity-orange { background: #FF9800; }
+        .severity-red { background: #F44336; }
+        
+        .priority-badge {
+            background: #555;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+        .priority-high { background: #F44336; }
+        .priority-medium { background: #FF9800; }
+        .priority-low { background: #4CAF50; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-card {
+            background: #333;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #2196F3;
+        }
+        .button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover { background: #1976D2; }
+        .button.success { background: #4CAF50; }
+        .button.danger { background: #F44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Enhanced Suggestion System - Teste Completo</h1>
+        
+        <div class="test-section">
+            <div class="test-title">🔧 Controles de Teste</div>
+            <button class="button" onclick="runAllTests()">▶️ Executar Todos os Testes</button>
+            <button class="button success" onclick="testBasicFunctionality()">🧪 Teste Básico</button>
+            <button class="button" onclick="testMathematicalRequirements()">📊 Teste Matemático</button>
+            <button class="button" onclick="testEdgeCases()">⚠️ Casos Extremos</button>
+            <button class="button danger" onclick="clearResults()">🗑️ Limpar</button>
+        </div>
+
+        <div id="test-results" class="test-section" style="display: none;">
+            <div class="test-title">📋 Resultados dos Testes</div>
+            <div id="results-content"></div>
+        </div>
+
+        <div id="suggestion-preview" class="test-section" style="display: none;">
+            <div class="test-title">🎯 Preview de Sugestões Enhanced</div>
+            <div id="preview-content"></div>
+        </div>
+
+        <div id="performance-stats" class="test-section" style="display: none;">
+            <div class="test-title">⚡ Estatísticas de Performance</div>
+            <div id="stats-content"></div>
+        </div>
+    </div>
+
+    <!-- Carregar módulos do Enhanced System -->
+    <script src="suggestion-scorer.js"></script>
+    <script src="advanced-heuristics.js"></script>
+    <script src="enhanced-suggestion-engine.js"></script>
+    <script src="reference-data.js"></script>
+
+    <script>
+        // 🎯 Sistema de Testes para Enhanced Suggestion System
+        
+        let testResults = [];
+        let performanceMetrics = {};
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            testResults.push({
+                timestamp,
+                message,
+                type
+            });
+            updateResults();
+        }
+
+        function updateResults() {
+            const container = document.getElementById('results-content');
+            const html = testResults.map(r => 
+                `<div class="test-result ${r.type}">
+                    <strong>[${r.timestamp}]</strong> ${r.message}
+                </div>`
+            ).join('');
+            container.innerHTML = html;
+            document.getElementById('test-results').style.display = 'block';
+        }
+
+        function clearResults() {
+            testResults = [];
+            performanceMetrics = {};
+            document.getElementById('test-results').style.display = 'none';
+            document.getElementById('suggestion-preview').style.display = 'none';
+            document.getElementById('performance-stats').style.display = 'none';
+        }
+
+        // 🧪 Teste 1: Funcionalidade Básica
+        function testBasicFunctionality() {
+            log('🧪 Iniciando teste de funcionalidade básica...', 'info');
+            
+            try {
+                // Verificar se módulos estão carregados
+                if (typeof window.SuggestionScorer === 'undefined') {
+                    throw new Error('SuggestionScorer não carregado');
+                }
+                if (typeof window.AdvancedHeuristics === 'undefined') {
+                    throw new Error('AdvancedHeuristics não carregado');
+                }
+                if (typeof window.EnhancedSuggestionEngine === 'undefined') {
+                    throw new Error('EnhancedSuggestionEngine não carregado');
+                }
+                
+                log('✅ Todos os módulos carregados com sucesso', 'pass');
+
+                // Teste básico de scoring
+                const scorer = new window.SuggestionScorer();
+                const testScore = scorer.calculateZScore(10, 5, 2);
+                if (testScore === 2.5) {
+                    log('✅ Cálculo de Z-Score funcionando: z = (10-5)/2 = 2.5', 'pass');
+                } else {
+                    log(`❌ Z-Score incorreto: esperado 2.5, obtido ${testScore}`, 'fail');
+                }
+
+                // Teste de severidade
+                const severity = scorer.getSeverity(2.5);
+                if (severity === 'orange') {
+                    log('✅ Classificação de severidade funcionando: |2.5| = orange', 'pass');
+                } else {
+                    log(`❌ Severidade incorreta: esperado 'orange', obtido '${severity}'`, 'fail');
+                }
+
+                log('🎉 Teste básico concluído!', 'pass');
+
+            } catch (error) {
+                log(`❌ Erro no teste básico: ${error.message}`, 'fail');
+            }
+        }
+
+        // 📊 Teste 2: Requisitos Matemáticos
+        function testMathematicalRequirements() {
+            log('📊 Iniciando teste de requisitos matemáticos...', 'info');
+            
+            try {
+                const scorer = new window.SuggestionScorer();
+                
+                // Teste de casos de severidade
+                const testCases = [
+                    { z: 0.5, expected: 'green', desc: '|0.5| ≤ 1' },
+                    { z: 1.5, expected: 'yellow', desc: '1 < |1.5| ≤ 2' },
+                    { z: 2.5, expected: 'orange', desc: '2 < |2.5| ≤ 3' },
+                    { z: 4.0, expected: 'red', desc: '|4.0| > 3' },
+                    { z: -1.5, expected: 'yellow', desc: '1 < |-1.5| ≤ 2' }
+                ];
+
+                let passed = 0;
+                testCases.forEach(test => {
+                    const result = scorer.getSeverity(test.z);
+                    if (result === test.expected) {
+                        log(`✅ Severidade correta: ${test.desc} → ${result}`, 'pass');
+                        passed++;
+                    } else {
+                        log(`❌ Severidade incorreta: ${test.desc} → esperado ${test.expected}, obtido ${result}`, 'fail');
+                    }
+                });
+
+                // Teste de cálculo de prioridade
+                const priority = scorer.calculatePriority({
+                    value: 10,
+                    target: 5,
+                    tolerance: 2,
+                    weight: 0.8,
+                    confidence: 0.9,
+                    dependencyBonus: 0.1
+                });
+
+                const expectedZ = (10 - 5) / 2; // 2.5
+                const expectedSeverity = 3; // orange = 3
+                const expectedPriority = 0.8 * 3 * 0.9 * (1 + 0.1); // = 2.376
+                
+                if (Math.abs(priority - expectedPriority) < 0.001) {
+                    log(`✅ Cálculo de prioridade correto: ${priority.toFixed(3)}`, 'pass');
+                    passed++;
+                } else {
+                    log(`❌ Prioridade incorreta: esperado ${expectedPriority.toFixed(3)}, obtido ${priority.toFixed(3)}`, 'fail');
+                }
+
+                log(`📊 Teste matemático: ${passed}/${testCases.length + 1} casos passaram`, passed === testCases.length + 1 ? 'pass' : 'warning');
+
+            } catch (error) {
+                log(`❌ Erro no teste matemático: ${error.message}`, 'fail');
+            }
+        }
+
+        // ⚠️ Teste 3: Casos Extremos
+        function testEdgeCases() {
+            log('⚠️ Iniciando teste de casos extremos...', 'info');
+            
+            try {
+                const scorer = new window.SuggestionScorer();
+                
+                // Teste com valores extremos
+                const extremeCases = [
+                    { value: Infinity, target: 0, tolerance: 1, desc: 'Valor infinito' },
+                    { value: 0, target: 0, tolerance: 0, desc: 'Tolerância zero' },
+                    { value: -100, target: 100, tolerance: 10, desc: 'Valores negativos' },
+                    { value: 0, target: 0, tolerance: 1, desc: 'Z-score zero' }
+                ];
+
+                let handled = 0;
+                extremeCases.forEach(test => {
+                    try {
+                        const z = scorer.calculateZScore(test.value, test.target, test.tolerance);
+                        const severity = scorer.getSeverity(z);
+                        log(`✅ Caso extremo tratado: ${test.desc} → z=${z}, sev=${severity}`, 'pass');
+                        handled++;
+                    } catch (error) {
+                        log(`⚠️ Caso extremo com erro: ${test.desc} → ${error.message}`, 'warning');
+                    }
+                });
+
+                // Teste do sistema completo com dados inválidos
+                const engine = new window.EnhancedSuggestionEngine();
+                const invalidAnalysis = {
+                    lufs: { integrated: null },
+                    dr: undefined,
+                    lra: "invalid",
+                    truePeak: {},
+                    bands: []
+                };
+
+                const result = engine.processAnalysis(invalidAnalysis, 'electronic');
+                log(`✅ Sistema resiliente a dados inválidos: ${result.suggestions.length} sugestões geradas`, 'pass');
+
+                log(`⚠️ Teste de casos extremos: ${handled}/${extremeCases.length} casos tratados`, 'info');
+
+            } catch (error) {
+                log(`❌ Erro no teste de casos extremos: ${error.message}`, 'fail');
+            }
+        }
+
+        // 🎯 Teste Completo com Preview de Sugestões
+        function runAllTests() {
+            clearResults();
+            log('🚀 Iniciando bateria completa de testes...', 'info');
+            
+            const startTime = performance.now();
+            
+            // Executar todos os testes
+            testBasicFunctionality();
+            testMathematicalRequirements();
+            testEdgeCases();
+            
+            // Teste de integração completa
+            testCompleteIntegration();
+            
+            const endTime = performance.now();
+            performanceMetrics.totalTime = endTime - startTime;
+            
+            log(`⏱️ Testes concluídos em ${performanceMetrics.totalTime.toFixed(2)}ms`, 'info');
+            updatePerformanceStats();
+        }
+
+        function testCompleteIntegration() {
+            log('🔄 Testando integração completa...', 'info');
+            
+            try {
+                const engine = new window.EnhancedSuggestionEngine();
+                
+                // Dados de teste realistas
+                const testAnalysis = {
+                    lufs: { integrated: -18.5 },
+                    dr: 8.2,
+                    lra: 12.5,
+                    truePeak: -0.8,
+                    stereoWidth: 0.85,
+                    bands: [
+                        { freq: 60, gain: 2.5, q: 0.7 },
+                        { freq: 2000, gain: -1.8, q: 1.2 },
+                        { freq: 8000, gain: 3.2, q: 0.9 }
+                    ]
+                };
+
+                const startProcess = performance.now();
+                const result = engine.processAnalysis(testAnalysis, 'rock');
+                const endProcess = performance.now();
+
+                performanceMetrics.processingTime = endProcess - startProcess;
+                performanceMetrics.suggestionsGenerated = result.suggestions.length;
+
+                log(`✅ Integração completa: ${result.suggestions.length} sugestões geradas`, 'pass');
+                log(`⚡ Tempo de processamento: ${performanceMetrics.processingTime.toFixed(2)}ms`, 'info');
+
+                // Exibir preview das sugestões
+                displaySuggestionPreview(result.suggestions);
+
+            } catch (error) {
+                log(`❌ Erro na integração completa: ${error.message}`, 'fail');
+            }
+        }
+
+        function displaySuggestionPreview(suggestions) {
+            const container = document.getElementById('preview-content');
+            
+            if (!suggestions || suggestions.length === 0) {
+                container.innerHTML = '<div class="test-result warning">Nenhuma sugestão gerada</div>';
+                document.getElementById('suggestion-preview').style.display = 'block';
+                return;
+            }
+
+            const html = suggestions.map(s => {
+                const severityClass = s.severity || 'green';
+                const priorityClass = s.priority > 2 ? 'high' : s.priority > 1 ? 'medium' : 'low';
+                
+                return `
+                    <div class="suggestion-item ${severityClass}">
+                        <span class="severity-dot severity-${severityClass}"></span>
+                        <strong>${s.description || 'Sem descrição'}</strong>
+                        <span class="priority-badge priority-${priorityClass}">P: ${(s.priority || 0).toFixed(2)}</span>
+                        <br>
+                        <small style="opacity: 0.8;">
+                            Tipo: ${s.type || 'unknown'} • 
+                            Z-Score: ${(s.zScore || 0).toFixed(2)} • 
+                            Confiança: ${((s.confidence || 1) * 100).toFixed(0)}%
+                        </small>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+            document.getElementById('suggestion-preview').style.display = 'block';
+        }
+
+        function updatePerformanceStats() {
+            const container = document.getElementById('stats-content');
+            
+            const stats = [
+                { title: 'Tempo Total', value: `${(performanceMetrics.totalTime || 0).toFixed(2)}ms` },
+                { title: 'Tempo de Processamento', value: `${(performanceMetrics.processingTime || 0).toFixed(2)}ms` },
+                { title: 'Sugestões Geradas', value: performanceMetrics.suggestionsGenerated || 0 },
+                { title: 'Taxa de Processamento', value: `${((performanceMetrics.suggestionsGenerated || 0) / Math.max(performanceMetrics.processingTime || 1, 1) * 1000).toFixed(0)} sug/s` }
+            ];
+
+            const html = `
+                <div class="stats-grid">
+                    ${stats.map(stat => `
+                        <div class="stat-card">
+                            <div style="font-size: 20px; font-weight: bold; color: #2196F3;">${stat.value}</div>
+                            <div style="opacity: 0.8;">${stat.title}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            container.innerHTML = html;
+            document.getElementById('performance-stats').style.display = 'block';
+        }
+
+        // Auto-executar teste básico ao carregar
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🎯 Sistema de testes carregado. Clique em "Executar Todos os Testes" para começar.', 'info');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

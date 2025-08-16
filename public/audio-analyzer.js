@@ -1,5 +1,5 @@
 // 🎵 AUDIO ANALYZER V1 - Ponte para V2 com cache-busting agressivo
-// Versão v1.5-FIXED-CLEAN sem duplicações
+// Versão v1.5-FIXED-CLEAN-NOHIGH sem duplicações (removido "muito alto")
 // Implementação usando Web Audio API (100% gratuito)
 
 class AudioAnalyzer {
@@ -442,7 +442,8 @@ class AudioAnalyzer {
               }
             } catch (rmErr) { (window.__caiarLog||function(){})('REF_MATCH_INTEGRATION_ERROR','Erro matcher', { error: rmErr?.message||String(rmErr) }); }
             const enableScoring = (typeof window === 'undefined' || window.ENABLE_MIX_SCORING !== false);
-            if (enableScoring) {
+            // Adiado: scoring completo será recalculado ao final (após bandas) para garantir contagem correta
+            if (false && enableScoring) {
               let activeRef = null;
               try {
                 if (typeof window !== 'undefined') {
@@ -751,7 +752,9 @@ class AudioAnalyzer {
         };
         // Se qualityOverall ausente, calcular média ponderada
         if (!Number.isFinite(baseAnalysis.qualityOverall)) {
+          console.log('[COLOR_RATIO_V2_FIX] Fallback triggered - qualityOverall was:', baseAnalysis.qualityOverall);
           baseAnalysis.qualityOverall = clamp((scoreDyn*0.25 + scoreTech*0.25 + scoreLoud*0.3 + scoreFreq*0.2));
+          console.log('[COLOR_RATIO_V2_FIX] Fallback set qualityOverall =', baseAnalysis.qualityOverall);
         }
       }
     } catch(e){ if (window.DEBUG_ANALYZER) console.warn('Fallback quality breakdown falhou', e); }
@@ -787,6 +790,67 @@ class AudioAnalyzer {
       if (__DEBUG_ANALYZER__) console.warn('⚠️ Adapter avançado falhou (com V2):', e?.message || e);
     }
 
+    try {
+      // Recalcular score ao final (todas bandas prontas) para garantir contagem correta de verdes/vermelhas
+      // Removida exigência de baseAnalysis.mixScore prévio (bloco inicial está desativado)
+      if (typeof window !== 'undefined' && baseAnalysis.technicalData) {
+        const tdFinal = baseAnalysis.technicalData;
+        console.log('[COLOR_RATIO_V2_DEBUG] tdFinal input:', tdFinal);
+        console.log('[COLOR_RATIO_V2_DEBUG] tdFinal keys:', Object.keys(tdFinal || {}));
+        let activeRef = null;
+        try { activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null; } catch {}
+        try {
+          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+          if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
+            const finalScore = scorerMod.computeMixScore(tdFinal, activeRef);
+            console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
+            
+            // TESTE MANUAL COM DADOS CONHECIDOS
+            const testData = {
+              "spectrum.balance": { classification: "yellow" },
+              "spectrum.clarity": { classification: "red" },
+              "spectrum.presence": { classification: "green" },
+              "spectrum.warmth": { classification: "yellow" },
+              "spectrum.brightness": { classification: "green" },
+              "spectrum.fullness": { classification: "green" },
+              "dynamics.punch": { classification: "yellow" },
+              "dynamics.consistency": { classification: "red" },
+              "dynamics.contrast": { classification: "green" },
+              "technical.clipCount": { classification: "green" },
+              "technical.distortionLevel": { classification: "red" },
+              "technical.noiseFloor": { classification: "yellow" }
+            };
+            const testScore = scorerMod.computeMixScore(testData, activeRef);
+            console.log('[COLOR_RATIO_V2_TEST] Manual test G=5, Y=4, R=3, T=12 should be 59:', testScore);
+            // O scoring.js agora está correto, não precisa de override
+            baseAnalysis.mixScore = finalScore;
+            baseAnalysis.mixScorePct = finalScore.scorePct;
+            baseAnalysis.mixClassification = finalScore.classification;
+            
+            // CRÍTICO: Atualizar qualityOverall usado pela UI
+            baseAnalysis._originalQualityOverall = baseAnalysis.qualityOverall;
+            baseAnalysis.qualityOverall = finalScore.scorePct;
+            console.log('[COLOR_RATIO_V2_FIX] Setting qualityOverall =', finalScore.scorePct, '(was:', baseAnalysis._originalQualityOverall, ')');
+            // Logging para debug (sem override)
+            try {
+              const cc = finalScore.colorCounts || {};
+              if (window.DEBUG_SCORE === true && cc.total > 0) {
+                console.log('[ANALYSIS][FINAL_SCORE]', {
+                  method: finalScore.method,
+                  scorePct: finalScore.scorePct,
+                  colorCounts: cc,
+                  weights: finalScore.weights,
+                  denominator: finalScore.denominator_info,
+                  yellowKeys: finalScore.yellowKeys
+                });
+              }
+              try { window.__LAST_MIX_SCORE = finalScore; } catch {}
+            } catch {}
+            if (window.DEBUG_SCORE === true) console.log('[ANALYSIS][RECALC_SCORE] method=', finalScore.scoringMethod, 'scorePct=', finalScore.scorePct, finalScore.colorCounts, 'weights=', finalScore.weights, 'denom=', finalScore.denominator_info, 'yellowKeys=', finalScore.yellowKeys);
+          }
+        } catch (reScoreErr) { if (window.DEBUG_SCORE) console.warn('[RECALC_SCORE_ERROR]', reScoreErr); }
+      }
+    } catch {}
     return baseAnalysis;
   }
 
@@ -826,14 +890,18 @@ class AudioAnalyzer {
         // Todas as métricas base calculadas aqui usarão exatamente o mesmo PCM bruto (sem ganhos posteriores)
         const td = analysis.technicalData;
         // Peak (dBFS) já será calculado abaixo; adiantamos se quisermos evitar duplicação
-        // Clipping sample-level unificado
+        // Clipping sample-level unificado com threshold mais rigoroso
         let samplePeakL = 0, samplePeakR = 0, clipCount = 0;
-        const clipThresh = 0.99;
+        const clipThresh = 0.99; // Threshold mais rigoroso para clipping
+        
+        // Análise do canal esquerdo
         for (let i=0;i<leftChannel.length;i++) {
           const a = Math.abs(leftChannel[i]);
           if (a > samplePeakL) samplePeakL = a;
           if (a >= clipThresh) clipCount++;
         }
+        
+        // Análise do canal direito (se diferente)
         if (rightChannel !== leftChannel) {
           for (let i=0;i<rightChannel.length;i++) {
             const a = Math.abs(rightChannel[i]);
@@ -913,13 +981,15 @@ class AudioAnalyzer {
       let dcSum = 0;
       let clipped = 0;
       const len = leftChannel.length;
-      const clipThreshold = 0.95; // igual ao V2
+      const clipThreshold = 0.99; // Threshold mais rigoroso para detecção de clipping
       let dcSumR = 0;
       const useHPF = (typeof window !== 'undefined' && window.AUDIT_MODE===true && window.DC_HPF20===true) || (typeof process !== 'undefined' && process.env.AUDIT_MODE==='1' && process.env.DC_HPF20==='1');
       // HPF estado
       let aL=0,aR=0, xPrevL=0,yPrevL=0,xPrevR=0,yPrevR=0;
       const sr = audioBuffer.sampleRate || 48000;
       const fc=20; const w=2*Math.PI*fc/sr; const alpha = w/(w+1);
+      
+      // Contagem de clipping mais precisa - verificar ambos os canais
       for (let i = 0; i < len; i++) {
         let sL = leftChannel[i];
         let sR = rightChannel[i] ?? sL;
@@ -929,7 +999,11 @@ class AudioAnalyzer {
         }
         dcSum += sL;
         dcSumR += sR;
-        if (Math.abs(sL) >= clipThreshold) clipped++;
+        
+        // Detectar clipping em qualquer canal
+        if (Math.abs(sL) >= clipThreshold || Math.abs(sR) >= clipThreshold) {
+          clipped++;
+        }
       }
       const dcOffset = dcSum / Math.max(1, len);
       const dcOffsetRight = dcSumR / Math.max(1, len);
@@ -1131,13 +1205,23 @@ class AudioAnalyzer {
   // 🚨 Detectar problemas comuns
   detectCommonProblems(analysis) {
     const { peak, rms, dynamicRange } = analysis.technicalData;
+    const clipSamples = analysis.technicalData?.clippingSamples || 0;
+    const clipPct = analysis.technicalData?.clippingPct || 0;
+    const truePeak = analysis.technicalData?.truePeakDbtp;
 
-    // Problema: Clipping
-    if (peak > -0.5) {
+    // Problema: Clipping - critérios mais rigorosos e completos
+    const hasClipping = peak > -0.1 || clipSamples > 0 || clipPct > 0 || (truePeak !== null && truePeak > -0.1);
+    
+    if (hasClipping) {
+      let clippingDetails = [];
+      if (peak > -0.1) clippingDetails.push(`Peak: ${peak.toFixed(2)}dB`);
+      if (truePeak !== null && truePeak > -0.1) clippingDetails.push(`TruePeak: ${truePeak.toFixed(2)}dBTP`);
+      if (clipSamples > 0) clippingDetails.push(`${clipSamples} samples (${clipPct.toFixed(3)}%)`);
+      
       analysis.problems.push({
         type: 'clipping',
         severity: 'high',
-        message: 'Áudio com clipping detectado',
+        message: `Áudio com clipping detectado - ${clippingDetails.join(', ')}`,
         solution: 'Reduza o volume geral ou use limitador'
       });
     }
@@ -2095,15 +2179,39 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
             }
           } catch {}
         }
-        // Clipping problem consistente
+        // Clipping problem consistente - critérios mais rigorosos
         try {
           const tp = tdv.truePeakDbtp;
+          const peak = tdv.peak;
           const clipSamples = tdv.clippingSamplesTruePeak ?? tdv.clippingSamples;
-          const should = (Number.isFinite(tp) && tp >= 0) || (Number.isFinite(clipSamples) && clipSamples > 0);
+          const clipPct = tdv.clippingPct;
+          
+          // Critérios mais rigorosos para detecção de clipping
+          const hasClippingByTruePeak = Number.isFinite(tp) && tp >= -0.1;
+          const hasClippingByPeak = Number.isFinite(peak) && peak >= -0.1;
+          const hasClippingBySamples = Number.isFinite(clipSamples) && clipSamples > 0;
+          const hasClippingByPercent = Number.isFinite(clipPct) && clipPct > 0;
+          
+          const should = hasClippingByTruePeak || hasClippingByPeak || hasClippingBySamples || hasClippingByPercent;
+          
           const probs = Array.isArray(baseAnalysis.problems) ? baseAnalysis.problems : (baseAnalysis.problems=[]);
           const has = probs.some(p=>p.type==='clipping');
-          if (has && !should) baseAnalysis.problems = probs.filter(p=>p.type!=='clipping');
-          else if (!has && should) probs.push({type:'clipping', severity:'high', message:'Clipping detectado', solution:'Reduza ganho / limite picos'});
+          
+          if (has && !should) {
+            baseAnalysis.problems = probs.filter(p=>p.type!=='clipping');
+          } else if (!has && should) {
+            let details = [];
+            if (hasClippingByTruePeak) details.push(`TruePeak: ${tp.toFixed(2)}dBTP`);
+            if (hasClippingByPeak) details.push(`Peak: ${peak.toFixed(2)}dB`);
+            if (hasClippingBySamples) details.push(`${clipSamples} samples`);
+            
+            probs.push({
+              type:'clipping', 
+              severity:'high', 
+              message:`Clipping detectado - ${details.join(', ')}`, 
+              solution:'Reduza ganho / limite picos'
+            });
+          }
         } catch {}
         // LUFS ST plausível
         if (Number.isFinite(tdv.lufsIntegrated) && Number.isFinite(tdv.lufsShortTerm) && Math.abs(tdv.lufsShortTerm - tdv.lufsIntegrated) > 25) {

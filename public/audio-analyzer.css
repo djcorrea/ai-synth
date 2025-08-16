@@ -1594,3 +1594,182 @@
         margin: 0 4px;
     }
 }
+
+/* 📝 CSS para Cards Didáticos de Sugestões */
+.didactic-card {
+    min-height: auto !important;
+    height: auto !important;
+    white-space: normal !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4 !important;
+}
+
+.didactic-card .diag-title {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    margin-bottom: 8px !important;
+    line-height: 1.3 !important;
+}
+
+.didactic-explanation {
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    color: #e8e8e8 !important;
+    margin: 8px 0 !important;
+    padding: 0 !important;
+}
+
+.didactic-action {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    padding: 8px !important;
+    margin: 8px 0 !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 4px !important;
+    border-left: 2px solid #9fb3d9 !important;
+}
+
+.didactic-rationale {
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+    opacity: 0.85 !important;
+    font-style: italic !important;
+    margin: 8px 0 !important;
+    padding: 6px !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-radius: 3px !important;
+}
+
+.didactic-technical {
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+    opacity: 0.7 !important;
+    margin-top: 8px !important;
+    padding: 4px !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    border-radius: 3px !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+}
+
+/* Severidade por cores nos cards didáticos */
+.didactic-card.severity-green {
+    border-left-color: #4CAF50 !important;
+}
+
+.didactic-card.severity-green .didactic-action {
+    border-left-color: #4CAF50 !important;
+}
+
+.didactic-card.severity-yellow {
+    border-left-color: #FFC107 !important;
+}
+
+.didactic-card.severity-yellow .didactic-action {
+    border-left-color: #FFC107 !important;
+}
+
+.didactic-card.severity-orange {
+    border-left-color: #FF9800 !important;
+}
+
+.didactic-card.severity-orange .didactic-action {
+    border-left-color: #FF9800 !important;
+}
+
+.didactic-card.severity-red {
+    border-left-color: #F44336 !important;
+}
+
+.didactic-card.severity-red .didactic-action {
+    border-left-color: #F44336 !important;
+}
+
+/* Ajustes responsivos para cards didáticos */
+@media (max-width: 600px) {
+    .didactic-card {
+        padding: 10px !important;
+    }
+    
+    .didactic-explanation {
+        font-size: 12px !important;
+    }
+    
+    .didactic-action {
+        font-size: 11px !important;
+        padding: 6px !important;
+    }
+    
+    .didactic-rationale {
+        font-size: 10px !important;
+        padding: 4px !important;
+    }
+}
+
+/* Melhorias para largura dos cards em containers pequenos */
+.diag-section {
+    width: 100%;
+    max-width: none;
+}
+
+.diag-section .didactic-card {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Auto-height para todos os itens de diagnóstico */
+.diag-item {
+    height: auto !important;
+    min-height: 60px;
+}
+
+/* 🚨 CSS para Avisos Críticos */
+.diag-item.critical {
+    border-left-color: #F44336 !important;
+    border-left-width: 4px !important;
+    background: rgba(244, 67, 54, 0.1) !important;
+    animation: critical-pulse 2s infinite;
+}
+
+.diag-item.critical .diag-title {
+    color: #F44336 !important;
+    font-weight: 700 !important;
+}
+
+@keyframes critical-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.1);
+    }
+}
+
+/* 🔍 Animação para inconsistências */
+@keyframes inconsistent-flash {
+    0%, 100% { 
+        border-left-color: #FF9800;
+        background: rgba(255, 152, 0, 0.1);
+    }
+    50% { 
+        border-left-color: #F57C00;
+        background: rgba(245, 124, 0, 0.15);
+    }
+}
+
+.diag-item.inconsistent {
+    animation: inconsistent-flash 1.5s infinite;
+}
+
+/* Responsividade para avisos críticos */
+@media (max-width: 600px) {
+    .diag-item.critical {
+        margin: 8px 0;
+        padding: 8px;
+    }
+    
+    .diag-item.inconsistent {
+        margin: 8px 0;
+        padding: 8px;
+    }
+}

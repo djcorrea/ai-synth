@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Teste Cards Didáticos de Sugestões</title>
+    <link rel="stylesheet" href="audio-analyzer.css">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #1a1a1a; 
+            color: #ffffff; 
+            line-height: 1.4;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+        }
+        .test-section { 
+            margin: 30px 0; 
+            padding: 20px; 
+            border: 1px solid #333; 
+            border-radius: 8px; 
+            background: #2a2a2a; 
+        }
+        .section-title { 
+            font-size: 18px; 
+            margin-bottom: 15px; 
+            color: #4CAF50; 
+            border-bottom: 1px solid #444;
+            padding-bottom: 8px;
+        }
+        .comparison { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+            margin: 20px 0;
+        }
+        .before, .after { 
+            padding: 15px; 
+            border-radius: 6px; 
+        }
+        .before { 
+            background: #2c1810; 
+            border-left: 4px solid #ff9800; 
+        }
+        .after { 
+            background: #0d2818; 
+            border-left: 4px solid #4caf50; 
+        }
+        .before h4, .after h4 { 
+            margin: 0 0 10px 0; 
+            font-size: 14px; 
+        }
+        .button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .button:hover { background: #1976D2; }
+        
+        /* Simular o container do modal */
+        .mock-modal {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        @media (max-width: 600px) {
+            .comparison { 
+                grid-template-columns: 1fr; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Teste: Cards Didáticos de Sugestões</h1>
+        <p>Comparação entre o formato original e o novo formato didático dos cards de sugestões.</p>
+
+        <div class="test-section">
+            <div class="section-title">🔧 Controles de Teste</div>
+            <button class="button" onclick="loadOriginalCards()">📄 Carregar Cards Originais</button>
+            <button class="button" onclick="loadDidacticCards()">📚 Carregar Cards Didáticos</button>
+            <button class="button" onclick="loadMixedExample()">🎵 Exemplo Completo</button>
+        </div>
+
+        <div class="test-section">
+            <div class="section-title">📊 Comparação Lado a Lado</div>
+            <div class="comparison">
+                <div class="before">
+                    <h4>🔴 Formato Original</h4>
+                    <div id="original-cards">
+                        <!-- Cards originais serão inseridos aqui -->
+                    </div>
+                </div>
+                <div class="after">
+                    <h4>🟢 Formato Didático</h4>
+                    <div id="didactic-cards">
+                        <!-- Cards didáticos serão inseridos aqui -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <div class="section-title">🎵 Simulação do Modal Completo</div>
+            <div class="mock-modal">
+                <div id="full-example">
+                    <!-- Exemplo completo será inserido aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carregar dependências -->
+    <script src="suggestion-text-generator.js"></script>
+    <script src="audio-analyzer-integration.js"></script>
+
+    <script>
+        // 🎯 Dados de teste para simular sugestões
+        const testSuggestions = [
+            {
+                message: "Banda low_bass abaixo do ideal",
+                action: "Boost low_bass em ~2.1 dB",
+                details: "Valor atual: 13.34 dB | Alvo: 15.40 dB | Diferença: −2.06 dB",
+                type: "band_adjust",
+                severity: { level: "yellow", color: "#FFC107", label: "Moderado" },
+                priority: 2.3,
+                confidence: 0.85
+            },
+            {
+                message: "Banda high_mid acima do ideal",
+                action: "Cortar high_mid em ~3.2 dB",
+                details: "Valor atual: -1.5 dB | Alvo: -4.8 dB | Diferença: +3.3 dB",
+                type: "band_adjust",
+                severity: { level: "orange", color: "#FF9800", label: "Alto" },
+                priority: 3.1,
+                confidence: 0.92
+            },
+            {
+                message: "Sibilância detectada [6800Hz]",
+                action: "Aplicar corte cirúrgico de -4.5 dB em 6.8 kHz com Q=8",
+                details: "Pico detectado: +8.2 dB | Threshold: +3.5 dB",
+                type: "surgical_eq",
+                subtype: "sibilance",
+                severity: { level: "red", color: "#F44336", label: "Crítico" },
+                priority: 4.2,
+                confidence: 0.96,
+                technical: { frequency: 6800, dominantFreq: 6800 }
+            }
+        ];
+
+        // Configurar gênero atual para testes
+        window.currentGenre = 'funk_mandela';
+
+        // 🔄 Função para renderizar card original (simulado)
+        function renderOriginalCard(suggestion) {
+            return `
+                <div class="diag-item info" style="border-left: 3px solid #9fb3d9; margin-bottom: 8px;">
+                    <div class="diag-title">${suggestion.message}</div>
+                    <div class="diag-tip">${suggestion.action}</div>
+                    <div class="diag-tip" style="opacity:.85;font-size:12px;">${suggestion.details}</div>
+                </div>
+            `;
+        }
+
+        // 🎨 Função para renderizar card didático
+        function renderDidacticCard(suggestion) {
+            if (typeof window.SuggestionTextGenerator === 'undefined') {
+                return '<div style="color: #ff9800;">⚠️ Gerador de texto didático não carregado</div>';
+            }
+
+            try {
+                const generator = new window.SuggestionTextGenerator();
+                const didacticText = generator.generateDidacticText(suggestion);
+                
+                const severityColor = suggestion.severity?.color || '#9fb3d9';
+                const priority = suggestion.priority || 0;
+                
+                if (suggestion.type === 'surgical_eq') {
+                    const frequency = suggestion.technical?.frequency || '?';
+                    return `
+                        <div class="diag-item surgical enhanced didactic-card" style="border-left: 3px solid ${severityColor}; min-height: auto;">
+                            <div class="surgical-header" style="display: flex; gap: 8px; margin-bottom: 8px;">
+                                <span style="background: ${severityColor}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px;">${frequency} Hz</span>
+                                <span style="background: ${severityColor}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px;">${suggestion.severity?.label || 'detectado'}</span>
+                                <span style="opacity: 0.7; font-size: 10px;">P:${priority.toFixed(1)}</span>
+                            </div>
+                            <div style="margin: 8px 0; line-height: 1.4; font-weight: 600;">${didacticText.title}</div>
+                            <div class="didactic-explanation">${didacticText.explanation}</div>
+                            <div class="didactic-action"><strong>🔧 Ação:</strong> ${didacticText.action}</div>
+                            <div class="didactic-rationale"><strong>💡 Por quê:</strong> ${didacticText.rationale}</div>
+                            <div class="didactic-technical">📊 ${didacticText.technical}</div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="diag-item enhanced didactic-card severity-${suggestion.severity?.level || 'info'}" style="border-left: 3px solid ${severityColor}; min-height: auto; padding: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <div style="flex: 1; font-weight: 600; font-size: 14px;">${didacticText.title}</div>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${severityColor};"></span>
+                                    <span style="font-size: 10px; opacity: 0.7;">P:${priority.toFixed(1)}</span>
+                                </div>
+                            </div>
+                            <div class="didactic-explanation">${didacticText.explanation}</div>
+                            <div class="didactic-action"><strong>🔧 Ação:</strong> ${didacticText.action}</div>
+                            <div class="didactic-rationale"><strong>💡 Por quê:</strong> ${didacticText.rationale}</div>
+                            <div class="didactic-technical">📊 ${didacticText.technical}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao gerar card didático:', error);
+                return '<div style="color: #f44336;">❌ Erro ao gerar card didático</div>';
+            }
+        }
+
+        // 📄 Carregar cards originais
+        function loadOriginalCards() {
+            const container = document.getElementById('original-cards');
+            const html = testSuggestions.map(s => renderOriginalCard(s)).join('');
+            container.innerHTML = html;
+        }
+
+        // 📚 Carregar cards didáticos
+        function loadDidacticCards() {
+            const container = document.getElementById('didactic-cards');
+            const html = testSuggestions.map(s => renderDidacticCard(s)).join('');
+            container.innerHTML = html;
+        }
+
+        // 🎵 Carregar exemplo completo
+        function loadMixedExample() {
+            const container = document.getElementById('full-example');
+            
+            const originalSection = `
+                <div class="diag-section">
+                    <div class="diag-heading" style="font-size: 16px; margin-bottom: 12px; color: #ff9800;">🔴 Formato Original</div>
+                    ${testSuggestions.map(s => renderOriginalCard(s)).join('')}
+                </div>
+            `;
+            
+            const didacticSection = `
+                <div class="diag-section" style="margin-top: 20px;">
+                    <div class="diag-heading" style="font-size: 16px; margin-bottom: 12px; color: #4caf50;">🟢 Formato Didático</div>
+                    ${testSuggestions.map(s => renderDidacticCard(s)).join('')}
+                </div>
+            `;
+            
+            container.innerHTML = originalSection + didacticSection;
+        }
+
+        // 🚀 Auto-carregar exemplo ao carregar a página
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                loadOriginalCards();
+                loadDidacticCards();
+                loadMixedExample();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

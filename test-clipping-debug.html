@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔬 Debug Clipping Detection</title>
+    <style>
+        body {
+            background: #0e0f1a;
+            color: #e9e9f1;
+            font-family: 'Courier New', monospace;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #1a1b2e;
+            border: 1px solid #2a2b3e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .debug-log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .metric-card {
+            background: #262738;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #4a90e2;
+        }
+        .metric-card.warn {
+            border-left-color: #ff6b6b;
+            background: #3a2626;
+        }
+        .metric-card.ok {
+            border-left-color: #51cf66;
+            background: #263a26;
+        }
+        .upload-area {
+            border: 2px dashed #444;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #4a90e2;
+            background: rgba(74, 144, 226, 0.1);
+        }
+        .upload-area.dragover {
+            border-color: #51cf66;
+            background: rgba(81, 207, 102, 0.1);
+        }
+        button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #357abd;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .analysis-results {
+            display: none;
+        }
+        .analysis-results.show {
+            display: block;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #444;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .comparison-table th {
+            background: #2a2b3e;
+            font-weight: bold;
+        }
+        .high-value {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .normal-value {
+            color: #51cf66;
+        }
+        .suspicious-value {
+            color: #ffd43b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Debug Detecção de Clipping</h1>
+        <p>Este teste visa identificar por que a detecção de clipping não está funcionando corretamente nos Problemas Técnicos</p>
+
+        <div class="section">
+            <h3>📁 Upload de Áudio</h3>
+            <div class="upload-area" id="uploadArea">
+                <div>
+                    <h4>🎵 Arraste um arquivo de áudio aqui</h4>
+                    <p>ou clique para selecionar</p>
+                    <p><small>Formatos: MP3, WAV, M4A, OGG (máx. 50MB)</small></p>
+                </div>
+                <input type="file" id="audioFile" accept="audio/*" style="display: none;">
+            </div>
+            <button id="generateClippedAudio">🔊 Gerar Áudio com Clipping para Teste</button>
+        </div>
+
+        <div class="section analysis-results" id="analysisResults">
+            <h3>📊 Resultados da Análise</h3>
+            <div id="basicInfo"></div>
+            
+            <h4>🔍 Métricas de Clipping (Detalhadas)</h4>
+            <div class="metric-grid" id="clippingMetrics"></div>
+            
+            <h4>📈 Comparação de Valores</h4>
+            <table class="comparison-table" id="comparisonTable">
+                <thead>
+                    <tr>
+                        <th>Métrica</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                        <th>Fonte</th>
+                        <th>Observações</th>
+                    </tr>
+                </thead>
+                <tbody id="comparisonBody"></tbody>
+            </table>
+            
+            <h4>🐛 Log de Debug Detalhado</h4>
+            <div class="debug-log" id="debugLog"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="audio-analyzer.js"></script>
+    <script src="audio-analyzer-integration.js"></script>
+
+    <script>
+        let currentAnalysis = null;
+        let debugLog = [];
+
+        const log = (...args) => {
+            const timestamp = new Date().toISOString().slice(11, 23);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            debugLog.push(`[${timestamp}] ${message}`);
+            updateDebugLog();
+            console.log(...args);
+        };
+
+        const updateDebugLog = () => {
+            document.getElementById('debugLog').textContent = debugLog.join('\n');
+        };
+
+        // Setup file upload
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('audioFile');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Generate clipped audio for testing
+        document.getElementById('generateClippedAudio').addEventListener('click', () => {
+            generateClippedTestAudio();
+        });
+
+        async function generateClippedTestAudio() {
+            log('🔊 Gerando áudio de teste com clipping...');
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const sampleRate = 48000;
+                const duration = 3; // 3 segundos
+                const buffer = audioContext.createBuffer(2, sampleRate * duration, sampleRate);
+                
+                const leftChannel = buffer.getChannelData(0);
+                const rightChannel = buffer.getChannelData(1);
+                
+                // Gerar sinal com clipping intencional
+                for (let i = 0; i < leftChannel.length; i++) {
+                    const t = i / sampleRate;
+                    // Seno 440Hz com amplitude 1.5 (vai clipar)
+                    const sample = Math.sin(2 * Math.PI * 440 * t) * 1.5;
+                    // Aplicar clipping hard
+                    const clippedSample = Math.max(-1, Math.min(1, sample));
+                    
+                    leftChannel[i] = clippedSample;
+                    rightChannel[i] = clippedSample;
+                }
+                
+                log(`✅ Áudio de teste gerado: ${duration}s, ${sampleRate}Hz, 2 canais`);
+                log(`🔊 Amplitude máxima antes do clipping: 1.5 (150%)`);
+                log(`✂️ Clipping aplicado em samples > 1.0 ou < -1.0`);
+                
+                await analyzeAudio(buffer, 'teste_clipping_gerado.wav');
+                
+            } catch (error) {
+                log('❌ Erro ao gerar áudio de teste:', error);
+            }
+        }
+
+        async function handleFile(file) {
+            log(`📁 Arquivo selecionado: ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)`);
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                log(`🎵 Áudio decodificado: ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels} canais`);
+                
+                await analyzeAudio(audioBuffer, file.name);
+                
+            } catch (error) {
+                log('❌ Erro ao processar arquivo:', error);
+            }
+        }
+
+        async function analyzeAudio(audioBuffer, filename) {
+            log('🔬 Iniciando análise detalhada...');
+            
+            try {
+                // Usar o sistema de análise existente
+                if (typeof window.audioAnalyzer === 'undefined') {
+                    if (typeof AudioAnalyzer !== 'undefined') {
+                        window.audioAnalyzer = new AudioAnalyzer();
+                        log('✅ AudioAnalyzer instanciado');
+                    } else {
+                        throw new Error('AudioAnalyzer não disponível');
+                    }
+                }
+
+                // Realizar análise completa
+                const analysis = await window.audioAnalyzer.analyzeAudioBufferDirect(audioBuffer, filename);
+                currentAnalysis = analysis;
+                
+                log('📊 Análise completa concluída');
+                log('🔍 TechnicalData:', analysis.technicalData);
+                
+                // Análise específica de clipping
+                await performClippingAnalysis(audioBuffer, analysis);
+                
+                // Mostrar resultados
+                displayResults(analysis, filename);
+                
+            } catch (error) {
+                log('❌ Erro na análise:', error);
+            }
+        }
+
+        async function performClippingAnalysis(audioBuffer, analysis) {
+            log('🔍 Realizando análise específica de clipping...');
+            
+            const leftChannel = audioBuffer.getChannelData(0);
+            const rightChannel = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : leftChannel;
+            
+            // Análise manual de clipping
+            let manualClipCount = 0;
+            let maxSample = 0;
+            let peakSampleL = 0;
+            let peakSampleR = 0;
+            const clipThreshold = 0.99;
+            
+            // Canal esquerdo
+            for (let i = 0; i < leftChannel.length; i++) {
+                const abs = Math.abs(leftChannel[i]);
+                if (abs > peakSampleL) peakSampleL = abs;
+                if (abs > maxSample) maxSample = abs;
+                if (abs >= clipThreshold) manualClipCount++;
+            }
+            
+            // Canal direito (se diferente)
+            if (rightChannel !== leftChannel) {
+                for (let i = 0; i < rightChannel.length; i++) {
+                    const abs = Math.abs(rightChannel[i]);
+                    if (abs > peakSampleR) peakSampleR = abs;
+                    if (abs > maxSample) maxSample = abs;
+                    if (abs >= clipThreshold) manualClipCount++;
+                }
+            } else {
+                peakSampleR = peakSampleL;
+            }
+            
+            const manualClipPct = (manualClipCount / (leftChannel.length + rightChannel.length)) * 100;
+            const maxSampleDb = maxSample > 0 ? 20 * Math.log10(maxSample) : -Infinity;
+            
+            log('🔢 Análise manual de clipping:');
+            log(`  - Samples clipped (threshold ${clipThreshold}): ${manualClipCount}`);
+            log(`  - Clipping percentage: ${manualClipPct.toFixed(4)}%`);
+            log(`  - Peak sample L: ${peakSampleL.toFixed(6)} (${peakSampleL > 0 ? (20 * Math.log10(peakSampleL)).toFixed(2) : '-∞'}dB)`);
+            log(`  - Peak sample R: ${peakSampleR.toFixed(6)} (${peakSampleR > 0 ? (20 * Math.log10(peakSampleR)).toFixed(2) : '-∞'}dB)`);
+            log(`  - Max sample overall: ${maxSample.toFixed(6)} (${maxSampleDb.toFixed(2)}dB)`);
+            
+            // Comparar com análise do sistema
+            const systemClipSamples = analysis.technicalData?.clippingSamples || 0;
+            const systemClipPct = analysis.technicalData?.clippingPct || 0;
+            const systemPeak = analysis.technicalData?.peak || -Infinity;
+            
+            log('🔢 Valores do sistema de análise:');
+            log(`  - clippingSamples: ${systemClipSamples}`);
+            log(`  - clippingPct: ${systemClipPct}`);
+            log(`  - peak: ${systemPeak}dB`);
+            
+            // Detectar discrepâncias
+            if (manualClipCount !== systemClipSamples) {
+                log(`⚠️ DISCREPÂNCIA: Manual=${manualClipCount}, Sistema=${systemClipSamples}`);
+            }
+            
+            if (Math.abs(manualClipPct - systemClipPct) > 0.001) {
+                log(`⚠️ DISCREPÂNCIA: Manual=${manualClipPct.toFixed(4)}%, Sistema=${systemClipPct}%`);
+            }
+            
+            // Análise de verdadeiro problema
+            const hasClippingIssue = maxSampleDb > -0.5 || manualClipCount > 0 || manualClipPct > 0;
+            log(`🚨 Problema de clipping detectado: ${hasClippingIssue}`);
+            log(`  - Critério Peak > -0.5dB: ${maxSampleDb > -0.5} (${maxSampleDb.toFixed(2)}dB)`);
+            log(`  - Critério Samples > 0: ${manualClipCount > 0} (${manualClipCount} samples)`);
+            log(`  - Critério Percentage > 0: ${manualClipPct > 0} (${manualClipPct.toFixed(4)}%)`);
+            
+            // Armazenar dados manuais para comparação
+            analysis._manualClippingAnalysis = {
+                clippedSamples: manualClipCount,
+                clippingPercentage: manualClipPct,
+                maxSample: maxSample,
+                maxSampleDb: maxSampleDb,
+                peakSampleL: peakSampleL,
+                peakSampleR: peakSampleR,
+                hasClippingIssue: hasClippingIssue
+            };
+        }
+
+        function displayResults(analysis, filename) {
+            const resultsDiv = document.getElementById('analysisResults');
+            resultsDiv.classList.add('show');
+            
+            // Basic info
+            const basicInfo = document.getElementById('basicInfo');
+            basicInfo.innerHTML = `
+                <h4>📁 ${filename}</h4>
+                <p><strong>Duração:</strong> ${analysis.duration?.toFixed(2) || 'N/A'}s</p>
+                <p><strong>Sample Rate:</strong> ${analysis.sampleRate || 'N/A'}Hz</p>
+                <p><strong>Canais:</strong> ${analysis.channels || 'N/A'}</p>
+            `;
+            
+            // Clipping metrics
+            const clippingMetrics = document.getElementById('clippingMetrics');
+            const td = analysis.technicalData || {};
+            const manual = analysis._manualClippingAnalysis || {};
+            
+            const createMetricCard = (title, value, status = 'normal', source = '') => {
+                const statusClass = status === 'problem' ? 'warn' : (status === 'ok' ? 'ok' : '');
+                return `
+                    <div class="metric-card ${statusClass}">
+                        <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
+                        <div style="font-size: 18px; margin-bottom: 5px;">${value}</div>
+                        ${source ? `<div style="font-size: 11px; opacity: 0.7;">${source}</div>` : ''}
+                    </div>
+                `;
+            };
+            
+            clippingMetrics.innerHTML = [
+                createMetricCard(
+                    'Peak Level', 
+                    `${(td.peak || -Infinity).toFixed(2)} dB`,
+                    td.peak > -0.5 ? 'problem' : 'ok'
+                ),
+                createMetricCard(
+                    'Clipping Samples (Sistema)',
+                    `${td.clippingSamples || 0}`,
+                    (td.clippingSamples || 0) > 0 ? 'problem' : 'ok'
+                ),
+                createMetricCard(
+                    'Clipping % (Sistema)',
+                    `${(td.clippingPct || 0).toFixed(4)}%`,
+                    (td.clippingPct || 0) > 0 ? 'problem' : 'ok'
+                ),
+                createMetricCard(
+                    'Clipping Samples (Manual)',
+                    `${manual.clippedSamples || 0}`,
+                    (manual.clippedSamples || 0) > 0 ? 'problem' : 'ok'
+                ),
+                createMetricCard(
+                    'Clipping % (Manual)',
+                    `${(manual.clippingPercentage || 0).toFixed(4)}%`,
+                    (manual.clippingPercentage || 0) > 0 ? 'problem' : 'ok'
+                ),
+                createMetricCard(
+                    'Max Sample (Manual)',
+                    `${(manual.maxSample || 0).toFixed(6)} (${(manual.maxSampleDb || -Infinity).toFixed(2)}dB)`,
+                    (manual.maxSampleDb || -Infinity) > -0.5 ? 'problem' : 'ok'
+                )
+            ].join('');
+            
+            // Comparison table
+            const comparisonBody = document.getElementById('comparisonBody');
+            const addRow = (metric, value, status, source, notes) => {
+                const statusColor = status === 'PROBLEMA' ? 'high-value' : 
+                                  status === 'OK' ? 'normal-value' : 
+                                  status === 'SUSPEITO' ? 'suspicious-value' : '';
+                return `
+                    <tr>
+                        <td>${metric}</td>
+                        <td class="${statusColor}">${value}</td>
+                        <td class="${statusColor}">${status}</td>
+                        <td>${source}</td>
+                        <td>${notes}</td>
+                    </tr>
+                `;
+            };
+            
+            comparisonBody.innerHTML = [
+                addRow(
+                    'Peak (Sistema)',
+                    `${(td.peak || -Infinity).toFixed(2)} dB`,
+                    td.peak > -0.5 ? 'PROBLEMA' : 'OK',
+                    td._sources?.peak || 'básico',
+                    td.peak > -0.5 ? 'Indica clipping' : 'Nível seguro'
+                ),
+                addRow(
+                    'Peak (Manual)',
+                    `${(manual.maxSampleDb || -Infinity).toFixed(2)} dB`,
+                    (manual.maxSampleDb || -Infinity) > -0.5 ? 'PROBLEMA' : 'OK',
+                    'análise manual',
+                    (manual.maxSampleDb || -Infinity) > -0.5 ? 'Indica clipping' : 'Nível seguro'
+                ),
+                addRow(
+                    'Clipping Samples (Sistema)',
+                    `${td.clippingSamples || 0}`,
+                    (td.clippingSamples || 0) > 0 ? 'PROBLEMA' : 'OK',
+                    td._sources?.clippingSamples || 'básico',
+                    (td.clippingSamples || 0) > 0 ? 'Amostras clipadas detectadas' : 'Nenhuma amostra clipada'
+                ),
+                addRow(
+                    'Clipping Samples (Manual)',
+                    `${manual.clippedSamples || 0}`,
+                    (manual.clippedSamples || 0) > 0 ? 'PROBLEMA' : 'OK',
+                    'análise manual (threshold 0.99)',
+                    (manual.clippedSamples || 0) > 0 ? 'Amostras clipadas detectadas' : 'Nenhuma amostra clipada'
+                ),
+                addRow(
+                    'True Peak (Sistema)',
+                    Number.isFinite(td.truePeakDbtp) ? `${td.truePeakDbtp.toFixed(2)} dBTP` : 'N/A',
+                    Number.isFinite(td.truePeakDbtp) && td.truePeakDbtp > 0 ? 'PROBLEMA' : 'OK',
+                    td._sources?.truePeakDbtp || 'avançado',
+                    Number.isFinite(td.truePeakDbtp) && td.truePeakDbtp > 0 ? 'True Peak acima de 0 dBTP' : 'True Peak dentro do limite'
+                )
+            ].join('');
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Sistema de debug de clipping iniciado');
+            log('📋 Aguardando upload de arquivo ou geração de teste...');
+        });
+    </script>
+</body>
+</html>

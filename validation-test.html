@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Validação - Analisador de Áudio</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .test-container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .pass { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .fail { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .critical { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .test-section { margin: 20px 0; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        .suggestion-item { border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔧 Teste de Validação do Analisador</h1>
+        <p>Este teste valida se as correções críticas estão funcionando corretamente.</p>
+        
+        <div class="test-section">
+            <h2>📊 Resultados dos Testes</h2>
+            <div id="testResults"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎯 Testes de Sugestões</h2>
+            <div id="suggestionTests"></div>
+        </div>
+    </div>
+
+    <!-- Carregar os scripts necessários -->
+    <script src="./suggestion-text-generator.js"></script>
+    <script>
+        // 🧪 Casos de teste para validar as correções
+        const testCases = [
+            {
+                name: "Banda acima do ideal com ação de cortar (CORRETO)",
+                suggestion: {
+                    message: "Banda low_bass acima do ideal",
+                    action: "Cortar low_bass em ~3.2dB",
+                    details: "Valor -10.50dB vs alvo -13.70dB | dif +3.20dB | limites [-15.70, -11.70] (media)"
+                },
+                expectedResult: "pass"
+            },
+            {
+                name: "Banda abaixo do ideal com ação de boost (CORRETO)",
+                suggestion: {
+                    message: "Banda high_mid abaixo do ideal", 
+                    action: "Boost high_mid em ~2.1dB",
+                    details: "Valor -22.10dB vs alvo -20.00dB | dif -2.10dB | limites [-22.00, -18.00] (leve)"
+                },
+                expectedResult: "pass"
+            },
+            {
+                name: "INCONSISTÊNCIA: Banda acima mas sugere boost (ERRO)",
+                suggestion: {
+                    message: "Banda low_bass acima do ideal",
+                    action: "Boost low_bass em ~3.2dB", // ERRO: deveria cortar
+                    details: "Valor -10.50dB vs alvo -13.70dB | dif +3.20dB"
+                },
+                expectedResult: "inconsistent"
+            },
+            {
+                name: "CRÍTICO: LUFS extremamente baixo",
+                suggestion: {
+                    message: "Volume geral baixo",
+                    action: "Aumentar gain geral",
+                    details: "LUFS: -35.2 LUFS | Muito baixo para mix"
+                },
+                expectedResult: "critical"
+            },
+            {
+                name: "CRÍTICO: Diferença extrema na mix (-15.1dB)",
+                suggestion: {
+                    message: "Banda presenca abaixo do ideal",
+                    action: "Boost presenca em ~4.0dB", 
+                    details: "Valor -26.20dB vs alvo -11.10dB | dif -15.10dB | limites [-13.57, -8.63] (alta)"
+                },
+                expectedResult: "critical"
+            },
+        ];
+        
+        // 🎯 Executar testes
+        function runTests() {
+            const generator = new SuggestionTextGenerator();
+            const resultsContainer = document.getElementById('testResults');
+            const suggestionsContainer = document.getElementById('suggestionTests');
+            
+            let passCount = 0;
+            let totalTests = testCases.length;
+            
+            testCases.forEach((testCase, index) => {
+                const result = generator.generateDidacticText(testCase.suggestion);
+                
+                let testStatus = 'fail';
+                let statusMessage = '';
+                
+                if (testCase.expectedResult === 'critical' && result.isCritical) {
+                    testStatus = 'pass';
+                    statusMessage = '✅ Problema crítico detectado corretamente';
+                    passCount++;
+                } else if (testCase.expectedResult === 'inconsistent' && result.isInconsistent) {
+                    testStatus = 'pass';
+                    statusMessage = '✅ Inconsistência detectada corretamente';
+                    passCount++;
+                } else if (testCase.expectedResult === 'pass' && !result.isCritical && !result.isInconsistent) {
+                    testStatus = 'pass';
+                    statusMessage = '✅ Sugestão válida processada corretamente';
+                    passCount++;
+                } else {
+                    statusMessage = `❌ Resultado inesperado. Esperado: ${testCase.expectedResult}, Obtido: ${result.isCritical ? 'critical' : result.isInconsistent ? 'inconsistent' : 'normal'}`;
+                }
+                
+                // Mostrar resultado do teste
+                resultsContainer.innerHTML += `
+                    <div class="test-result ${testStatus}">
+                        <strong>Teste ${index + 1}:</strong> ${testCase.name}<br>
+                        ${statusMessage}
+                    </div>
+                `;
+                
+                // Mostrar a sugestão renderizada
+                suggestionsContainer.innerHTML += `
+                    <div class="suggestion-item">
+                        <strong>${testCase.name}</strong>
+                        <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; border-left: 4px solid ${result.isCritical ? '#F44336' : result.isInconsistent ? '#FF9800' : '#4CAF50'};">
+                            <div><strong>Título:</strong> ${result.title}</div>
+                            <div><strong>Explicação:</strong> ${result.explanation}</div>
+                            <div><strong>Ação:</strong> ${result.action}</div>
+                            <div style="font-size: 12px; opacity: 0.8; margin-top: 8px;">
+                                <strong>Técnico:</strong> ${result.technical}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Resumo final
+            resultsContainer.innerHTML += `
+                <div class="test-result ${passCount === totalTests ? 'pass' : 'critical'}" style="margin-top: 20px; font-size: 16px; font-weight: bold;">
+                    📊 RESULTADO FINAL: ${passCount}/${totalTests} testes passaram
+                    ${passCount === totalTests ? ' 🎉 TODOS OS TESTES PASSARAM!' : ' ⚠️ Algumas correções ainda são necessárias'}
+                </div>
+            `;
+        }
+        
+        // Executar testes quando a página carregar
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>
