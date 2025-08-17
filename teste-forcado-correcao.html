@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Forçado - Correção de Bandas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .success { background: #2d5a27; }
+        .warning { background: #5a4a27; }
+        .error { background: #5a2727; }
+        .btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #005a9e; }
+        .btn.danger { background: #dc3545; }
+        .btn.success { background: #28a745; }
+        pre {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Teste Forçado - Correção de Bandas FabFilter</h1>
+    
+    <div class="test-section warning">
+        <h3>⚠️ Importante</h3>
+        <p>Este teste força a limpeza total de cache e aplica as correções de forma agressiva. Certifique-se de ter feito backup se necessário.</p>
+        <button class="btn danger" onclick="forceCleanAll()">🧹 Limpar TUDO (Cache + LocalStorage)</button>
+        <button class="btn" onclick="reloadSystem()">🔄 Recarregar Sistema</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>🔧 Teste de Correção Forçada</h3>
+        <button class="btn success" onclick="testForcedCorrection()">🎯 Testar Correção Forçada</button>
+        <button class="btn" onclick="simulateAnalysisWithValues()">📊 Simular com Valores Reais</button>
+        <button class="btn" onclick="checkConsoleDebug()">🐛 Ver Debug no Console</button>
+    </div>
+    
+    <div class="test-section" id="results">
+        <h3>📊 Resultados</h3>
+        <p>Execute o teste para ver os resultados...</p>
+    </div>
+    
+    <div class="test-section" id="debug-output">
+        <h3>🐛 Debug Output</h3>
+        <pre id="debug-pre">Aguardando execução...</pre>
+    </div>
+    
+    <script>
+        let debugLog = [];
+        
+        // Interceptar console.log para capturar debug
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            if (args[0] && args[0].includes('🔧')) {
+                debugLog.push(args.join(' '));
+                updateDebugOutput();
+            }
+        };
+        
+        function updateDebugOutput() {
+            const pre = document.getElementById('debug-pre');
+            pre.textContent = debugLog.slice(-20).join('\n') || 'Nenhum debug capturado ainda...';
+        }
+        
+        function forceCleanAll() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>🧹 Limpando TUDO...</h3>';
+            
+            // Limpar todos os caches possíveis
+            try {
+                // Cache do sistema
+                if (window.__PROD_AI_ADV_CACHE__) {
+                    window.__PROD_AI_ADV_CACHE__ = {};
+                }
+                
+                // LocalStorage
+                localStorage.clear();
+                
+                // SessionStorage
+                sessionStorage.clear();
+                
+                // Cache do navegador
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => caches.delete(name));
+                    });
+                }
+                
+                // Variáveis globais do sistema
+                window.__activeRefData = null;
+                window.__refDataCache = {};
+                window.PROD_AI_REF_GENRE = null;
+                
+                // Forçar garbage collection se possível
+                if (window.gc) window.gc();
+                
+                results.innerHTML = `
+                    <h3>🧹 Limpeza Completa</h3>
+                    <div style="background: #2d5a27; padding: 15px; border-radius: 8px;">
+                        <h4>✅ Tudo foi limpo!</h4>
+                        <ul>
+                            <li>Cache do sistema: Limpo</li>
+                            <li>LocalStorage: Limpo</li>
+                            <li>SessionStorage: Limpo</li>
+                            <li>Cache do navegador: Limpo</li>
+                            <li>Variáveis globais: Resetadas</li>
+                        </ul>
+                        <p><strong>Próximo passo:</strong> Recarregue a página ou o sistema para aplicar as correções.</p>
+                    </div>
+                `;
+            } catch (error) {
+                results.innerHTML = `
+                    <h3>🧹 Limpeza</h3>
+                    <div style="background: #5a2727; padding: 15px; border-radius: 8px;">
+                        <h4>❌ Erro durante limpeza</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function reloadSystem() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>🔄 Recarregando...</h3>';
+            
+            // Recarregar scripts do sistema
+            const scripts = [
+                'public/temp-v2.js',
+                'public/audio-analyzer.js', 
+                'public/audio-analyzer-integration.js'
+            ];
+            
+            let loaded = 0;
+            scripts.forEach(src => {
+                const script = document.createElement('script');
+                script.src = src + '?v=' + Date.now(); // Cache bust
+                script.onload = () => {
+                    loaded++;
+                    if (loaded === scripts.length) {
+                        results.innerHTML = `
+                            <h3>🔄 Sistema Recarregado</h3>
+                            <div style="background: #2d5a27; padding: 15px; border-radius: 8px;">
+                                <h4>✅ Scripts recarregados com sucesso!</h4>
+                                <p>Agora você pode testar a correção.</p>
+                            </div>
+                        `;
+                    }
+                };
+                script.onerror = () => {
+                    results.innerHTML = `
+                        <h3>🔄 Erro no Recarregamento</h3>
+                        <div style="background: #5a2727; padding: 15px; border-radius: 8px;">
+                            <h4>❌ Falha ao carregar ${src}</h4>
+                        </div>
+                    `;
+                };
+                document.head.appendChild(script);
+            });
+        }
+        
+        function testForcedCorrection() {
+            debugLog = []; // Limpar log anterior
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>🎯 Testando Correção Forçada...</h3>';
+            
+            // Dados simulados que imitam sua situação atual
+            const mockAnalysis = {
+                technicalData: {
+                    bandEnergies: {
+                        low_bass: { rms_db: 8.87, scale: 'original' },
+                        upper_bass: { rms_db: 8.36, scale: 'original' },
+                        low_mid: { rms_db: 13.15, scale: 'original' },
+                        mid: { rms_db: 4.19, scale: 'original' },
+                        high_mid: { rms_db: -2.96, scale: 'original' },
+                        brilho: { rms_db: -3.72, scale: 'original' },
+                        presenca: { rms_db: -19.40, scale: 'original' }
+                    }
+                }
+            };
+            
+            console.log('🔧 [TESTE] Iniciando teste com bandEnergies existentes...');
+            console.log('🔧 [TESTE] Valores antes da correção:', mockAnalysis.technicalData.bandEnergies);
+            
+            // Simular container e dados de referência
+            const tempContainer = document.createElement('div');
+            tempContainer.id = 'referenceComparisons';
+            document.body.appendChild(tempContainer);
+            
+            window.__activeRefData = {
+                bands: {
+                    low_bass: { target_db: 15.40, tol_db: 1.0 },
+                    upper_bass: { target_db: 10.80, tol_db: 2.0 },
+                    mid: { target_db: 3.30, tol_db: 2.0 }
+                }
+            };
+            window.PROD_AI_REF_GENRE = 'FUNK_MANDELA';
+            
+            // Forçar o debug
+            window.DEBUG_ANALYZER = true;
+            
+            // Chamar função de correção
+            if (typeof window.renderReferenceComparisons === 'function') {
+                window.renderReferenceComparisons(mockAnalysis);
+                
+                console.log('🔧 [TESTE] Valores após correção:', mockAnalysis.technicalData.bandEnergies);
+                
+                // Verificar se correção foi aplicada
+                const lowBassAfter = mockAnalysis.technicalData.bandEnergies.low_bass.rms_db;
+                const midAfter = mockAnalysis.technicalData.bandEnergies.mid.rms_db;
+                const correctionApplied = mockAnalysis.technicalData._fabfilterCompensationApplied;
+                
+                results.innerHTML = `
+                    <h3>🎯 Resultado do Teste</h3>
+                    <div style="background: ${correctionApplied ? '#2d5a27' : '#5a2727'}; padding: 15px; border-radius: 8px;">
+                        <h4>${correctionApplied ? '✅' : '❌'} Correção ${correctionApplied ? 'APLICADA' : 'NÃO APLICADA'}</h4>
+                        <table style="width: 100%; color: white;">
+                            <tr><th>Banda</th><th>Antes</th><th>Depois</th><th>Mudança</th></tr>
+                            <tr><td>low_bass</td><td>8.87 dB</td><td>${lowBassAfter.toFixed(2)} dB</td><td>${(lowBassAfter - 8.87).toFixed(2)} dB</td></tr>
+                            <tr><td>mid</td><td>4.19 dB</td><td>${midAfter.toFixed(2)} dB</td><td>${(midAfter - 4.19).toFixed(2)} dB</td></tr>
+                        </table>
+                        <p><strong>Flag de correção:</strong> ${correctionApplied ? 'Ativada' : 'Não ativada'}</p>
+                    </div>
+                `;
+            } else {
+                results.innerHTML = `
+                    <h3>🎯 Erro no Teste</h3>
+                    <div style="background: #5a2727; padding: 15px; border-radius: 8px;">
+                        <h4>❌ Função renderReferenceComparisons não encontrada</h4>
+                        <p>Recarregue o sistema primeiro.</p>
+                    </div>
+                `;
+            }
+            
+            // Limpar
+            document.body.removeChild(tempContainer);
+        }
+        
+        function simulateAnalysisWithValues() {
+            // Simular exatamente os valores que você está vendo
+            const realValues = {
+                technicalData: {
+                    bandEnergies: {
+                        low_bass: { rms_db: 8.87, scale: 'original' },
+                        upper_bass: { rms_db: 8.36, scale: 'original' },
+                        low_mid: { rms_db: 13.15, scale: 'original' },
+                        mid: { rms_db: 4.19, scale: 'original' },
+                        high_mid: { rms_db: -2.96, scale: 'original' },
+                        brilho: { rms_db: -3.72, scale: 'original' },
+                        presenca: { rms_db: -19.40, scale: 'original' }
+                    }
+                }
+            };
+            
+            console.log('🔧 [SIMULAÇÃO] Testando com valores reais da sua tabela...');
+            testForcedCorrection();
+        }
+        
+        function checkConsoleDebug() {
+            const results = document.getElementById('results');
+            results.innerHTML = `
+                <h3>🐛 Debug Console</h3>
+                <div style="background: #333; padding: 15px; border-radius: 8px;">
+                    <h4>Instruções:</h4>
+                    <ol>
+                        <li>Abra o Console do navegador (F12 → Console)</li>
+                        <li>Execute o teste de correção</li>
+                        <li>Procure por mensagens que começam com "🔧"</li>
+                        <li>Verifique se aparecem as mensagens de debug da correção</li>
+                    </ol>
+                    <p><strong>Debug capturado:</strong> ${debugLog.length} mensagens</p>
+                </div>
+            `;
+            updateDebugOutput();
+        }
+        
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            updateDebugOutput();
+        });
+    </script>
+</body>
+</html>

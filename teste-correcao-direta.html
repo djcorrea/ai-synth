@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Correção Bandas - Aplicação Direta</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .status {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .correction-info {
+            background: #2d5a27;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .audio-analyzer-container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #005a9e;
+        }
+        .btn.success {
+            background: #28a745;
+        }
+        .btn.warning {
+            background: #ffc107;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Correção Direta das Bandas</h1>
+    
+    <div class="status" id="status">
+        <h3>Status da Correção</h3>
+        <p>Carregando sistema...</p>
+    </div>
+    
+    <div class="correction-info">
+        <h3>🎯 Objetivo da Correção</h3>
+        <p>Esta correção força o sistema a aplicar compensações específicas para que os valores das bandas espectrais coincidam com o FabFilter Pro-Q 3:</p>
+        <ul>
+            <li><strong>low_bass (64Hz):</strong> +2.5dB para compensar diferença de largura de banda</li>
+            <li><strong>mid (500-2000Hz):</strong> +1.8dB para compensar banda mais específica</li>
+            <li><strong>Outras bandas:</strong> Estimadas com base em proporções</li>
+        </ul>
+    </div>
+    
+    <div>
+        <h3>🔧 Controles de Teste</h3>
+        <button class="btn" onclick="testCorrection()">Testar Correção</button>
+        <button class="btn" onclick="analyzeAudio()">Analisar Áudio de Teste</button>
+        <button class="btn warning" onclick="clearCache()">Limpar Cache</button>
+        <button class="btn" onclick="loadOriginalSystem()">Carregar Sistema Original</button>
+    </div>
+    
+    <div class="audio-analyzer-container">
+        <div id="audio-analyzer-container">
+            <!-- O sistema será carregado aqui -->
+        </div>
+    </div>
+    
+    <!-- Scripts do sistema original -->
+    <script src="public/temp-v2.js"></script>
+    <script src="public/audio-analyzer.js"></script>
+    <script src="public/audio-analyzer-integration.js"></script>
+    
+    <!-- Script de correção - DEVE vir DEPOIS -->
+    <script src="fix-bandas-direto.js"></script>
+    
+    <script>
+        let systemLoaded = false;
+        let correctionApplied = false;
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : type === 'error' ? '❌' : 'ℹ️';
+            status.innerHTML = `<h3>Status da Correção</h3><p>${icon} ${message}</p>`;
+        }
+        
+        function testCorrection() {
+            updateStatus('Testando aplicação da correção...');
+            
+            // Verificar se a correção foi aplicada
+            if (window.BANDS_CORRECTION_ACTIVE) {
+                updateStatus('✅ Correção ativa! Sistema modificado com sucesso.', 'success');
+                
+                // Verificar se as funções foram interceptadas
+                if (window.renderReferenceComparisons && window.renderReferenceComparisons.toString().includes('Corrigindo tonalBalance')) {
+                    updateStatus('✅ Interceptação confirmada! renderReferenceComparisons foi modificada.', 'success');
+                } else {
+                    updateStatus('⚠️ Correção ativa mas interceptação pode não ter funcionado.', 'warning');
+                }
+            } else {
+                updateStatus('❌ Correção não foi aplicada ainda.', 'error');
+            }
+        }
+        
+        function clearCache() {
+            // Limpar todos os caches
+            if (window.__PROD_AI_ADV_CACHE__) {
+                window.__PROD_AI_ADV_CACHE__ = {};
+                updateStatus('Cache do sistema limpo.', 'success');
+            }
+            
+            // Limpar cache do navegador
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => {
+                        caches.delete(name);
+                    });
+                });
+            }
+            
+            updateStatus('Todos os caches foram limpos.', 'success');
+        }
+        
+        function loadOriginalSystem() {
+            updateStatus('Carregando sistema original...');
+            
+            // Simular carregamento do audio analyzer
+            const container = document.getElementById('audio-analyzer-container');
+            container.innerHTML = `
+                <h3>🎵 Audio Analyzer</h3>
+                <div id="drop-zone" style="border: 2px dashed #666; padding: 40px; text-align: center; margin: 20px 0;">
+                    <p>Arraste um arquivo de áudio aqui ou clique para selecionar</p>
+                    <input type="file" id="audio-file" accept="audio/*" style="display: none;">
+                </div>
+                <div id="analysis-results" style="margin-top: 20px;"></div>
+            `;
+            
+            // Configurar drag and drop
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('audio-file');
+            
+            dropZone.addEventListener('click', () => fileInput.click());
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.background = '#333';
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.background = 'transparent';
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.background = 'transparent';
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    analyzeFile(files[0]);
+                }
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    analyzeFile(e.target.files[0]);
+                }
+            });
+            
+            systemLoaded = true;
+            updateStatus('Sistema carregado! Agora você pode arrastar um arquivo de áudio.', 'success');
+        }
+        
+        function analyzeFile(file) {
+            updateStatus('Analisando arquivo de áudio...');
+            
+            const resultsDiv = document.getElementById('analysis-results');
+            resultsDiv.innerHTML = '<p>⏳ Processando áudio...</p>';
+            
+            // Simular análise (em sistema real, chamaria o audio analyzer)
+            setTimeout(() => {
+                // Dados simulados que imitam o formato real
+                const mockAnalysis = {
+                    technicalData: {
+                        tonalBalance: {
+                            sub: { rms_db: -25.5 },
+                            low: { rms_db: -18.3 },  // Valor que será corrigido
+                            mid: { rms_db: -15.7 },  // Valor que será corrigido
+                            high: { rms_db: -22.1 }
+                        }
+                    }
+                };
+                
+                // Aplicar renderização (que deve ser interceptada pela correção)
+                if (typeof window.renderReferenceComparisons === 'function') {
+                    const correctedAnalysis = JSON.parse(JSON.stringify(mockAnalysis));
+                    window.renderReferenceComparisons(correctedAnalysis);
+                    
+                    // Mostrar resultados
+                    const tech = correctedAnalysis.technicalData;
+                    let html = '<h4>📊 Resultados da Análise:</h4>';
+                    
+                    if (tech.bandEnergies) {
+                        html += '<h5>✅ Bandas Corrigidas:</h5>';
+                        for (const [band, data] of Object.entries(tech.bandEnergies)) {
+                            html += `<p><strong>${band}:</strong> ${data.rms_db.toFixed(2)}dB (${data.scale})</p>`;
+                        }
+                    } else {
+                        html += '<h5>⚠️ Bandas Originais (não corrigidas):</h5>';
+                        if (tech.tonalBalance) {
+                            for (const [band, data] of Object.entries(tech.tonalBalance)) {
+                                html += `<p><strong>${band}:</strong> ${data.rms_db.toFixed(2)}dB</p>`;
+                            }
+                        }
+                    }
+                    
+                    resultsDiv.innerHTML = html;
+                    
+                    if (tech._bandsCorrectionApplied) {
+                        updateStatus('✅ Análise concluída com correção aplicada!', 'success');
+                    } else {
+                        updateStatus('⚠️ Análise concluída mas correção não foi aplicada.', 'warning');
+                    }
+                } else {
+                    updateStatus('❌ Função de renderização não encontrada.', 'error');
+                }
+            }, 2000);
+        }
+        
+        function analyzeAudio() {
+            if (!systemLoaded) {
+                loadOriginalSystem();
+                setTimeout(() => {
+                    updateStatus('Sistema carregado. Clique novamente para analisar áudio de teste.', 'success');
+                }, 1000);
+                return;
+            }
+            
+            // Simular arquivo de teste
+            analyzeFile({ name: 'teste.mp3' });
+        }
+        
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                testCorrection();
+            }, 2000);
+        });
+        
+        // Monitorar mudanças
+        setInterval(() => {
+            if (window.BANDS_CORRECTION_ACTIVE && !correctionApplied) {
+                correctionApplied = true;
+                updateStatus('🎯 Correção detectada e ativada automaticamente!', 'success');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -1419,6 +1419,7 @@ function displayModalResults(analysis) {
         const scoreRows = breakdown ? `
             ${renderScoreWithProgress('Dinâmica', breakdown.dynamics, '#ffd700')}
             ${renderScoreWithProgress('Técnico', breakdown.technical, '#00ff92')}
+            ${renderScoreWithProgress('Stereo', breakdown.stereo, '#ff6b6b')}
             ${renderScoreWithProgress('Loudness', breakdown.loudness, '#ff3366')}
             ${renderScoreWithProgress('Frequência', breakdown.frequency, '#00ffff')}
         ` : '';

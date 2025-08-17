@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema com Correção de Emergência</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .emergency-banner {
+            background: #dc3545;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status-section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .audio-analyzer-container {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #005a9e; }
+        .btn.danger { background: #dc3545; }
+        .btn.success { background: #28a745; }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="emergency-banner">
+        🚨 SISTEMA COM CORREÇÃO DE EMERGÊNCIA ATIVA 🚨
+    </div>
+    
+    <div class="status-section">
+        <h3>📊 Status da Correção</h3>
+        <div id="correction-status">Verificando...</div>
+        <br>
+        <button class="btn success" onclick="testEmergencyCorrection()">🧪 Testar Correção</button>
+        <button class="btn" onclick="simulateRealAnalysis()">📈 Simular Análise Real</button>
+        <button class="btn danger" onclick="clearAllAndReload()">🔄 Limpar e Recarregar</button>
+    </div>
+    
+    <div class="status-section">
+        <h3>🐛 Debug em Tempo Real</h3>
+        <pre id="debug-output">Aguardando atividade...</pre>
+    </div>
+    
+    <div class="audio-analyzer-container">
+        <h3>🎵 Sistema Audio Analyzer</h3>
+        <div id="referenceComparisons">
+            <p>Sistema carregando...</p>
+        </div>
+    </div>
+    
+    <!-- Scripts do sistema original -->
+    <script src="public/temp-v2.js"></script>
+    <script src="public/audio-analyzer.js"></script>
+    <script src="public/audio-analyzer-integration.js"></script>
+    
+    <!-- CORREÇÃO DE EMERGÊNCIA - deve vir por último -->
+    <script src="correcao-emergencia.js"></script>
+    
+    <script>
+        let debugMessages = [];
+        
+        // Interceptar console.log
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.join(' ');
+            if (message.includes('🚨') || message.includes('🔧')) {
+                debugMessages.push(`[${new Date().toLocaleTimeString()}] ${message}`);
+                updateDebugOutput();
+            }
+        };
+        
+        function updateDebugOutput() {
+            const debugOutput = document.getElementById('debug-output');
+            debugOutput.textContent = debugMessages.slice(-50).join('\n') || 'Nenhuma mensagem de debug ainda...';
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+        }
+        
+        function updateStatus() {
+            const statusDiv = document.getElementById('correction-status');
+            
+            let status = '<div style="margin: 10px 0;">';
+            
+            // Verificar se função original existe
+            if (typeof window.renderReferenceComparisons === 'function') {
+                status += '<div style="color: #28a745;">✅ Sistema Principal: Carregado</div>';
+            } else {
+                status += '<div style="color: #dc3545;">❌ Sistema Principal: Não encontrado</div>';
+            }
+            
+            // Verificar se correção de emergência está ativa
+            if (window.EMERGENCY_CORRECTION_ACTIVE) {
+                status += '<div style="color: #28a745;">✅ Correção de Emergência: ATIVA</div>';
+            } else {
+                status += '<div style="color: #ffc107;">⚠️ Correção de Emergência: Aguardando</div>';
+            }
+            
+            // Verificar função original backup
+            if (window._originalRenderReferenceComparisons) {
+                status += '<div style="color: #28a745;">✅ Backup Original: Salvo</div>';
+            } else {
+                status += '<div style="color: #6c757d;">ℹ️ Backup Original: Não criado ainda</div>';
+            }
+            
+            status += '</div>';
+            statusDiv.innerHTML = status;
+        }
+        
+        function testEmergencyCorrection() {
+            console.log('🧪 [TESTE] Iniciando teste de correção de emergência...');
+            
+            // Dados simulados com valores exatos da sua tabela
+            const testAnalysis = {
+                technicalData: {
+                    bandEnergies: {
+                        low_bass: { rms_db: 8.87, scale: 'original' },
+                        upper_bass: { rms_db: 8.36, scale: 'original' },
+                        low_mid: { rms_db: 13.15, scale: 'original' },
+                        mid: { rms_db: 4.19, scale: 'original' },
+                        high_mid: { rms_db: -2.96, scale: 'original' },
+                        brilho: { rms_db: -3.72, scale: 'original' },
+                        presenca: { rms_db: -19.40, scale: 'original' }
+                    }
+                }
+            };
+            
+            // Configurar dados de referência
+            window.__activeRefData = {
+                bands: {
+                    low_bass: { target_db: 15.40, tol_db: 1.0 },
+                    upper_bass: { target_db: 10.80, tol_db: 2.0 },
+                    low_mid: { target_db: 7.50, tol_db: 2.0 },
+                    mid: { target_db: 3.30, tol_db: 2.0 },
+                    high_mid: { target_db: -3.80, tol_db: 2.0 },
+                    brilho: { target_db: -11.10, tol_db: 2.0 },
+                    presenca: { target_db: -20.40, tol_db: 4.0 }
+                }
+            };
+            window.PROD_AI_REF_GENRE = 'FUNK_MANDELA';
+            
+            console.log('🧪 [TESTE] Valores ANTES da correção:', testAnalysis.technicalData.bandEnergies);
+            
+            // Chamar função (que deve ser interceptada)
+            if (typeof window.renderReferenceComparisons === 'function') {
+                window.renderReferenceComparisons(testAnalysis);
+                
+                console.log('🧪 [TESTE] Valores APÓS a correção:', testAnalysis.technicalData.bandEnergies);
+                console.log('🧪 [TESTE] Correção aplicada?', testAnalysis.technicalData._emergencyCorrectionApplied);
+                
+                // Verificar se valores mudaram
+                const lowBassChanged = testAnalysis.technicalData.bandEnergies.low_bass.rms_db !== 8.87;
+                const midChanged = testAnalysis.technicalData.bandEnergies.mid.rms_db !== 4.19;
+                
+                if (lowBassChanged || midChanged) {
+                    console.log('🧪 [TESTE] ✅ SUCESSO! Valores foram alterados pela correção!');
+                } else {
+                    console.log('🧪 [TESTE] ❌ FALHA! Valores não foram alterados.');
+                }
+            } else {
+                console.log('🧪 [TESTE] ❌ Função renderReferenceComparisons não encontrada!');
+            }
+        }
+        
+        function simulateRealAnalysis() {
+            console.log('📈 [SIMULAÇÃO] Simulando análise real...');
+            
+            // Criar uma análise que imita exatamente o que você está vendo
+            const realAnalysis = {
+                technicalData: {
+                    lufsIntegrated: -15.05,
+                    truePeakDbtp: -5.65,
+                    dynamicRange: 14.14,
+                    lra: 6.95,
+                    stereoCorrelation: 0.02,
+                    bandEnergies: {
+                        low_bass: { rms_db: 8.87, scale: 'original' },
+                        upper_bass: { rms_db: 8.36, scale: 'original' },
+                        low_mid: { rms_db: 13.15, scale: 'original' },
+                        mid: { rms_db: 4.19, scale: 'original' },
+                        high_mid: { rms_db: -2.96, scale: 'original' },
+                        brilho: { rms_db: -3.72, scale: 'original' },
+                        presenca: { rms_db: -19.40, scale: 'original' }
+                    }
+                }
+            };
+            
+            // Configurar exatamente como na sua tabela
+            window.__activeRefData = {
+                lufs_target: -5.50, tol_lufs: 1.02,
+                true_peak_target: -1.90, tol_true_peak: 0.50,
+                dr_target: 8.80, tol_dr: 1.12,
+                lra_target: 7.50, tol_lra: 3.34,
+                stereo_target: 0.12, tol_stereo: 0.07,
+                bands: {
+                    low_bass: { target_db: 15.40, tol_db: 1.05 },
+                    upper_bass: { target_db: 10.80, tol_db: 2.02 },
+                    low_mid: { target_db: 7.50, tol_db: 2.10 },
+                    mid: { target_db: 3.30, tol_db: 2.30 },
+                    high_mid: { target_db: -3.80, tol_db: 2.54 },
+                    brilho: { target_db: -11.10, tol_db: 2.47 },
+                    presenca: { target_db: -20.40, tol_db: 4.00 }
+                }
+            };
+            window.PROD_AI_REF_GENRE = 'FUNK_MANDELA';
+            
+            // Renderizar
+            if (typeof window.renderReferenceComparisons === 'function') {
+                window.renderReferenceComparisons(realAnalysis);
+                console.log('📈 [SIMULAÇÃO] Análise renderizada. Verifique a tabela acima!');
+            }
+        }
+        
+        function clearAllAndReload() {
+            // Limpar tudo
+            localStorage.clear();
+            sessionStorage.clear();
+            if (window.__PROD_AI_ADV_CACHE__) window.__PROD_AI_ADV_CACHE__ = {};
+            
+            // Recarregar página
+            window.location.reload();
+        }
+        
+        // Monitorar status a cada segundo
+        setInterval(updateStatus, 1000);
+        
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus();
+            console.log('🚨 [EMERGÊNCIA] Página carregada, sistema em monitoramento...');
+        });
+    </script>
+</body>
+</html>

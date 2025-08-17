@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Sistema de Bandas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .debug-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #00ff88;
+        }
+        
+        .error {
+            border-left-color: #ff4757;
+            background: #4a2a2a;
+        }
+        
+        .warning {
+            border-left-color: #ffd93d;
+            background: #4a3a2a;
+        }
+        
+        code {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        pre {
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        h1 { color: #00ff88; }
+        h2 { color: #ffd93d; }
+        h3 { color: #ff6b6b; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Sistema de Bandas Espectrais</h1>
+    
+    <div class="debug-section">
+        <h2>1. Verificar Cache do Sistema</h2>
+        <div id="cache-check"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>2. Testar Função Corrigida</h2>
+        <div id="function-test"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>3. Forçar Sistema Corrigido</h2>
+        <button onclick="forceCorrectBands()" style="background: #00ff88; border: none; padding: 10px 20px; border-radius: 4px; color: #000; cursor: pointer; font-weight: bold;">
+            🔧 FORÇAR BANDAS CORRETAS
+        </button>
+        <div id="force-result"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>4. Logs do Sistema</h2>
+        <div id="system-logs"></div>
+    </div>
+
+    <script>
+        console.log('🔍 Debug de bandas iniciado');
+        
+        // 1. Verificar cache
+        function checkCache() {
+            const cache = window.__PROD_AI_ADV_CACHE__;
+            const cacheDiv = document.getElementById('cache-check');
+            
+            if (!cache) {
+                cacheDiv.innerHTML = '<p class="error">❌ Cache não encontrado</p>';
+                return;
+            }
+            
+            const specMod = cache.specMod;
+            const hasSpecMod = !!specMod && !specMod.__err;
+            const hasFunction = hasSpecMod && typeof specMod.analyzeSpectralFeatures === 'function';
+            
+            cacheDiv.innerHTML = `
+                <p><strong>Cache encontrado:</strong> ✅</p>
+                <p><strong>Módulo espectral:</strong> ${hasSpecMod ? '✅' : '❌'}</p>
+                <p><strong>Função disponível:</strong> ${hasFunction ? '✅' : '❌'}</p>
+                <p><strong>Erro no módulo:</strong> ${specMod?.__err ? '❌ ' + specMod.__err : '✅ Nenhum'}</p>
+                <pre>Cache keys: ${Object.keys(cache).join(', ')}</pre>
+            `;
+        }
+        
+        // 2. Testar função corrigida
+        function testCorrectedFunction() {
+            const testDiv = document.getElementById('function-test');
+            
+            if (!window.audioAnalyzer) {
+                testDiv.innerHTML = '<p class="error">❌ audioAnalyzer não encontrado</p>';
+                return;
+            }
+            
+            const hasFunction = typeof window.audioAnalyzer._computeCorrectBandEnergies === 'function';
+            testDiv.innerHTML = `
+                <p><strong>Função corrigida:</strong> ${hasFunction ? '✅' : '❌'}</p>
+                <p><strong>AudioAnalyzer:</strong> ${!!window.audioAnalyzer ? '✅' : '❌'}</p>
+            `;
+            
+            if (hasFunction) {
+                console.log('🔧 Função _computeCorrectBandEnergies encontrada');
+            } else {
+                console.error('❌ Função _computeCorrectBandEnergies NÃO encontrada');
+            }
+        }
+        
+        // 3. Forçar bandas corretas
+        function forceCorrectBands() {
+            window.FORCE_CORRECT_BANDS = true;
+            window.USE_ADVANCED_SPECTRUM = false; // Forçar fallback
+            
+            // Limpar cache para forçar recalculo
+            if (window.__PROD_AI_ADV_CACHE__) {
+                delete window.__PROD_AI_ADV_CACHE__.specMod;
+            }
+            
+            document.getElementById('force-result').innerHTML = `
+                <p class="warning">⚠️ Configurações forçadas:</p>
+                <ul>
+                    <li><code>FORCE_CORRECT_BANDS = true</code></li>
+                    <li><code>USE_ADVANCED_SPECTRUM = false</code></li>
+                    <li>Cache espectral limpo</li>
+                </ul>
+                <p><strong>Agora analise um áudio novamente!</strong></p>
+            `;
+            
+            console.log('🔧 Sistema forçado para usar bandas corretas');
+        }
+        
+        // 4. Interceptar logs
+        function setupLogging() {
+            const originalLog = console.log;
+            const originalWarn = console.warn;
+            const logs = [];
+            
+            console.log = function(...args) {
+                if (args[0] && args[0].includes && (args[0].includes('bandas') || args[0].includes('spectrum') || args[0].includes('fallback'))) {
+                    logs.push(`LOG: ${args.join(' ')}`);
+                    updateLogs();
+                }
+                originalLog.apply(console, args);
+            };
+            
+            console.warn = function(...args) {
+                if (args[0] && args[0].includes && (args[0].includes('bandas') || args[0].includes('spectrum') || args[0].includes('fallback'))) {
+                    logs.push(`WARN: ${args.join(' ')}`);
+                    updateLogs();
+                }
+                originalWarn.apply(console, args);
+            };
+            
+            function updateLogs() {
+                const logsDiv = document.getElementById('system-logs');
+                logsDiv.innerHTML = '<pre>' + logs.slice(-10).join('\n') + '</pre>';
+            }
+        }
+        
+        // Executar testes
+        checkCache();
+        testCorrectedFunction();
+        setupLogging();
+        
+        // Verificar constantemente
+        setInterval(() => {
+            checkCache();
+            testCorrectedFunction();
+        }, 5000);
+    </script>
+</body>
+</html>

@@ -923,7 +923,10 @@ class AudioAnalyzer {
     // 📊 Análise de Volume e Dinâmica
     analysis.technicalData.peak = this.findPeakLevel(leftChannel);
     analysis.technicalData.rms = this.calculateRMS(leftChannel);
-    analysis.technicalData.dynamicRange = this.calculateDynamicRange(leftChannel);
+    // 🎯 Calcular Crest Factor (nova nomenclatura correta)
+    analysis.technicalData.crestFactor = this.calculateCrestFactor(leftChannel);
+    // 🔄 Manter dynamicRange para compatibilidade (mesmo valor que crestFactor)
+    analysis.technicalData.dynamicRange = analysis.technicalData.crestFactor;
     // 🔬 Nova métrica de dinâmica estatística (dr_stat) – não substitui dynamicRange legacy
     try {
       const enableDRRedef = (typeof window !== 'undefined') && (
@@ -1097,8 +1100,9 @@ class AudioAnalyzer {
     return 20 * Math.log10(rms); // Converter para dB
   }
 
-  // 🎚️ Calcular range dinâmico
-  calculateDynamicRange(channelData) {
+  // 🎚️ Calcular Crest Factor (anteriormente chamado Dynamic Range)
+  // Nota: Esta é a diferença Peak-RMS em dB, não o Dynamic Range técnico (TT DR ou EBU PLR)
+  calculateCrestFactor(channelData) {
     const peak = this.findPeakLevel(channelData);
     const rms = this.calculateRMS(channelData);
     
@@ -1110,16 +1114,22 @@ class AudioAnalyzer {
     return Math.abs(peak - rms);
   }
 
-  // 🎵 Encontrar frequências dominantes
+  // 🔄 Alias para compatibilidade (será removido gradualmente)
+  calculateDynamicRange(channelData) {
+    console.warn('⚠️ calculateDynamicRange() deprecated - use calculateCrestFactor() instead');
+    return this.calculateCrestFactor(channelData);
+  }
+
+  // 🎵 Encontrar frequências dominantes (versão melhorada)
   findDominantFrequencies(channelData, sampleRate) {
   if (window.DEBUG_ANALYZER === true) console.log('🎯 Iniciando análise de frequências...');
     
-    // Implementação simplificada e mais rápida
-    const fftSize = 256; // Reduzido para melhor performance
+    // 🎯 Implementação melhorada com FFT maior e interpolação
+    const fftSize = 2048; // Aumentado de 256 para melhor resolução
     const frequencies = [];
-    const maxSections = 20; // Limitar número de seções
+    const maxSections = 15; // Reduzido para melhor performance
     
-    const stepSize = Math.max(fftSize * 4, Math.floor(channelData.length / maxSections));
+    const stepSize = Math.max(fftSize * 2, Math.floor(channelData.length / maxSections));
     
     // Analisar diferentes seções do áudio
     for (let i = 0; i < channelData.length - fftSize && frequencies.length < maxSections; i += stepSize) {
@@ -1127,22 +1137,31 @@ class AudioAnalyzer {
         const section = channelData.slice(i, i + fftSize);
         const spectrum = this.simpleFFT(section);
         
-        // Encontrar frequência dominante nesta seção
-        let maxMagnitude = 0;
-        let dominantBin = 0;
-        
-        for (let j = 1; j < spectrum.length / 2; j++) { // Começar do bin 1
+        // 🎯 Encontrar top 3 picos por seção para melhor detecção
+        const peaks = [];
+        for (let j = 2; j < spectrum.length / 2 - 2; j++) { // Evitar DC e Nyquist
           const magnitude = spectrum[j];
-          if (magnitude > maxMagnitude) {
-            maxMagnitude = magnitude;
-            dominantBin = j;
+          // Verificar se é um pico local
+          if (magnitude > spectrum[j-1] && magnitude > spectrum[j+1] && 
+              magnitude > spectrum[j-2] && magnitude > spectrum[j+2]) {
+            const freq = (j * sampleRate) / fftSize;
+            if (freq > 30 && freq < 18000) { // Faixa mais focada
+              // 🎯 Interpolação parabólica para melhor precisão
+              const y1 = spectrum[j-1], y2 = spectrum[j], y3 = spectrum[j+1];
+              const a = (y1 - 2*y2 + y3) / 2;
+              const b = (y3 - y1) / 2;
+              const correction = a !== 0 ? -b / (2*a) : 0;
+              const refinedFreq = ((j + correction) * sampleRate) / fftSize;
+              
+              peaks.push({ freq: refinedFreq, magnitude });
+            }
           }
         }
         
-        const dominantFreq = (dominantBin * sampleRate) / fftSize;
-        if (dominantFreq > 20 && dominantFreq < 20000) { // Faixa audível
-          frequencies.push(dominantFreq);
-        }
+        // Ordenar por magnitude e pegar os top 2
+        peaks.sort((a, b) => b.magnitude - a.magnitude);
+        frequencies.push(...peaks.slice(0, 2).map(p => p.freq));
+        
       } catch (error) {
         console.warn('Erro na análise de seção:', error);
         continue;
@@ -1187,19 +1206,31 @@ class AudioAnalyzer {
     return spectrum;
   }
 
-  // 📊 Agrupar frequências similares
+  // 📊 Agrupar frequências similares (versão melhorada)
   groupFrequencies(frequencies) {
     const groups = {};
-    const tolerance = 50; // Hz
+    // 🎯 Tolerância adaptativa baseada na frequência
+    const getTolerance = (freq) => {
+      if (freq < 200) return 20;      // Graves: ±20 Hz
+      if (freq < 1000) return 30;     // Low-mid: ±30 Hz  
+      if (freq < 4000) return 50;     // Mid: ±50 Hz
+      if (freq < 10000) return 100;   // High-mid: ±100 Hz
+      return 200;                     // Agudos: ±200 Hz
+    };
     
     frequencies.forEach(freq => {
+      const tolerance = getTolerance(freq);
       const rounded = Math.round(freq / tolerance) * tolerance;
       groups[rounded] = (groups[rounded] || 0) + 1;
     });
     
     return Object.entries(groups)
       .sort(([,a], [,b]) => b - a)
-      .map(([freq, count]) => ({ frequency: parseFloat(freq), occurrences: count }));
+      .map(([freq, count]) => ({ 
+        frequency: parseFloat(freq), 
+        occurrences: count,
+        confidence: Math.min(1.0, count / 3) // Confiança baseada em ocorrências
+      }));
   }
 
   // 🚨 Detectar problemas comuns
@@ -1407,81 +1438,90 @@ class AudioAnalyzer {
   try { (window.__caiarLog||function(){})('SUGGESTIONS_V1_POST','Sugestões V1 pós-processadas', { total: (analysis.suggestions||[]).length }); } catch {}
   }
 
-  // 🎯 Gerar prompt personalizado para IA
+  // 🎯 Gerar prompt personalizado para IA (otimizado)
   generateAIPrompt(analysis) {
-    let prompt = `🎵 ANÁLISE TÉCNICA DE ÁUDIO DETECTADA:\n\n`;
-    
-    prompt += `📊 DADOS TÉCNICOS:\n`;
-    prompt += `• Peak: ${analysis.technicalData.peak.toFixed(1)}dB\n`;
-    prompt += `• RMS: ${analysis.technicalData.rms.toFixed(1)}dB\n`;
-    prompt += `• Dinâmica: ${analysis.technicalData.dynamicRange.toFixed(1)}dB\n`;
-    prompt += `• Duração: ${analysis.duration.toFixed(1)}s\n`;
-    prompt += `• Sample Rate: ${analysis.sampleRate}Hz\n`;
-    prompt += `• Canais: ${analysis.channels}\n\n`;
-
-    if (analysis.technicalData.dominantFrequencies.length > 0) {
-      prompt += `🎯 FREQUÊNCIAS DOMINANTES:\n`;
-      analysis.technicalData.dominantFrequencies.slice(0, 5).forEach(freq => {
-        prompt += `• ${Math.round(freq.frequency)}Hz (${freq.occurrences}x detectada)\n`;
-      });
-      prompt += `\n`;
-    }
-
-    if (analysis.problems.length > 0) {
-      prompt += `🚨 PROBLEMAS DETECTADOS:\n`;
-      analysis.problems.forEach(problem => {
-        prompt += `• ${problem.message}\n`;
-        prompt += `  Solução: ${problem.solution}\n`;
-      });
-      prompt += `\n`;
-    }
-
+    const td = analysis.technicalData || {};
     const sugList = analysis.suggestionsSnapshot || analysis.suggestions || [];
-    if (sugList.length > 0) {
-      prompt += `💡 SUGESTÕES AUTOMÁTICAS (snapshot reconciliado):\n`;
-      sugList.forEach(suggestion => {
-        prompt += `• ${suggestion.message}\n`;
-        prompt += `  Ação: ${suggestion.action}\n`;
+    
+    // Cabeçalho compacto
+    let prompt = `🎵 ANÁLISE DE ÁUDIO - Preciso de ajuda para otimizar meu mix:\n\n`;
+    
+    // Métricas principais em linha compacta
+    const metrics = [
+      `Peak: ${td.peak?.toFixed(1)||'N/A'}dB`,
+      `RMS: ${td.rms?.toFixed(1)||'N/A'}dB`, 
+      `DR: ${td.dynamicRange?.toFixed(1)||'N/A'}dB`,
+      td.lufsIntegrated ? `LUFS: ${td.lufsIntegrated.toFixed(1)}` : null,
+      td.truePeakDbtp ? `TP: ${td.truePeakDbtp.toFixed(1)}dBTP` : null,
+      td.lra ? `LRA: ${td.lra.toFixed(1)}` : null
+    ].filter(Boolean);
+    
+    prompt += `📊 MÉTRICAS: ${metrics.join(' | ')}\n`;
+    
+    // Frequências dominantes (só as 3 principais)
+    if (td.dominantFrequencies?.length > 0) {
+      const topFreqs = td.dominantFrequencies.slice(0, 3)
+        .map(f => `${Math.round(f.frequency)}Hz`)
+        .join(', ');
+      prompt += `🎯 FREQ. DOMINANTES: ${topFreqs}\n`;
+    }
+    
+    // Centroide espectral se disponível
+    if (td.spectralCentroid) {
+      prompt += `🎼 CENTROIDE: ${Math.round(td.spectralCentroid)}Hz\n`;
+    }
+    
+    prompt += `\n`;
+
+    // Problemas críticos
+    if (analysis.problems?.length > 0) {
+      prompt += `🚨 PROBLEMAS:\n`;
+      analysis.problems.forEach(p => {
+        prompt += `• ${p.message} → ${p.solution}\n`;
       });
       prompt += `\n`;
     }
 
-    prompt += `🎯 CONTEXTO: Sou um produtor musical que precisa de ajuda específica para melhorar meu áudio. `;
-    prompt += `Com base nesta análise técnica REAL do meu arquivo, me forneça conselhos práticos e específicos `;
-    prompt += `incluindo valores exatos de EQ, compressão, limitação e outros processamentos. `;
-    prompt += `Se detectou frequências problemáticas, me diga exatamente onde cortar/realçar e com qual Q. `;
-    prompt += `Se o volume está inadequado, me diga os valores exatos de compressão e limitação para corrigir.`;
+    // Sugestões principais
+    if (sugList.length > 0) {
+      prompt += `💡 SUGESTÕES:\n`;
+      sugList.forEach(s => {
+        prompt += `• ${s.message} → ${s.action}\n`;
+      });
+      prompt += `\n`;
+    }
 
-  // ⚠️ Regra obrigatória para reforçar uso dos dados do JSON na resposta da IA
-  prompt += `\n\n⚠️ REGRAS OBRIGATÓRIAS:\n`;
-  prompt += `1. Use TODOS os valores de Peak, RMS, Dinâmica (dynamicRange e dr_stat se existir), LUFS, True Peak, LRA, THD (se houver), centroid e frequências dominantes.\n`;
-  prompt += `2. NÃO contradiga as sugestões listadas; apenas complemente com [EXTRA] se necessário e justifique com dados.\n`;
-  prompt += `3. Sempre forneça valores numéricos específicos (dB, Hz, ratios, ms).\n`;
-  prompt += `4. Se uma métrica estiver fora do alvo, priorize ações que movam ela para dentro da tolerância.\n`;
-  try {
-    const attach = {
-      mixScore: analysis.mixScore?.scorePct,
-      classification: analysis.mixScore?.classification,
-      scoreMode: analysis.mixScore?.scoreMode,
-      categories: analysis.mixScore?.categories,
-      perMetric: analysis.mixScore?.perMetric?.slice(0,40),
-      suggestions: (analysis.suggestionsSnapshot||analysis.suggestions)||[],
-      problems: analysis.problems||[],
-      technical: {
-        peak: analysis.technicalData.peak,
-        rms: analysis.technicalData.rms,
-        dynamicRange: analysis.technicalData.dynamicRange,
-        dr_stat: analysis.technicalData.dr_stat,
-        lufsIntegrated: analysis.technicalData.lufsIntegrated,
-        lra: analysis.technicalData.lra,
-        truePeakDbtp: analysis.technicalData.truePeakDbtp,
-        spectralCentroid: analysis.technicalData.spectralCentroid,
-        thdPercent: analysis.technicalData.thdPercent,
-        dcOffset: analysis.technicalData.dcOffset
-      }
-    };
-    prompt += `\n\n### BLOCO_ESTRUTURADO_JSON\n` + JSON.stringify(attach, null, 2) + `\n### FIM_BLOCO_JSON`;
-  } catch {}
+    // Contexto direto e objetivo
+    prompt += `CONTEXTO: Com base nestes dados técnicos REAIS, forneça conselhos específicos com valores exatos (dB, Hz, Q, ratios) para EQ, compressão e limitação.`;
+
+    // JSON estruturado otimizado
+    try {
+      const data = {
+        metrics: {
+          peak: td.peak,
+          rms: td.rms,
+          dynamicRange: td.dynamicRange,
+          dr_stat: td.dr_stat,
+          lufsIntegrated: td.lufsIntegrated,
+          lra: td.lra,
+          truePeakDbtp: td.truePeakDbtp,
+          spectralCentroid: td.spectralCentroid,
+          clippingSamples: td.clippingSamples,
+          dcOffset: td.dcOffset
+        },
+        score: analysis.mixScore?.scorePct,
+        classification: analysis.mixScore?.classification,
+        suggestions: sugList.map(s => ({ type: s.type, message: s.message, action: s.action })),
+        problems: analysis.problems?.map(p => ({ type: p.type, message: p.message, solution: p.solution })) || []
+      };
+      
+      // Remove propriedades null/undefined para economizar espaço
+      Object.keys(data.metrics).forEach(k => {
+        if (data.metrics[k] == null) delete data.metrics[k];
+      });
+      
+      prompt += `\n\n### JSON_DATA\n${JSON.stringify(data, null, 1)}\n### END_JSON`;
+    } catch {}
 
     return prompt;
   }
@@ -1807,8 +1847,27 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
     try {
       const t0Spec = performance.now();
       const ref = (typeof window !== 'undefined') ? window.PROD_AI_REF_DATA : null;
-      const doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
-      if (doBands) {
+      
+      // 🔧 CORREÇÃO: Verificar se módulo espectral está disponível, senão usar fallback melhorado
+      let doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
+      
+      // 🔧 FALLBACK MELHORADO: Se módulo avançado falhar, usar definições corretas mesmo assim
+      const forceCorrectBands = !doBands && !!ref && (typeof window !== 'undefined' && window.FORCE_CORRECT_BANDS !== false);
+      
+      // Debug logs
+      if (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true) {
+        console.log('🔍 Debug bandas:', {
+          hasRef: !!ref,
+          hasSpecMod: !!cache.specMod,
+          specModError: cache.specMod?.__err,
+          hasAnalyzeFunction: !!(cache.specMod && typeof cache.specMod.analyzeSpectralFeatures === 'function'),
+          doBands,
+          forceCorrectBands,
+          FORCE_CORRECT_BANDS: window.FORCE_CORRECT_BANDS
+        });
+      }
+      
+      if (doBands || forceCorrectBands) {
         // Evitar reprocessar se já existe (idempotente)
         if (!td.bandEnergies) {
           // Esperar referência carregada (até 1s) se necessário
@@ -1981,12 +2040,12 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                   let action;
                   if (status === 'ALTO') {
                     // Mensagens diferenciadas para bandas específicas de aspereza/brilho/presença
-                    if (band === 'high_mid') action = `High-mid acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${Math.min(baseMag, sideTol).toFixed(1)} dB em 2–6 kHz`;
-                    else if (band === 'brilho') action = `Brilho/agudos acima do alvo (+${baseMag.toFixed(1)}dB). Aplique shelf suave >8–10 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
-                    else if (band === 'presenca') action = `Presença acima do ideal (+${baseMag.toFixed(1)}dB). Suavize 3–6 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
-                    else action = `Cortar ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB (target ${refTarget.toFixed(1)} +${tolMax} / -${tolMin})`;
+                    if (band === 'high_mid') action = `High-mid acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${baseMag.toFixed(1)} dB em 2–6 kHz`;
+                    else if (band === 'brilho') action = `Brilho/agudos acima do alvo (+${baseMag.toFixed(1)}dB). Aplique shelf suave >8–10 kHz (~${baseMag.toFixed(1)} dB)`;
+                    else if (band === 'presenca') action = `Presença acima do ideal (+${baseMag.toFixed(1)}dB). Suavize 3–6 kHz (~${baseMag.toFixed(1)} dB)`;
+                    else action = `Cortar ${band} em ~${baseMag.toFixed(1)}dB (target ${refTarget.toFixed(1)} +${tolMax} / -${tolMin})`;
                   } else {
-                    action = diff > 0 ? `Cortar ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB` : `Boost ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB`;
+                    action = diff > 0 ? `Cortar ${band} em ~${baseMag.toFixed(1)}dB` : `Boost ${band} em ~${baseMag.toFixed(1)}dB`;
                   }
                   const key = `band:${band}`;
                   if (!existingKeys.has(key)) {
@@ -2115,6 +2174,33 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
         }
       }
       if (doBands) timing.spectrumMs = Math.round(performance.now() - t0Spec);
+      
+      // 🔧 FALLBACK MELHORADO: Se módulo avançado falhou, usar cálculo simplificado com bandas corretas
+      else if (forceCorrectBands && !td.bandEnergies) {
+        console.log('🔧 Usando fallback melhorado para bandas espectrais');
+        try {
+          const srcBuffer = left; // usar canal esquerdo
+          const bandEnergies = this._computeCorrectBandEnergies(srcBuffer, sr);
+          if (bandEnergies) {
+            td.bandEnergies = bandEnergies;
+            td.bandScale = 'rms_db_corrected';
+            (td._sources = td._sources || {}).bandEnergies = 'fallback:corrected';
+            
+            // Converter para tonalBalance também
+            if (!td.tonalBalance) {
+              td.tonalBalance = {
+                sub: bandEnergies.sub ? { rms_db: bandEnergies.sub.rms_db } : null,
+                low: bandEnergies.low_bass ? { rms_db: bandEnergies.low_bass.rms_db } : null,
+                mid: bandEnergies.mid ? { rms_db: bandEnergies.mid.rms_db } : null,
+                high: bandEnergies.brilho ? { rms_db: bandEnergies.brilho.rms_db } : null
+              };
+              (td._sources = td._sources || {}).tonalBalance = 'fallback:corrected';
+            }
+          }
+        } catch (fe) { 
+          if (debug) console.warn('⚠️ Fallback melhorado falhou:', fe?.message || fe); 
+        }
+      }
     } catch (e) { if (debug) console.warn('⚠️ [ADV] Band energies falharam:', e?.message || e); }
     // ===== FASE 2 (FIM) =====
 
@@ -2138,11 +2224,36 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
           mv.crestVsExpectedDelta = parseFloat(d2.toFixed(2));
         }
       }
+      // 🎯 Validação LRA: detectar valores anômalos
       if (Number.isFinite(td.lra)) {
-        // LRA plausível: não maior que 3× DR e não negativa
-        if (Number.isFinite(dr)) {
-          mv.lraPlausibility = (td.lra >= 0 && td.lra <= dr * 3) ? 'ok' : 'check';
+        if (td.lra > 30) {
+          mv.lraAnomaly = 'high';
+          mv.lraNote = 'LRA muito alto - possível uso de algoritmo legacy';
+          console.warn(`⚠️ LRA anômalo: ${td.lra.toFixed(1)} LU - considere ativar USE_R128_LRA`);
+        } else if (td.lra < 0.5) {
+          mv.lraAnomaly = 'low';
+          mv.lraNote = 'LRA muito baixo - material muito comprimido';
+        } else {
+          mv.lraAnomaly = 'normal';
         }
+      }
+      // 🎯 Validação LUFS: range broadcasting
+      if (Number.isFinite(td.lufsIntegrated)) {
+        const lufs = td.lufsIntegrated;
+        if (lufs > -6) {
+          mv.lufsWarning = 'very_loud';
+          mv.lufsNote = 'LUFS muito alto - risco de distorção';
+        } else if (lufs < -50) {
+          mv.lufsWarning = 'very_quiet';
+          mv.lufsNote = 'LUFS muito baixo - possível silêncio/erro';
+        } else if (lufs >= -24 && lufs <= -22) {
+          mv.lufsNote = 'Broadcast compliant (EBU R128)';
+        }
+      }
+      // 🎯 Validação adicional LRA vs DR
+      if (Number.isFinite(td.lra) && Number.isFinite(dr)) {
+        // LRA plausível: não maior que 3× DR e não negativa
+        mv.lraPlausibility = (td.lra >= 0 && td.lra <= dr * 3) ? 'ok' : 'check';
       }
     } catch (e) { if (debug) console.warn('⚠️ [ADV] Validação métricas falhou:', e?.message || e); }
     // === Invariantes & saneamento (feature flag ENABLE_METRIC_INVARIANTS) ===
@@ -2227,6 +2338,161 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
   } catch (err) {
     if (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true) console.warn('⚠️ [ADV] Adapter geral falhou:', err?.message || err);
     return baseAnalysis;
+  }
+};
+
+// 🔧 FUNÇÃO AUXILIAR: Cálculo correto de bandas espectrais quando módulo avançado falha
+AudioAnalyzer.prototype._computeCorrectBandEnergies = function(signal, sampleRate) {
+  try {
+    // Definições corretas das bandas (alinhadas com referências)
+    const bandDefs = {
+      sub: [20, 60],
+      low_bass: [60, 120],      // ✅ CORRETO: 60-120 Hz (em vez de 60-250)
+      upper_bass: [120, 250],
+      low_mid: [250, 500],
+      mid: [500, 2000],         // ✅ CORRETO: 500-2000 Hz (em vez de 250-4000)
+      high_mid: [2000, 6000],
+      brilho: [6000, 12000],
+      presenca: [12000, 18000]
+    };
+    
+    // Configuração FFT
+    const fftSize = 2048;
+    const hop = 1024;
+    const maxSeconds = 60; // Limitar processamento
+    const maxSamples = Math.min(signal.length, sampleRate * maxSeconds);
+    const slice = signal.subarray(0, maxSamples);
+    
+    // Acumuladores por banda
+    const bandAccumulators = {};
+    Object.keys(bandDefs).forEach(band => {
+      bandAccumulators[band] = { energy: 0, count: 0 };
+    });
+    
+    let totalFrames = 0;
+    
+    // Processar janelas FFT
+    for (let start = 0; start + fftSize <= slice.length; start += hop) {
+      const frame = slice.subarray(start, start + fftSize);
+      
+      // FFT simples (usando método existente se disponível)
+      let spectrum;
+      try {
+        if (this && typeof this.simpleFFT === 'function') {
+          spectrum = this.simpleFFT(frame);
+        } else if (window.audioAnalyzer && typeof window.audioAnalyzer.simpleFFT === 'function') {
+          spectrum = window.audioAnalyzer.simpleFFT(frame);
+        } else {
+          // Usar implementação FFT básica inline
+          spectrum = this._basicFFT(frame);
+        }
+      } catch (fftErr) {
+        console.warn('⚠️ Erro FFT:', fftErr?.message);
+        continue;
+      }
+      
+      if (!spectrum || spectrum.length < 2) continue;
+      
+      const binSize = sampleRate / fftSize;
+      const nyquist = sampleRate / 2;
+      
+      // Mapear cada bin para as bandas corretas
+      for (let bin = 0; bin < spectrum.length / 2; bin++) {
+        const freq = bin * binSize;
+        if (freq > nyquist) break;
+        
+        const magnitude = spectrum[bin];
+        if (!Number.isFinite(magnitude) || magnitude <= 0) continue;
+        
+        // Encontrar qual banda esta frequência pertence
+        for (const [bandName, [fLow, fHigh]] of Object.entries(bandDefs)) {
+          if (freq >= fLow && freq < fHigh) {
+            bandAccumulators[bandName].energy += magnitude;
+            bandAccumulators[bandName].count++;
+            break; // Cada bin pertence a apenas uma banda
+          }
+        }
+      }
+      
+      totalFrames++;
+      if (totalFrames >= 100) break; // Limitar processamento
+    }
+    
+    if (totalFrames === 0) return null;
+    
+    // Calcular resultados finais
+    const bandEnergies = {};
+    let totalEnergy = 0;
+    
+    // Primeiro passo: calcular energias médias
+    for (const [bandName, acc] of Object.entries(bandAccumulators)) {
+      if (acc.count > 0) {
+        const avgEnergy = acc.energy / acc.count;
+        totalEnergy += avgEnergy;
+        bandEnergies[bandName] = { linearEnergy: avgEnergy };
+      }
+    }
+    
+    // Segundo passo: converter para dB relativo
+    if (totalEnergy > 0) {
+      for (const [bandName, data] of Object.entries(bandEnergies)) {
+        if (data && data.linearEnergy > 0) {
+          // Converter para dB relativo ao total
+          const ratio = data.linearEnergy / totalEnergy;
+          const rms_db = 20 * Math.log10(Math.max(ratio, 1e-12));
+          
+          bandEnergies[bandName] = {
+            energy: data.linearEnergy,
+            rms_db: rms_db,
+            scale: 'rms_db_corrected'
+          };
+        } else {
+          bandEnergies[bandName] = {
+            energy: 0,
+            rms_db: -Infinity,
+            scale: 'rms_db_corrected'
+          };
+        }
+      }
+    }
+    
+    console.log('🔧 Bandas corrigidas calculadas:', Object.keys(bandEnergies));
+    return bandEnergies;
+    
+  } catch (err) {
+    console.warn('⚠️ Erro no cálculo de bandas corrigidas:', err?.message || err);
+    return null;
+  }
+};
+
+// 🔧 FFT básico inline para fallback
+AudioAnalyzer.prototype._basicFFT = function(frame) {
+  try {
+    // Implementação simples usando DFT para frequências relevantes
+    const N = frame.length;
+    const spectrum = new Float32Array(N);
+    
+    // Calcular apenas as frequências baixas e médias (mais eficiente)
+    const maxBin = Math.min(N/2, 1024); // Limitar para performance
+    
+    for (let k = 0; k < maxBin; k++) {
+      let realPart = 0;
+      let imagPart = 0;
+      
+      for (let n = 0; n < N; n++) {
+        const angle = -2 * Math.PI * k * n / N;
+        realPart += frame[n] * Math.cos(angle);
+        imagPart += frame[n] * Math.sin(angle);
+      }
+      
+      // Magnitude
+      spectrum[k] = Math.sqrt(realPart * realPart + imagPart * imagPart);
+    }
+    
+    return spectrum;
+  } catch (err) {
+    console.warn('⚠️ Erro FFT básico:', err?.message);
+    return null;
   }
 };
 

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Correção Bug Tolerância</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .test-case {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #00ff88;
+        }
+        
+        .error {
+            background: #4a2a2a;
+            border-left-color: #ff4757;
+        }
+        
+        .success {
+            background: #2a4a2a;
+            border-left-color: #52f7ad;
+        }
+        
+        .code {
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        
+        .before {
+            color: #ff6b6b;
+        }
+        
+        .after {
+            color: #51cf66;
+        }
+        
+        h1 {
+            color: #00ff88;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #ffd93d;
+        }
+        
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .pass {
+            background: #1f4d28;
+            color: #52f7ad;
+        }
+        
+        .fail {
+            background: #4d1f1f;
+            color: #ff4757;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste - Correção do Bug das Tolerâncias</h1>
+    
+    <div class="test-case">
+        <h2>📝 Problema Identificado</h2>
+        <p>O sistema estava usando <code>Math.min(baseMag, sideTol)</code> nas sugestões de ajuste, o que causava:</p>
+        <ul>
+            <li>Low_bass: diferença real 16dB → sugestão incorreta 1.7dB (tolerância)</li>
+            <li>Mid: diferença real 7.45dB → sugestão incorreta 2.3dB (tolerância)</li>
+        </ul>
+    </div>
+    
+    <div class="test-case">
+        <h2>⚠️ Código Problemático (ANTES)</h2>
+        <div class="code before">
+if (band === 'high_mid') action = `High-mid acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${Math.min(baseMag, sideTol).toFixed(1)} dB em 2–6 kHz`;
+        </div>
+        <p>❌ Quando <code>baseMag > sideTol</code>, usava a tolerância em vez da diferença real!</p>
+    </div>
+    
+    <div class="test-case success">
+        <h2>✅ Código Corrigido (DEPOIS)</h2>
+        <div class="code after">
+if (band === 'high_mid') action = `High-mid acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${baseMag.toFixed(1)} dB em 2–6 kHz`;
+        </div>
+        <p>✅ Agora sempre usa <code>baseMag</code> (diferença real) nas sugestões!</p>
+    </div>
+    
+    <div class="test-case">
+        <h2>🧪 Simulação dos Casos Reportados</h2>
+        <div id="simulacao"></div>
+    </div>
+
+    <script>
+        function simularSugestoes() {
+            const casos = [
+                {
+                    banda: 'low_bass',
+                    valorAtual: -1.4, // Exemplo do usuário  
+                    valorAlvo: -14.6, // Target funk_mandela
+                    tolerancia: 1.66,  // tol_db funk_mandela low_bass
+                    diferencaReal: 13.2 // ~16dB como reportado
+                },
+                {
+                    banda: 'mid',
+                    valorAtual: 10.75, // Exemplo do usuário
+                    valorAlvo: 3.3,    // Target funk_mandela mid
+                    tolerancia: 2.3,   // tol_db funk_mandela mid
+                    diferencaReal: 7.45 // Como reportado
+                }
+            ];
+            
+            let html = '';
+            
+            casos.forEach((caso, i) => {
+                const baseMag = Math.abs(caso.diferencaReal);
+                const sideTol = caso.tolerancia;
+                
+                // Simulação do código ANTES (bugado)
+                const sugestaoAntiga = Math.min(baseMag, sideTol).toFixed(1);
+                
+                // Simulação do código DEPOIS (corrigido)
+                const sugestaoCorrigida = baseMag.toFixed(1);
+                
+                html += `
+                    <div style="background: #333; padding: 15px; margin: 10px 0; border-radius: 8px;">
+                        <h3>Caso ${i + 1}: Banda ${caso.banda}</h3>
+                        <p><strong>Atual:</strong> ${caso.valorAtual}dB | <strong>Alvo:</strong> ${caso.valorAlvo}dB | <strong>Diferença Real:</strong> ${caso.diferencaReal}dB</p>
+                        <p><strong>Tolerância:</strong> ±${caso.tolerancia}dB</p>
+                        
+                        <div class="test-result fail">
+                            <strong>❌ ANTES (bugado):</strong> Sugestão ${sugestaoAntiga}dB<br>
+                            <em>Usava Math.min(${baseMag.toFixed(1)}, ${sideTol}) = ${sugestaoAntiga}dB</em>
+                        </div>
+                        
+                        <div class="test-result pass">
+                            <strong>✅ DEPOIS (corrigido):</strong> Sugestão ${sugestaoCorrigida}dB<br>
+                            <em>Usa baseMag = ${sugestaoCorrigida}dB (diferença real)</em>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('simulacao').innerHTML = html;
+        }
+        
+        // Executar simulação ao carregar
+        simularSugestoes();
+        
+        console.log('🔧 Teste de correção carregado');
+        console.log('📊 Casos simulados baseados no problema reportado pelo usuário');
+    </script>
+</body>
+</html>

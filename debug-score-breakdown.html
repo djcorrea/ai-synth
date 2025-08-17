@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Debug Score Breakdown</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 20px; 
+            background: #1a1a2e; 
+            color: #eee;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { 
+            text-align: center; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .debug-section {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #00ffff;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .metric-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .status-ok { background: #4CAF50; color: white; }
+        .status-yellow { background: #FFC107; color: black; }
+        .status-red { background: #F44336; color: white; }
+        
+        .calculation-box {
+            background: #2d1b69;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .file-input {
+            padding: 10px;
+            border: 2px dashed #666;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .file-input:hover {
+            border-color: #00ffff;
+            background: rgba(0, 255, 255, 0.1);
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th {
+            background: #2d1b69;
+            color: #00ffff;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .summary-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            text-align: center;
+        }
+        .big-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .color-green { color: #4CAF50; }
+        .color-yellow { color: #FFC107; }
+        .color-red { color: #F44336; }
+        .color-blue { color: #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Score Breakdown Debugger</h1>
+            <p>Analise detalhadamente por que o score está baixo</p>
+        </div>
+
+        <div class="debug-section">
+            <h2>📁 Upload de Arquivo de Áudio</h2>
+            <div class="file-input" onclick="document.getElementById('audioFile').click()">
+                <p>Clique aqui para selecionar um arquivo de áudio</p>
+                <input type="file" id="audioFile" accept="audio/*" style="display: none;" onchange="analyzeFile(this)">
+            </div>
+            <div id="analysisResults" style="display: none;">
+                <h3>📊 Resultados da Análise</h3>
+                <div id="scoreResults"></div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h2>🧮 Simulador de Score</h2>
+            <p>Teste como diferentes contagens afetam o score final:</p>
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0;">
+                <div>
+                    <label>🟢 Métricas Green (OK):</label>
+                    <input type="number" id="greenCount" value="8" min="0" style="width: 100%; padding: 8px; margin-top: 5px;">
+                </div>
+                <div>
+                    <label>🟡 Métricas Yellow (Leve):</label>
+                    <input type="number" id="yellowCount" value="7" min="0" style="width: 100%; padding: 8px; margin-top: 5px;">
+                </div>
+                <div>
+                    <label>🔴 Métricas Red (Alto):</label>
+                    <input type="number" id="redCount" value="10" min="0" style="width: 100%; padding: 8px; margin-top: 5px;">
+                </div>
+            </div>
+            
+            <button class="btn" onclick="calculateScore()">🧮 Calcular Score</button>
+            
+            <div class="calculation-box" id="calculationResult">
+                <h4>💡 Cálculo do Score:</h4>
+                <p id="calculationDetails">Ajuste os valores acima e clique em "Calcular Score"</p>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h2>📋 Exemplo de Breakdown Detalhado</h2>
+            <div id="exampleBreakdown">
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <h3>🎯 Score Final</h3>
+                        <div class="big-number color-red" id="finalScore">32%</div>
+                        <p>Color Ratio V2</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>🟢 Green</h3>
+                        <div class="big-number color-green" id="greenDisplay">8</div>
+                        <p>Métricas OK</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>🟡 Yellow</h3>
+                        <div class="big-number color-yellow" id="yellowDisplay">7</div>
+                        <p>Desvio Leve</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>🔴 Red</h3>
+                        <div class="big-number color-red" id="redDisplay">10</div>
+                        <p>Desvio Alto</p>
+                    </div>
+                </div>
+
+                <h3>🔍 Por que os Sub-scores são Altos?</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th>Sub-score</th>
+                            <th>Métricas na Categoria</th>
+                            <th>Explicação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Dinâmica</td>
+                            <td>79/100</td>
+                            <td>DR, LRA, Crest Factor</td>
+                            <td>Média das 3 métricas individuais</td>
+                        </tr>
+                        <tr>
+                            <td>Técnico</td>
+                            <td>95/100</td>
+                            <td>True Peak, DC Offset, THD</td>
+                            <td>Métricas técnicas geralmente OK</td>
+                        </tr>
+                        <tr>
+                            <td>Loudness</td>
+                            <td>94/100</td>
+                            <td>LUFS, Headroom</td>
+                            <td>LUFS próximo do target</td>
+                        </tr>
+                        <tr>
+                            <td>Frequência</td>
+                            <td>40/100</td>
+                            <td>8 bandas + centroid + rolloff</td>
+                            <td>Muitas bandas fora do alvo</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="calculation-box">
+                    <h4>💡 A Matemática por Trás:</h4>
+                    <p><strong>Sub-scores por categoria:</strong> Média simples das métricas daquela categoria</p>
+                    <p><strong>Score final:</strong> Conta TODAS as métricas de TODAS as categorias</p>
+                    <p><strong>Se frequência tem 10 métricas e 7 estão "Red":</strong></p>
+                    <ul>
+                        <li>Sub-score frequência = média das 10 métricas individuais</li>
+                        <li>Score final = penalizado pelas 7 métricas "Red" no total</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h2>🛠️ Soluções para Melhorar o Score</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3>🎚️ Ajuste de EQ</h3>
+                    <p>As bandas de frequência são o maior impacto no score baixo</p>
+                    <ul>
+                        <li>Corte excessivos em high-mid</li>
+                        <li>Ajuste brilho/presença</li>
+                        <li>Balance sub/graves</li>
+                    </ul>
+                </div>
+                <div class="metric-card">
+                    <h3>🔊 Loudness Management</h3>
+                    <p>LUFS e LRA já estão bons (94%)</p>
+                    <ul>
+                        <li>Manter current LUFS</li>
+                        <li>LRA dentro do target</li>
+                        <li>True Peak controlado</li>
+                    </ul>
+                </div>
+                <div class="metric-card">
+                    <h3>⚡ Dinâmica</h3>
+                    <p>Score 79% indica espaço para melhoria</p>
+                    <ul>
+                        <li>Aumentar Dynamic Range</li>
+                        <li>Controlar compressão</li>
+                        <li>Preserve transients</li>
+                    </ul>
+                </div>
+                <div class="metric-card">
+                    <h3>🎯 Priorização</h3>
+                    <p>Foque onde terá mais impacto</p>
+                    <ul>
+                        <li><strong>1º:</strong> Frequência (40% → 70%)</li>
+                        <li><strong>2º:</strong> Dinâmica (79% → 85%)</li>
+                        <li><strong>3º:</strong> Manter Loudness/Técnico</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simular cálculo de score
+        function calculateScore() {
+            const green = parseInt(document.getElementById('greenCount').value) || 0;
+            const yellow = parseInt(document.getElementById('yellowCount').value) || 0;
+            const red = parseInt(document.getElementById('redCount').value) || 0;
+            const total = green + yellow + red;
+            
+            if (total === 0) {
+                document.getElementById('calculationDetails').innerHTML = "❌ Total de métricas não pode ser zero";
+                return;
+            }
+            
+            // Fórmula Color Ratio V2
+            const rawScore = ((green * 1.0) + (yellow * 0.5) + (red * 0.0)) / total * 100;
+            const finalScore = Math.round(rawScore);
+            
+            // Atualizar displays
+            document.getElementById('finalScore').textContent = finalScore + '%';
+            document.getElementById('greenDisplay').textContent = green;
+            document.getElementById('yellowDisplay').textContent = yellow;
+            document.getElementById('redDisplay').textContent = red;
+            
+            // Cálculo detalhado
+            document.getElementById('calculationDetails').innerHTML = `
+                <h4>🧮 Cálculo Detalhado:</h4>
+                <p><strong>Fórmula:</strong> ((Green × 1.0) + (Yellow × 0.5) + (Red × 0.0)) / Total × 100</p>
+                <p><strong>Substituindo:</strong> (${green} × 1.0 + ${yellow} × 0.5 + ${red} × 0.0) / ${total} × 100</p>
+                <p><strong>Cálculo:</strong> (${green} + ${yellow * 0.5} + 0) / ${total} × 100</p>
+                <p><strong>Resultado:</strong> ${rawScore.toFixed(2)}% → <strong>${finalScore}%</strong></p>
+                
+                <h4>📊 Análise:</h4>
+                <p>• Green contribui: ${(green/total*100).toFixed(1)}% das métricas</p>
+                <p>• Yellow contribui: ${(yellow/total*100).toFixed(1)}% das métricas</p>
+                <p>• Red penaliza: ${(red/total*100).toFixed(1)}% das métricas</p>
+                
+                ${finalScore < 50 ? '<p style="color: #F44336;"><strong>⚠️ Score baixo:</strong> Muitas métricas Red estão puxando o score para baixo</p>' : ''}
+                ${finalScore >= 80 ? '<p style="color: #4CAF50;"><strong>✅ Score alto:</strong> Boa distribuição de métricas</p>' : ''}
+            `;
+            
+            // Atualizar cor do score
+            const scoreElement = document.getElementById('finalScore');
+            if (finalScore >= 80) scoreElement.className = 'big-number color-green';
+            else if (finalScore >= 60) scoreElement.className = 'big-number color-yellow';
+            else scoreElement.className = 'big-number color-red';
+        }
+        
+        // Análise de arquivo
+        async function analyzeFile(input) {
+            if (!input.files || !input.files[0]) return;
+            
+            const file = input.files[0];
+            document.getElementById('analysisResults').style.display = 'block';
+            document.getElementById('scoreResults').innerHTML = '<p>🔄 Analisando arquivo...</p>';
+            
+            try {
+                // Aqui você conectaria com seu sistema de análise
+                // Por enquanto, simular resultado
+                setTimeout(() => {
+                    document.getElementById('scoreResults').innerHTML = `
+                        <h4>📄 Arquivo: ${file.name}</h4>
+                        <p>🔗 Para análise real, use o sistema principal em <code>http://localhost:3000</code></p>
+                        <p>📝 Este debugger mostra a lógica de cálculo do score</p>
+                    `;
+                }, 1000);
+            } catch (error) {
+                document.getElementById('scoreResults').innerHTML = `<p style="color: #F44336;">❌ Erro: ${error.message}</p>`;
+            }
+        }
+        
+        // Calcular score inicial
+        calculateScore();
+    </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 URGENTE: Score 40 Incorreto</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a2e; color: #fff; }
+        .critical { background: rgba(244, 67, 54, 0.1); padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #f44336; }
+        .analysis { background: #16213e; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #2196F3; }
+        .test-box { background: #0d1421; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        pre { background: #0d1421; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        .score-item { padding: 8px; margin: 4px 0; border-radius: 4px; display: flex; justify-content: space-between; }
+        .green { background: rgba(76, 175, 80, 0.2); color: #52f7ad; }
+        .yellow { background: rgba(255, 193, 7, 0.2); color: #ffce4d; }
+        .red { background: rgba(244, 67, 54, 0.2); color: #ff7b7b; }
+        h1 { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>🚨 URGENTE: Score 40 Incorreto</h1>
+    
+    <div class="critical">
+        <h2>📊 Análise da Situação Atual</h2>
+        <p><strong>Problema:</strong> Score 40 para diagnósticos "4 verde, 2 amarelo, 6 vermelho"</p>
+        
+        <h3>Diagnósticos da Tabela (12 itens):</h3>
+        <div class="test-box">
+            <div class="score-item green">✅ LUFS Int: -15.05 vs -5.60 = Verde (dentro dos limites)</div>
+            <div class="score-item green">✅ True Peak: -5.65 vs -1.90 = Verde</div>
+            <div class="score-item green">✅ DR: 14.14 vs 8.80 = Verde</div>
+            <div class="score-item green">✅ LRA: 6.95 vs 7.50 = Verde</div>
+            <div class="score-item yellow">🟡 Stereo Corr: 0.02 vs 0.12 = Amarelo</div>
+            <div class="score-item yellow">🟡 low_bass: 8.87 vs 15.40 = Amarelo</div>
+            <div class="score-item red">🔴 upper_bass: 8.36 vs 10.80 = Vermelho</div>
+            <div class="score-item red">🔴 low_mid: 13.15 vs 7.50 = Vermelho</div>
+            <div class="score-item red">🔴 mid: 4.19 vs 3.30 = Vermelho</div>
+            <div class="score-item red">🔴 high_mid: -2.98 vs -3.80 = Vermelho</div>
+            <div class="score-item red">🔴 brilho: -3.72 vs -11.10 = Vermelho</div>
+            <div class="score-item red">🔴 presenca: -19.40 vs -20.40 = Vermelho</div>
+        </div>
+        
+        <p><strong>Total:</strong> 4 verde + 2 amarelo + 6 vermelho = 12 diagnósticos ✅</p>
+    </div>
+
+    <div class="analysis">
+        <h2>🔍 Precisamos Ver os Sub-Scores</h2>
+        <p><strong>QUESTÃO CRÍTICA:</strong> O score 40 deveria vir dos 5 sub-scores de qualidade, não dos 12 diagnósticos!</p>
+        
+        <h3>Informações Necessárias:</h3>
+        <ul>
+            <li>✅ O score Stereo agora aparece na interface?</li>
+            <li>❓ Quais são os valores dos 5 sub-scores?</li>
+            <li>❓ O console mostra logs de debug?</li>
+        </ul>
+        
+        <div class="test-box">
+            <h4>🧮 Cálculo Hipotético</h4>
+            <button onclick="calculatePossibleScores()" id="testBtn">Calcular Cenários Possíveis</button>
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        function calculatePossibleScores() {
+            const weights = {
+                dynamics: 0.25,
+                technical: 0.15,
+                stereo: 0.20,
+                loudness: 0.20,
+                frequency: 0.20
+            };
+            
+            // Baseado nas informações que temos:
+            // - LUFS -15.05 (bom) → Loudness ~70-80
+            // - DR 14.14 (excelente) → Dynamics ~85-95
+            // - True Peak -5.65 (bom) → Technical ~80-90
+            // - Stereo Corr 0.02 (baixo) → Stereo ~40-50
+            // - Frequência (baseado nas bandas) → ~50-60
+            
+            const scenarios = [
+                { name: "Cenário 1", dynamics: 90, technical: 85, stereo: 45, loudness: 75, frequency: 55 },
+                { name: "Cenário 2", dynamics: 85, technical: 80, stereo: 40, loudness: 70, frequency: 50 },
+                { name: "Cenário 3 (extremo)", dynamics: 95, technical: 90, stereo: 0, loudness: 80, frequency: 60 }
+            ];
+            
+            let results = '<h4>Cenários Possíveis:</h4><pre>';
+            
+            scenarios.forEach(scenario => {
+                const score = Math.round(
+                    scenario.dynamics * weights.dynamics +
+                    scenario.technical * weights.technical +
+                    scenario.stereo * weights.stereo +
+                    scenario.loudness * weights.loudness +
+                    scenario.frequency * weights.frequency
+                );
+                
+                results += `${scenario.name}:\n`;
+                results += `  Dynamics: ${scenario.dynamics} × 0.25 = ${(scenario.dynamics * weights.dynamics).toFixed(1)}\n`;
+                results += `  Technical: ${scenario.technical} × 0.15 = ${(scenario.technical * weights.technical).toFixed(1)}\n`;
+                results += `  Stereo: ${scenario.stereo} × 0.20 = ${(scenario.stereo * weights.stereo).toFixed(1)}\n`;
+                results += `  Loudness: ${scenario.loudness} × 0.20 = ${(scenario.loudness * weights.loudness).toFixed(1)}\n`;
+                results += `  Frequency: ${scenario.frequency} × 0.20 = ${(scenario.frequency * weights.frequency).toFixed(1)}\n`;
+                results += `  TOTAL: ${score}/100\n\n`;
+            });
+            
+            results += 'Para score = 40, provavelmente:\n';
+            results += '- Stereo score muito baixo (0-20)\n';
+            results += '- OU há bug no cálculo/exibição\n';
+            results += '- OU está usando pesos incorretos';
+            
+            results += '</pre>';
+            
+            document.getElementById('result').innerHTML = results;
+        }
+    </script>
+</body>
+</html>

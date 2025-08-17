@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Debug Score Real - 40 vs Sub-Scores</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a2e; color: #fff; }
+        .problem { background: rgba(244, 67, 54, 0.1); padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #f44336; }
+        .calculation { background: #16213e; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #2196F3; }
+        .test-box { background: #0d1421; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        pre { background: #0d1421; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        .score-item { padding: 8px; margin: 4px 0; border-radius: 4px; display: flex; justify-content: space-between; }
+        .green { background: rgba(76, 175, 80, 0.2); color: #52f7ad; }
+        .yellow { background: rgba(255, 193, 7, 0.2); color: #ffce4d; }
+        .red { background: rgba(244, 67, 54, 0.2); color: #ff7b7b; }
+        h1 { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>🚨 BUG CONFIRMADO: Score 40 vs Sub-Scores</h1>
+    
+    <div class="problem">
+        <h2>📊 Dados da Imagem</h2>
+        <p><strong>Score Mostrado:</strong> 40/100</p>
+        
+        <h3>Sub-Scores Visíveis:</h3>
+        <div class="score-item red">
+            <span>Dinâmica</span> <span>58/100 (🔴 vermelho)</span>
+        </div>
+        <div class="score-item green">
+            <span>Técnico</span> <span>100/100 (🟢 verde)</span>
+        </div>
+        <div class="score-item green">
+            <span>Loudness</span> <span>87/100 (🟢 verde)</span>
+        </div>
+        <div class="score-item green">
+            <span>Frequência</span> <span>87/100 (🟢 verde)</span>
+        </div>
+        
+        <p><strong>Problema:</strong> Falta o score de <strong>Stereo</strong> na interface!</p>
+    </div>
+
+    <div class="calculation">
+        <h2>🧮 Cálculo Manual</h2>
+        <div class="test-box">
+            <button onclick="testScenarios()" id="testBtn">Testar Cenários Possíveis</button>
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        function testScenarios() {
+            const weights = {
+                dynamics: 0.25,
+                frequency: 0.20,
+                stereo: 0.20,
+                loudness: 0.20,
+                technical: 0.15
+            };
+            
+            // Dados visíveis na imagem
+            const visibleScores = {
+                dynamics: 58,
+                technical: 100,
+                loudness: 87,
+                frequency: 87
+            };
+            
+            // Cenários para o score Stereo faltante
+            const stereoScenarios = [0, 10, 20, 30, 40, 50];
+            
+            let results = '<h3>Testando Valores de Stereo:</h3><pre>';
+            
+            stereoScenarios.forEach(stereoScore => {
+                const scores = {
+                    ...visibleScores,
+                    stereo: stereoScore
+                };
+                
+                const finalScore = Math.round(
+                    scores.dynamics * weights.dynamics +
+                    scores.frequency * weights.frequency +
+                    scores.stereo * weights.stereo +
+                    scores.loudness * weights.loudness +
+                    scores.technical * weights.technical
+                );
+                
+                const match = finalScore === 40 ? ' ✅ MATCH!' : '';
+                results += `Stereo: ${stereoScore}/100 → Score Final: ${finalScore}/100${match}\n`;
+            });
+            
+            results += '\nCálculo detalhado para Stereo = 0:\n';
+            results += `58 × 0.25 = ${58 * 0.25}\n`;
+            results += `87 × 0.20 = ${87 * 0.20}\n`;
+            results += `0 × 0.20 = ${0 * 0.20}\n`;
+            results += `87 × 0.20 = ${87 * 0.20}\n`;
+            results += `100 × 0.15 = ${100 * 0.15}\n`;
+            results += `Total = ${58*0.25 + 87*0.20 + 0*0.20 + 87*0.20 + 100*0.15} → 40`;
+            
+            results += '</pre>';
+            
+            document.getElementById('result').innerHTML = results;
+        }
+    </script>
+</body>
+</html>
