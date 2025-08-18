@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Correção Análise Espectral</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #111; color: #0f0; }
+        .antes { color: #f00; background: #300; padding: 10px; margin: 10px 0; }
+        .depois { color: #0f0; background: #030; padding: 10px; margin: 10px 0; }
+        .math { font-family: monospace; background: #222; padding: 15px; border-left: 4px solid #0f0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 CORREÇÃO: Análise Espectral</h1>
+    
+    <h2>📊 Problema Identificado</h2>
+    <div class="antes">
+        <strong>❌ ANTES (Problema):</strong><br>
+        Cálculo: <code>norm = lin / (totalEnergy / bins.length)</code><br>
+        Resultado: low_bass = <strong>+13.34 dB</strong> (impossível!)<br>
+        Motivo: Normalização incorreta permitia valores > 1
+    </div>
+    
+    <div class="depois">
+        <strong>✅ DEPOIS (Corrigido):</strong><br>
+        Cálculo: <code>norm = energy / totalEnergy</code><br>
+        Resultado: low_bass deve ser <strong>negativo</strong><br>
+        Motivo: Proporção correta da energia total
+    </div>
+    
+    <h2>🧮 Explicação Matemática</h2>
+    <div class="math">
+        <strong>Lógica Correta:</strong><br>
+        • energy = soma da energia da banda específica<br>
+        • totalEnergy = soma de TODAS as energias espectrais<br>
+        • norm = energy / totalEnergy (sempre < 1 para banda individual)<br>
+        • dB = 10 * log10(norm) (sempre negativo se norm < 1)<br><br>
+        
+        <strong>Exemplo:</strong><br>
+        Se low_bass tem 5% da energia total:<br>
+        norm = 0.05<br>
+        dB = 10 * log10(0.05) = <strong>-13.0 dB</strong> ✅<br><br>
+        
+        <strong>Delta resultante:</strong><br>
+        Valor: -13.0 dB<br>
+        Alvo: -8.0 dB<br>
+        Δ = -13.0 - (-8.0) = <strong>-5.0 dB</strong> (precisa aumentar)
+    </div>
+    
+    <h2>🎯 Resultado Esperado</h2>
+    <p>Agora, ao analisar um áudio:</p>
+    <ul>
+        <li>✅ Todos os valores de banda serão <strong>negativos</strong></li>
+        <li>✅ Deltas mostrarão ajustes realistas (±10 dB típico)</li>
+        <li>✅ Interface indicará corretamente se precisa aumentar/diminuir</li>
+    </ul>
+    
+    <div style="margin-top: 40px; text-align: center; color: #666;">
+        <p>🔄 Recarregue a página principal e teste com um áudio</p>
+        <p>📊 Os valores agora devem ser matematicamente corretos</p>
+    </div>
+    
+    <script>
+        console.log('🔧 Correção aplicada na análise espectral');
+        console.log('✅ Normalização corrigida para garantir valores negativos');
+        console.log('🎯 Deltas agora serão realistas e úteis');
+        
+        // Redirecionar para página principal em 5 segundos
+        setTimeout(() => {
+            window.location.href = '/?v=SPECTRAL_FIXED&t=' + Date.now();
+        }, 5000);
+    </script>
+</body>
+</html>

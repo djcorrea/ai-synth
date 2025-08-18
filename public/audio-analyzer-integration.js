@@ -116,14 +116,14 @@ const __INLINE_EMBEDDED_REFS__ = {
         { key: 'trap', label: 'Trap' }
     ]},
     byGenre: {
-        trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:1}, low_bass:{target_db:-14.6,tol_db:2.8}, upper_bass:{target_db:-14.8,tol_db:1}, low_mid:{target_db:-12.6,tol_db:2.2}, mid:{target_db:-12,tol_db:2.5}, high_mid:{target_db:-20.2,tol_db:2.1}, brilho:{target_db:-24.7,tol_db:1}, presenca:{target_db:-32.1,tol_db:2.1} } },
-    // Perfil atualizado Funk Mandela (62 faixas)
-    funk_mandela:   { lufs_target: -5.6, tol_lufs: 1.92,  true_peak_target: -1.9, tol_true_peak: 0.5, dr_target: 8.8, tol_dr: 1.12, lra_target: 7.5, tol_lra: 3.34, stereo_target: null,  tol_stereo: 0.07, bands: { sub:{target_db:null,tol_db:1.78}, low_bass:{target_db:15.4,tol_db:1.66}, upper_bass:{target_db:10.8,tol_db:2.02}, low_mid:{target_db:7.5,tol_db:2.19}, mid:{target_db:3.3,tol_db:2.3}, high_mid:{target_db:-3.8,tol_db:2.54}, brilho:{target_db:-11.1,tol_db:2.47}, presenca:{target_db:-20.4,tol_db:4} } },
-        funk_bruxaria:  { lufs_target: -10, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
-        eletronico:     { lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 8, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
-        eletrofunk:     { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
-        funk_consciente:{ lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 10, tol_dr: 2, lra_target: 7, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:3}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } },
-        trap:           { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-16,tol_db:4}, low_bass:{target_db:-16,tol_db:3}, upper_bass:{target_db:-15,tol_db:3}, low_mid:{target_db:-14,tol_db:3}, mid:{target_db:-13,tol_db:3}, high_mid:{target_db:-20,tol_db:3}, brilho:{target_db:-25,tol_db:3}, presenca:{target_db:-32,tol_db:3} } }
+        trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:2.5}, low_bass:{target_db:-14.6,tol_db:4.3}, upper_bass:{target_db:-14.8,tol_db:2.5}, low_mid:{target_db:-12.6,tol_db:3.7}, mid:{target_db:-12,tol_db:4.0}, high_mid:{target_db:-20.2,tol_db:3.6}, brilho:{target_db:-24.7,tol_db:2.5}, presenca:{target_db:-32.1,tol_db:3.6} } },
+    // Perfil corrigido Funk Mandela v2.0 (57 faixas) - Agregação Linear Domain
+    funk_mandela:   { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -10.46, tol_true_peak: 1.77, dr_target: 7.5, tol_dr: 1.2, lra_target: 7.4, tol_lra: 2.9, stereo_target: 0.22, tol_stereo: 0.1, bands: { sub:{target_db:-6.7,tol_db:3.4}, low_bass:{target_db:-8.0,tol_db:4.3}, upper_bass:{target_db:-12.0,tol_db:3.1}, low_mid:{target_db:-8.4,tol_db:3.8}, mid:{target_db:-6.3,tol_db:2.9}, high_mid:{target_db:-11.2,tol_db:3.6}, brilho:{target_db:-14.8,tol_db:3.2}, presenca:{target_db:-19.2,tol_db:4.5} } },
+        funk_bruxaria:  { lufs_target: -10, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
+        eletronico:     { lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 8, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
+        eletrofunk:     { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
+        funk_consciente:{ lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 10, tol_dr: 2, lra_target: 7, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
+        trap:           { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-16,tol_db:5.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } }
     }
 };
 
@@ -920,11 +920,18 @@ function displayModalResults(analysis) {
         const timeKpi = Number.isFinite(analysis.processingMs) ? kpi(analysis.processingMs, 'TEMPO (MS)', 'kpi-time') : '';
 
         const src = (k) => (analysis.technicalData?._sources && analysis.technicalData._sources[k]) ? ` data-src="${analysis.technicalData._sources[k]}" title="origem: ${analysis.technicalData._sources[k]}"` : '';
-        const row = (label, valHtml, keyForSource=null) => `
-            <div class="data-row"${keyForSource?src(keyForSource):''}>
-                <span class="label">${label}</span>
-                <span class="value">${valHtml}</span>
-            </div>`;
+        const row = (label, valHtml, keyForSource=null) => {
+            // Usar sistema de enhancement se disponível
+            const enhancedLabel = (typeof window !== 'undefined' && window.enhanceRowLabel) 
+                ? window.enhanceRowLabel(label, keyForSource) 
+                : label;
+            
+            return `
+                <div class="data-row"${keyForSource?src(keyForSource):''}>
+                    <span class="label">${enhancedLabel}</span>
+                    <span class="value">${valHtml}</span>
+                </div>`;
+        };
 
         const safePct = (v) => (Number.isFinite(v) ? `${(v*100).toFixed(0)}%` : '—');
         const monoCompat = (s) => s ? s : '—';
@@ -932,10 +939,10 @@ function displayModalResults(analysis) {
         const col1 = [
             row('Peak', `${safeFixed(analysis.technicalData.peak)} dB`, 'peak'),
             row('RMS', `${safeFixed(analysis.technicalData.rms)} dB`, 'rms'),
-            row('Dinâmica', `${safeFixed(analysis.technicalData.dynamicRange)} dB`, 'dynamicRange'),
+            row('DR', `${safeFixed(analysis.technicalData.dynamicRange)} dB`, 'dynamicRange'),
             row('Crest Factor', `${safeFixed(analysis.technicalData.crestFactor)}`, 'crestFactor'),
             row('True Peak', (advancedReady && Number.isFinite(analysis.technicalData.truePeakDbtp)) ? `${safeFixed(analysis.technicalData.truePeakDbtp)} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
-            row('LUFS (Int.)', (advancedReady && Number.isFinite(analysis.technicalData.lufsIntegrated)) ? `${safeFixed(analysis.technicalData.lufsIntegrated)} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
+            row('LUFS Int.', (advancedReady && Number.isFinite(analysis.technicalData.lufsIntegrated)) ? `${safeFixed(analysis.technicalData.lufsIntegrated)} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
             row('LRA', (advancedReady && Number.isFinite(analysis.technicalData.lra)) ? `${safeFixed(analysis.technicalData.lra)} dB` : (advancedReady? '—':'⏳'), 'lra')
             ].join('') + (
                 Number.isFinite(analysis.technicalData.loudnessOffsetDb) ?
@@ -944,9 +951,9 @@ function displayModalResults(analysis) {
 
         const col2 = [
             row('Correlação', Number.isFinite(analysis.technicalData.stereoCorrelation) ? safeFixed(analysis.technicalData.stereoCorrelation, 2) : '—', 'stereoCorrelation'),
-            row('Largura', Number.isFinite(analysis.technicalData.stereoWidth) ? safeFixed(analysis.technicalData.stereoWidth, 2) : '—'),
+            row('Largura', Number.isFinite(analysis.technicalData.stereoWidth) ? safeFixed(analysis.technicalData.stereoWidth, 2) : '—', 'stereoWidth'),
             row('Balance', Number.isFinite(analysis.technicalData.balanceLR) ? safePct(analysis.technicalData.balanceLR) : '—', 'balanceLR'),
-            row('Mono Compat.', monoCompat(analysis.technicalData.monoCompatibility)),
+            row('Mono Compat.', monoCompat(analysis.technicalData.monoCompatibility), 'monoCompatibility'),
             row('Centroide', Number.isFinite(analysis.technicalData.spectralCentroid) ? safeHz(analysis.technicalData.spectralCentroid) : '—', 'spectralCentroid'),
             row('Rolloff (85%)', Number.isFinite(analysis.technicalData.spectralRolloff85) ? safeHz(analysis.technicalData.spectralRolloff85) : '—', 'spectralRolloff85'),
             row('Flux', Number.isFinite(analysis.technicalData.spectralFlux) ? safeFixed(analysis.technicalData.spectralFlux, 3) : '—', 'spectralFlux'),
@@ -1659,12 +1666,17 @@ function renderReferenceComparisons(analysis) {
     const rows = [];
     const nf = (n, d=2) => Number.isFinite(n) ? n.toFixed(d) : '—';
     const pushRow = (label, val, target, tol, unit='') => {
+        // Usar sistema de enhancement se disponível
+        const enhancedLabel = (typeof window !== 'undefined' && window.enhanceRowLabel) 
+            ? window.enhanceRowLabel(label, label.toLowerCase().replace(/[^a-z]/g, '')) 
+            : label;
+            
         // Tratar target null ou NaN como N/A explicitamente
         const targetIsNA = (target == null || target === '' || (typeof target==='number' && !Number.isFinite(target)));
         if (!Number.isFinite(val) && targetIsNA) return; // nada útil
         if (targetIsNA) {
             rows.push(`<tr>
-                <td>${label}</td>
+                <td>${enhancedLabel}</td>
                 <td>${Number.isFinite(val)?nf(val)+unit:'—'}</td>
                 <td colspan="2" style="opacity:.55">N/A</td>
             </tr>`);
@@ -1672,27 +1684,34 @@ function renderReferenceComparisons(analysis) {
         }
         const diff = Number.isFinite(val) && Number.isFinite(target) ? (val - target) : null;
         
-        // NOVA LÓGICA: implementar mesma severidade do scoring
-        let cssClass = 'na';
-        if (Number.isFinite(diff) && Number.isFinite(tol) && tol > 0) {
-            const adiff = Math.abs(diff);
-            if (adiff <= tol) {
-                cssClass = 'ok'; // verde - dentro da tolerância
-            } else {
-                const n = adiff / tol; // n > 1 quando fora da tolerância
-                if (n <= 2) {
-                    cssClass = 'yellow'; // amarelo - desvio leve (1 < n <= 2)
+        // Usar nova função de célula melhorada se disponível
+        let diffCell;
+        if (typeof window !== 'undefined' && window.createEnhancedDiffCell) {
+            diffCell = window.createEnhancedDiffCell(diff, unit, tol);
+        } else {
+            // Fallback para sistema antigo
+            let cssClass = 'na';
+            if (Number.isFinite(diff) && Number.isFinite(tol) && tol > 0) {
+                const adiff = Math.abs(diff);
+                if (adiff <= tol) {
+                    cssClass = 'ok';
                 } else {
-                    cssClass = 'warn'; // vermelho - desvio médio/alto (n > 2)
+                    const n = adiff / tol;
+                    if (n <= 2) {
+                        cssClass = 'yellow';
+                    } else {
+                        cssClass = 'warn';
+                    }
                 }
             }
+            
+            diffCell = Number.isFinite(diff)
+                ? `<td class="${cssClass}">${diff>0?'+':''}${nf(diff)}${unit}</td>`
+                : '<td class="na" style="opacity:.55">—</td>';
         }
         
-        const diffCell = Number.isFinite(diff)
-            ? `<td class="${cssClass}">${diff>0?'+':''}${nf(diff)}${unit}</td>`
-            : '<td class="na" style="opacity:.55">—</td>';
         rows.push(`<tr>
-            <td>${label}</td>
+            <td>${enhancedLabel}</td>
             <td>${Number.isFinite(val)?nf(val)+unit:'—'}</td>
             <td>${Number.isFinite(target)?nf(target)+unit:'N/A'}${tol!=null?`<span class="tol">±${nf(tol,2)}</span>`:''}</td>
             ${diffCell}

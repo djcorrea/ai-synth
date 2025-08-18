@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug: Lógica de Sugestões</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 20px;
+        }
+        .test-case {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #4caf50;
+        }
+        .test-case.error {
+            border-left-color: #f44336;
+        }
+        .logic-check {
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .correct {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .incorrect {
+            color: #f44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug: Lógica das Sugestões</h1>
+    
+    <div class="test-case">
+        <h3>📊 Teste da Lógica de Sugestões</h3>
+        <div id="logic-tests"></div>
+    </div>
+
+    <script>
+        // Simular casos de teste da lógica
+        function testSuggestionLogic() {
+            const testCases = [
+                {
+                    name: "low_bass BAIXO (-15dB vs -12dB target)",
+                    current: -15,
+                    target: -12,
+                    diff: -3,  // current - target = -15 - (-12) = -3
+                    status: "BAIXO",
+                    expectedAction: "BOOST",
+                    expectedMessage: "abaixo do ideal"
+                },
+                {
+                    name: "high_mid ALTO (-8dB vs -12dB target)", 
+                    current: -8,
+                    target: -12,
+                    diff: 4,   // current - target = -8 - (-12) = +4
+                    status: "ALTO",
+                    expectedAction: "REDUZIR",
+                    expectedMessage: "acima do ideal"
+                },
+                {
+                    name: "brilho ALTO (-5dB vs -10dB target)",
+                    current: -5,
+                    target: -10, 
+                    diff: 5,   // current - target = -5 - (-10) = +5
+                    status: "ALTO",
+                    expectedAction: "REDUZIR",
+                    expectedMessage: "acima do ideal"
+                }
+            ];
+
+            let html = '';
+            testCases.forEach(test => {
+                html += `<div class="logic-check">
+                    <strong>${test.name}</strong><br>
+                    Valor atual: ${test.current}dB | Target: ${test.target}dB<br>
+                    Diferença: ${test.diff > 0 ? '+' : ''}${test.diff}dB<br>
+                    Status: ${test.status}<br>
+                    <span class="correct">✅ Deve ${test.expectedAction}: ${test.expectedMessage}</span><br>
+                    <small>Lógica: Se diff > 0 (atual > target) → ALTO → REDUZIR/CORTAR</small><br>
+                    <small>Lógica: Se diff < 0 (atual < target) → BAIXO → BOOST/AUMENTAR</small>
+                </div>`;
+            });
+
+            document.getElementById('logic-tests').innerHTML = html;
+        }
+
+        // Executar teste
+        testSuggestionLogic();
+
+        // Verificar se friendly labels está carregado
+        setTimeout(() => {
+            if (typeof window.convertSuggestionsToFriendly === 'function') {
+                console.log('✅ convertSuggestionsToFriendly disponível');
+            } else {
+                console.log('❌ convertSuggestionsToFriendly NÃO disponível');
+            }
+        }, 500);
+    </script>
+</body>
+</html>

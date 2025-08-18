@@ -1485,7 +1485,9 @@ class AudioAnalyzer {
     // Sugestões principais
     if (sugList.length > 0) {
       prompt += `💡 SUGESTÕES:\n`;
-      sugList.forEach(s => {
+      // Converter sugestões para nomes amigáveis
+      const friendlySuggestions = (window.convertSuggestionsToFriendly && window.convertSuggestionsToFriendly(sugList)) || sugList;
+      friendlySuggestions.forEach(s => {
         prompt += `• ${s.message} → ${s.action}\n`;
       });
       prompt += `\n`;
@@ -1511,7 +1513,7 @@ class AudioAnalyzer {
         },
         score: analysis.mixScore?.scorePct,
         classification: analysis.mixScore?.classification,
-        suggestions: sugList.map(s => ({ type: s.type, message: s.message, action: s.action })),
+        suggestions: (window.convertSuggestionsToFriendly && window.convertSuggestionsToFriendly(sugList.map(s => ({ type: s.type, message: s.message, action: s.action })))) || sugList.map(s => ({ type: s.type, message: s.message, action: s.action })),
         problems: analysis.problems?.map(p => ({ type: p.type, message: p.message, solution: p.solution })) || []
       };
       
@@ -1847,27 +1849,8 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
     try {
       const t0Spec = performance.now();
       const ref = (typeof window !== 'undefined') ? window.PROD_AI_REF_DATA : null;
-      
-      // 🔧 CORREÇÃO: Verificar se módulo espectral está disponível, senão usar fallback melhorado
-      let doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
-      
-      // 🔧 FALLBACK MELHORADO: Se módulo avançado falhar, usar definições corretas mesmo assim
-      const forceCorrectBands = !doBands && !!ref && (typeof window !== 'undefined' && window.FORCE_CORRECT_BANDS !== false);
-      
-      // Debug logs
-      if (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true) {
-        console.log('🔍 Debug bandas:', {
-          hasRef: !!ref,
-          hasSpecMod: !!cache.specMod,
-          specModError: cache.specMod?.__err,
-          hasAnalyzeFunction: !!(cache.specMod && typeof cache.specMod.analyzeSpectralFeatures === 'function'),
-          doBands,
-          forceCorrectBands,
-          FORCE_CORRECT_BANDS: window.FORCE_CORRECT_BANDS
-        });
-      }
-      
-      if (doBands || forceCorrectBands) {
+      const doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
+      if (doBands) {
         // Evitar reprocessar se já existe (idempotente)
         if (!td.bandEnergies) {
           // Esperar referência carregada (até 1s) se necessário
@@ -1910,14 +1893,15 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
             const totalEnergy = mags.reduce((a,b)=>a + (b>0?b:0),0) || 1;
             for (const [band,[fLow,fHigh]] of Object.entries(bandDefs)) {
               let energy=0, count=0;
-              for (let i=0;i<bins.length;i++) {
+              for (let i=0; i<bins.length; i++) {
                 const f = bins[i];
                 if (f >= fLow && f < fHigh) { energy += mags[i]; count++; }
               }
               if (count>0) {
                 const lin = energy / count; // média simples
-                // Converter para dB relativo ao total médio das magnitudes
-                const norm = lin / (totalEnergy / bins.length);
+                // CORREÇÃO: Normalizar pela energia TOTAL, não pela média por bin
+                // Isso garante valores relativos negativos (banda < total)
+                const norm = energy / totalEnergy; // Proporção da energia total
                 const db = 10 * Math.log10(norm || 1e-9);
                 bandEnergies[band] = { energy: lin, rms_db: db, scale: 'log_ratio_db' };
               } else {
@@ -2022,7 +2006,8 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                 if (!Number.isFinite(data.rms_db) || data.rms_db === -Infinity) continue;
                 // Usar valor normalizado se disponível
                 const refTarget = (refBandTargetsNormalized && Number.isFinite(refBandTargetsNormalized[band])) ? refBandTargetsNormalized[band] : refBand.target_db;
-                const diff = data.rms_db - refTarget;
+                // TESTE: Usar mesmo cálculo da interface visual (target - atual)
+                const diff = refTarget - data.rms_db;
                 // Suporte a tolerância assimétrica: tol_min / tol_max. Compat: usar tol_db se não existirem.
                 const tolMin = Number.isFinite(refBand.tol_min) ? refBand.tol_min : refBand.tol_db;
                 const tolMax = Number.isFinite(refBand.tol_max) ? refBand.tol_max : refBand.tol_db;
@@ -2032,31 +2017,42 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                 if (data.rms_db < lowLimit) status = 'BAIXO'; else if (data.rms_db > highLimit) status = 'ALTO';
                 const outOfRange = status !== 'OK';
                 if (outOfRange) {
-                  const direction = status === 'ALTO' ? 'reduzir' : 'aumentar';
+                  // CORREÇÃO: Usar a mesma lógica da interface visual
+                  // diff > 0 = valor atual maior que target = DIMINUIR/CORTAR
+                  // diff < 0 = valor atual menor que target = AUMENTAR/BOOST
+                  const shouldReduce = diff > 0; // valor atual > target
+                  const shouldBoost = diff < 0;  // valor atual < target
+                  
                   const baseMag = Math.abs(diff);
                   const sideTol = diff > 0 ? tolMax : tolMin;
                   const n = sideTol>0 ? baseMag / sideTol : 0;
                   const severity = n <= 1 ? 'leve' : (n <= 2 ? 'media' : 'alta');
                   let action;
-                  if (status === 'ALTO') {
-                    // Mensagens diferenciadas para bandas específicas de aspereza/brilho/presença
-                    if (band === 'high_mid') action = `High-mid acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${baseMag.toFixed(1)} dB em 2–6 kHz`;
-                    else if (band === 'brilho') action = `Brilho/agudos acima do alvo (+${baseMag.toFixed(1)}dB). Aplique shelf suave >8–10 kHz (~${baseMag.toFixed(1)} dB)`;
-                    else if (band === 'presenca') action = `Presença acima do ideal (+${baseMag.toFixed(1)}dB). Suavize 3–6 kHz (~${baseMag.toFixed(1)} dB)`;
-                    else action = `Cortar ${band} em ~${baseMag.toFixed(1)}dB (target ${refTarget.toFixed(1)} +${tolMax} / -${tolMin})`;
+                  
+                  if (shouldReduce) {
+                    // Valor atual > target = precisa reduzir
+                    if (band === 'high_mid') action = `Médios Agudos (2-4kHz) acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${Math.min(baseMag, sideTol).toFixed(1)} dB em 2–6 kHz`;
+                    else if (band === 'brilho') action = `Agudos (4-8kHz) acima do alvo (+${baseMag.toFixed(1)}dB). Aplique shelf suave >8–10 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
+                    else if (band === 'presenca') action = `Presença (8-12kHz) acima do ideal (+${baseMag.toFixed(1)}dB). Suavize 3–6 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
+                    else action = `Cortar ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB`;
                   } else {
-                    action = diff > 0 ? `Cortar ${band} em ~${baseMag.toFixed(1)}dB` : `Boost ${band} em ~${baseMag.toFixed(1)}dB`;
+                    // Valor atual < target = precisa aumentar
+                    action = `Boost ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB`;
                   }
                   const key = `band:${band}`;
                   if (!existingKeys.has(key)) {
                     // Acrescentar faixa sugerida (Hz) nos detalhes, usando definição das bandas
                     const br = bandDefs[band];
                     const rangeTxt = Array.isArray(br) && br.length===2 ? ` | faixa ${Math.round(br[0])}-${Math.round(br[1])}Hz` : '';
+                    // Usar nome amigável da banda se disponível
+                    const friendlyBandName = (window.getFriendlyLabel && window.getFriendlyLabel(`band:${band}`)) || band;
+                    const statusMessage = shouldReduce ? `${friendlyBandName} acima do ideal` : `${friendlyBandName} abaixo do ideal`;
+                    
                     sug.push({
                       type: 'band_adjust',
                       _bandKey: key,
-                      message: status === 'ALTO' ? `Banda ${band} acima do ideal` : `Banda ${band} abaixo do ideal`,
-                      action,
+                      message: `Banda ${statusMessage}`,
+                      action: action.replace(new RegExp(`\\b${band}\\b`, 'gi'), friendlyBandName),
                       details: `Valor ${data.rms_db.toFixed(2)}dB vs alvo ${refTarget.toFixed(2)}dB | dif ${diff>0?'+':''}${diff.toFixed(2)}dB | limites [${(refTarget-tolMin).toFixed(2)}, ${(refTarget+tolMax).toFixed(2)}] (${severity})${rangeTxt}${refBandTargetsNormalized?' • escala normalizada':''}`
                     });
                     existingKeys.add(key);
@@ -2174,33 +2170,6 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
         }
       }
       if (doBands) timing.spectrumMs = Math.round(performance.now() - t0Spec);
-      
-      // 🔧 FALLBACK MELHORADO: Se módulo avançado falhou, usar cálculo simplificado com bandas corretas
-      else if (forceCorrectBands && !td.bandEnergies) {
-        console.log('🔧 Usando fallback melhorado para bandas espectrais');
-        try {
-          const srcBuffer = left; // usar canal esquerdo
-          const bandEnergies = this._computeCorrectBandEnergies(srcBuffer, sr);
-          if (bandEnergies) {
-            td.bandEnergies = bandEnergies;
-            td.bandScale = 'rms_db_corrected';
-            (td._sources = td._sources || {}).bandEnergies = 'fallback:corrected';
-            
-            // Converter para tonalBalance também
-            if (!td.tonalBalance) {
-              td.tonalBalance = {
-                sub: bandEnergies.sub ? { rms_db: bandEnergies.sub.rms_db } : null,
-                low: bandEnergies.low_bass ? { rms_db: bandEnergies.low_bass.rms_db } : null,
-                mid: bandEnergies.mid ? { rms_db: bandEnergies.mid.rms_db } : null,
-                high: bandEnergies.brilho ? { rms_db: bandEnergies.brilho.rms_db } : null
-              };
-              (td._sources = td._sources || {}).tonalBalance = 'fallback:corrected';
-            }
-          }
-        } catch (fe) { 
-          if (debug) console.warn('⚠️ Fallback melhorado falhou:', fe?.message || fe); 
-        }
-      }
     } catch (e) { if (debug) console.warn('⚠️ [ADV] Band energies falharam:', e?.message || e); }
     // ===== FASE 2 (FIM) =====
 
@@ -2338,161 +2307,6 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
   } catch (err) {
     if (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true) console.warn('⚠️ [ADV] Adapter geral falhou:', err?.message || err);
     return baseAnalysis;
-  }
-};
-
-// 🔧 FUNÇÃO AUXILIAR: Cálculo correto de bandas espectrais quando módulo avançado falha
-AudioAnalyzer.prototype._computeCorrectBandEnergies = function(signal, sampleRate) {
-  try {
-    // Definições corretas das bandas (alinhadas com referências)
-    const bandDefs = {
-      sub: [20, 60],
-      low_bass: [60, 120],      // ✅ CORRETO: 60-120 Hz (em vez de 60-250)
-      upper_bass: [120, 250],
-      low_mid: [250, 500],
-      mid: [500, 2000],         // ✅ CORRETO: 500-2000 Hz (em vez de 250-4000)
-      high_mid: [2000, 6000],
-      brilho: [6000, 12000],
-      presenca: [12000, 18000]
-    };
-    
-    // Configuração FFT
-    const fftSize = 2048;
-    const hop = 1024;
-    const maxSeconds = 60; // Limitar processamento
-    const maxSamples = Math.min(signal.length, sampleRate * maxSeconds);
-    const slice = signal.subarray(0, maxSamples);
-    
-    // Acumuladores por banda
-    const bandAccumulators = {};
-    Object.keys(bandDefs).forEach(band => {
-      bandAccumulators[band] = { energy: 0, count: 0 };
-    });
-    
-    let totalFrames = 0;
-    
-    // Processar janelas FFT
-    for (let start = 0; start + fftSize <= slice.length; start += hop) {
-      const frame = slice.subarray(start, start + fftSize);
-      
-      // FFT simples (usando método existente se disponível)
-      let spectrum;
-      try {
-        if (this && typeof this.simpleFFT === 'function') {
-          spectrum = this.simpleFFT(frame);
-        } else if (window.audioAnalyzer && typeof window.audioAnalyzer.simpleFFT === 'function') {
-          spectrum = window.audioAnalyzer.simpleFFT(frame);
-        } else {
-          // Usar implementação FFT básica inline
-          spectrum = this._basicFFT(frame);
-        }
-      } catch (fftErr) {
-        console.warn('⚠️ Erro FFT:', fftErr?.message);
-        continue;
-      }
-      
-      if (!spectrum || spectrum.length < 2) continue;
-      
-      const binSize = sampleRate / fftSize;
-      const nyquist = sampleRate / 2;
-      
-      // Mapear cada bin para as bandas corretas
-      for (let bin = 0; bin < spectrum.length / 2; bin++) {
-        const freq = bin * binSize;
-        if (freq > nyquist) break;
-        
-        const magnitude = spectrum[bin];
-        if (!Number.isFinite(magnitude) || magnitude <= 0) continue;
-        
-        // Encontrar qual banda esta frequência pertence
-        for (const [bandName, [fLow, fHigh]] of Object.entries(bandDefs)) {
-          if (freq >= fLow && freq < fHigh) {
-            bandAccumulators[bandName].energy += magnitude;
-            bandAccumulators[bandName].count++;
-            break; // Cada bin pertence a apenas uma banda
-          }
-        }
-      }
-      
-      totalFrames++;
-      if (totalFrames >= 100) break; // Limitar processamento
-    }
-    
-    if (totalFrames === 0) return null;
-    
-    // Calcular resultados finais
-    const bandEnergies = {};
-    let totalEnergy = 0;
-    
-    // Primeiro passo: calcular energias médias
-    for (const [bandName, acc] of Object.entries(bandAccumulators)) {
-      if (acc.count > 0) {
-        const avgEnergy = acc.energy / acc.count;
-        totalEnergy += avgEnergy;
-        bandEnergies[bandName] = { linearEnergy: avgEnergy };
-      }
-    }
-    
-    // Segundo passo: converter para dB relativo
-    if (totalEnergy > 0) {
-      for (const [bandName, data] of Object.entries(bandEnergies)) {
-        if (data && data.linearEnergy > 0) {
-          // Converter para dB relativo ao total
-          const ratio = data.linearEnergy / totalEnergy;
-          const rms_db = 20 * Math.log10(Math.max(ratio, 1e-12));
-          
-          bandEnergies[bandName] = {
-            energy: data.linearEnergy,
-            rms_db: rms_db,
-            scale: 'rms_db_corrected'
-          };
-        } else {
-          bandEnergies[bandName] = {
-            energy: 0,
-            rms_db: -Infinity,
-            scale: 'rms_db_corrected'
-          };
-        }
-      }
-    }
-    
-    console.log('🔧 Bandas corrigidas calculadas:', Object.keys(bandEnergies));
-    return bandEnergies;
-    
-  } catch (err) {
-    console.warn('⚠️ Erro no cálculo de bandas corrigidas:', err?.message || err);
-    return null;
-  }
-};
-
-// 🔧 FFT básico inline para fallback
-AudioAnalyzer.prototype._basicFFT = function(frame) {
-  try {
-    // Implementação simples usando DFT para frequências relevantes
-    const N = frame.length;
-    const spectrum = new Float32Array(N);
-    
-    // Calcular apenas as frequências baixas e médias (mais eficiente)
-    const maxBin = Math.min(N/2, 1024); // Limitar para performance
-    
-    for (let k = 0; k < maxBin; k++) {
-      let realPart = 0;
-      let imagPart = 0;
-      
-      for (let n = 0; n < N; n++) {
-        const angle = -2 * Math.PI * k * n / N;
-        realPart += frame[n] * Math.cos(angle);
-        imagPart += frame[n] * Math.sin(angle);
-      }
-      
-      // Magnitude
-      spectrum[k] = Math.sqrt(realPart * realPart + imagPart * imagPart);
-    }
-    
-    return spectrum;
-  } catch (err) {
-    console.warn('⚠️ Erro FFT básico:', err?.message);
-    return null;
   }
 };
 

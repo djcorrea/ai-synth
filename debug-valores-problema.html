@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug: Verificação de Valores</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #111; color: #0f0; }
+        .debug { background: #222; padding: 15px; margin: 10px 0; border: 1px solid #444; }
+        .erro { color: #f00; background: #300; }
+        .correto { color: #0f0; background: #030; }
+        .valor { font-size: 18px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔍 DEBUG: Verificação de Valores</h1>
+    
+    <div id="debug-refs" class="debug">
+        <h3>📊 Dados de Referência Carregados:</h3>
+        <div id="ref-data">Carregando...</div>
+    </div>
+    
+    <div id="debug-calc" class="debug">
+        <h3>🧮 Teste de Cálculo Delta:</h3>
+        <div id="calc-data">Aguardando...</div>
+    </div>
+
+    <script>
+        console.log('🔍 Iniciando debug de valores...');
+        
+        function debugReferencias() {
+            // Tentar carregar scripts primeiro
+            const script1 = document.createElement('script');
+            script1.src = 'public/refs/embedded-refs.js?' + Date.now();
+            script1.onload = () => {
+                const script2 = document.createElement('script');
+                script2.src = 'public/audio-analyzer-integration.js?' + Date.now();
+                script2.onload = verificarDados;
+                document.head.appendChild(script2);
+            };
+            document.head.appendChild(script1);
+        }
+        
+        function verificarDados() {
+            let refHtml = '';
+            let calcHtml = '';
+            
+            // Verificar dados embutidos
+            const embedded = window.__EMBEDDED_REFS__?.byGenre?.funk_mandela;
+            const inline = window.__INLINE_EMBEDDED_REFS__?.byGenre?.funk_mandela;
+            
+            if (embedded) {
+                refHtml += '<div class="correto">✅ Embedded data encontrado:</div>';
+                refHtml += `<pre>${JSON.stringify({
+                    version: embedded.version,
+                    aggregation_method: embedded.aggregation_method,
+                    low_bass: embedded.bands?.low_bass
+                }, null, 2)}</pre>`;
+            }
+            
+            if (inline) {
+                refHtml += '<div class="correto">✅ Inline data encontrado:</div>';
+                refHtml += `<pre>${JSON.stringify({
+                    version: inline.version,
+                    aggregation_method: inline.aggregation_method,
+                    low_bass: inline.bands?.low_bass
+                }, null, 2)}</pre>`;
+            }
+            
+            if (!embedded && !inline) {
+                refHtml += '<div class="erro">❌ Nenhum dado de referência encontrado!</div>';
+            }
+            
+            // Simular cálculo de delta
+            const refTarget = embedded?.bands?.low_bass?.target_db || inline?.bands?.low_bass?.target_db || null;
+            const valorAtual = 13.34; // Valor problemático da interface
+            
+            if (refTarget !== null) {
+                const delta = valorAtual - refTarget;
+                
+                calcHtml += `<div class="valor">
+                    <strong>Cálculo Delta Low Bass:</strong><br>
+                    Valor Atual: ${valorAtual} dB<br>
+                    Alvo (Ref): ${refTarget} dB<br>
+                    Delta = ${valorAtual} - (${refTarget}) = <span class="${delta > 0 ? 'erro' : 'correto'}">${delta.toFixed(2)} dB</span>
+                </div>`;
+                
+                // Análise do problema
+                if (valorAtual > 0) {
+                    calcHtml += '<div class="erro">❌ PROBLEMA: Valor atual positivo é impossível para banda relativa!</div>';
+                }
+                
+                if (Math.abs(delta) > 20) {
+                    calcHtml += '<div class="erro">❌ PROBLEMA: Delta muito alto indica valor atual incorreto!</div>';
+                }
+                
+                calcHtml += '<div class="correto">✅ Referência corrigida (target negativo)</div>';
+                calcHtml += '<div class="erro">❌ Valor atual ainda está incorreto (positivo)</div>';
+                calcHtml += '<div>💡 SOLUÇÃO: O problema não é o delta, é o valor atual estar positivo!</div>';
+            } else {
+                calcHtml += '<div class="erro">❌ Target não encontrado!</div>';
+            }
+            
+            document.getElementById('ref-data').innerHTML = refHtml;
+            document.getElementById('calc-data').innerHTML = calcHtml;
+            
+            console.log('🔍 Debug concluído:', { embedded, inline, refTarget, valorAtual });
+        }
+        
+        // Iniciar debug
+        debugReferencias();
+    </script>
+</body>
+</html>

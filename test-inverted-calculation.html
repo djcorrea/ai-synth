@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste: Inversão de Cálculo</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 20px;
+        }
+        .test-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .calculation {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .test {
+            color: #52c7f7;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Teste: Inversão de Cálculo (target - atual)</h1>
+    
+    <div class="test-section">
+        <h2>📊 Nova Lógica Testada</h2>
+        
+        <div class="calculation">
+            <strong>Banda: Graves (60-120Hz)</strong><br>
+            Atual: -15.95dB<br>
+            Target: -8.00dB<br>
+            <span class="test">NOVO CÁLCULO: diff = target - atual</span><br>
+            diff = -8.00 - (-15.95) = +7.95dB<br><br>
+            
+            <strong>Resultado:</strong><br>
+            diff > 0 (positivo) = DIMINUIR ✅<br>
+            <span class="success">Isso coincide com "DIMINUIR 7.9" da tabela!</span>
+        </div>
+        
+        <div class="calculation">
+            <strong>Interpretação Corrigida:</strong><br>
+            • diff > 0 = Precisa DIMINUIR a diferença = CORTAR EQ<br>
+            • diff < 0 = Precisa AUMENTAR a diferença = BOOST EQ<br><br>
+            
+            <strong>Com Graves:</strong><br>
+            diff = +7.95 → CORTAR Graves em ~7.9dB ✅
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Validação Completa</h2>
+        <div id="validation-results"></div>
+    </div>
+
+    <script>
+        const testCases = [
+            { band: 'Graves (60-120Hz)', atual: -15.95, target: -8.00 },
+            { band: 'Graves Altos (120-200Hz)', atual: -15.87, target: -12.00 },
+            { band: 'Médios Agudos (2-4kHz)', atual: -5.97, target: -11.20 },
+            { band: 'Agudos (4-8kHz)', atual: -8.73, target: -14.80 }
+        ];
+
+        let html = '';
+        testCases.forEach(test => {
+            const diffNovo = test.target - test.atual;
+            const action = diffNovo > 0 ? 'CORTAR' : 'BOOST';
+            
+            html += `<div class="calculation">
+                <strong>${test.band}</strong><br>
+                diff = ${test.target} - (${test.atual}) = ${diffNovo.toFixed(2)}<br>
+                <span class="success">Resultado: ${action} em ~${Math.abs(diffNovo).toFixed(1)}dB</span>
+            </div>`;
+        });
+
+        document.getElementById('validation-results').innerHTML = html;
+    </script>
+</body>
+</html>

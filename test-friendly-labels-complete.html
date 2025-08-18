@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Completo - Labels Amigáveis</title>
+    <link rel="stylesheet" href="friendly-labels.css">
+    <style>
+        body {
+            background: #0d1321;
+            color: #fff;
+            font-family: 'Poppins', sans-serif;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .test-title {
+            color: #00ffff;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .comparison-table th {
+            background: rgba(0,255,255,0.1);
+            font-weight: 600;
+        }
+        .old-label {
+            color: #ff9800;
+            font-family: monospace;
+        }
+        .new-label {
+            color: #52f7ad;
+            font-weight: 600;
+        }
+        .diff-demo {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .diff-card {
+            background: rgba(255,255,255,0.08);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 200px;
+        }
+        .diff-ok { border-color: #52f7ad; }
+        .diff-warn { border-color: #ffce4d; }
+        .diff-error { border-color: #ff6b6b; }
+    </style>
+</head>
+<body>
+    <h1>🎵 Teste Completo - Sistema de Labels Amigáveis V2</h1>
+    
+    <div class="test-section">
+        <div class="test-title">📊 Comparação: ANTES vs DEPOIS</div>
+        
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Métrica Original</th>
+                    <th>Novo Nome Amigável</th>
+                    <th>Benefício</th>
+                </tr>
+            </thead>
+            <tbody id="comparison-tbody">
+                <!-- Será preenchido via JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">🎛️ Teste de Direções (Aumentar/Diminuir)</div>
+        <p>Demonstração de como as diferenças são exibidas com indicações visuais claras:</p>
+        
+        <div class="diff-demo">
+            <div class="diff-card diff-ok">
+                <h4>✅ IDEAL</h4>
+                <div id="diff-ideal"></div>
+                <small>Valor dentro da tolerância</small>
+            </div>
+            
+            <div class="diff-card diff-warn">
+                <h4>⚠️ AJUSTAR</h4>
+                <div id="diff-adjust"></div>
+                <small>Precisa de pequeno ajuste</small>
+            </div>
+            
+            <div class="diff-card diff-error">
+                <h4>🚨 CORRIGIR</h4>
+                <div id="diff-correct"></div>
+                <small>Requer correção urgente</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">🔧 Status do Sistema</div>
+        <div id="system-status-container">
+            <p><strong>Sistema carregado:</strong> <span id="system-loaded">Verificando...</span></p>
+            <p><strong>Labels funcionando:</strong> <span id="labels-working">Verificando...</span></p>
+            <p><strong>Direções funcionando:</strong> <span id="directions-working">Verificando...</span></p>
+            <p><strong>Total de métricas mapeadas:</strong> <span id="metrics-count">Calculando...</span></p>
+            <p><strong>Total de bandas mapeadas:</strong> <span id="bands-count">Calculando...</span></p>
+        </div>
+    </div>
+
+    <script src="friendly-labels.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Teste 1: Verificar se o sistema carregou
+            const systemLoaded = typeof window.getFriendlyLabel === 'function';
+            document.getElementById('system-loaded').innerHTML = systemLoaded ? 
+                '<span style="color: #52f7ad;">✅ SIM</span>' : 
+                '<span style="color: #ff6b6b;">❌ NÃO</span>';
+            
+            if (!systemLoaded) return;
+            
+            // Teste 2: Preencher tabela de comparação
+            const testMetrics = [
+                'LUFS Int.', 'True Peak', 'DR', 'LRA', 'Correlação', 'Peak', 'RMS',
+                'Crest Factor', 'Largura', 'Balance', 'Centroide', 'Rolloff (85%)',
+                'Flux', 'Flatness', 'sub', 'low_bass', 'upper_bass', 'low_mid',
+                'mid', 'high_mid', 'brilho', 'presenca'
+            ];
+            
+            const tbody = document.getElementById('comparison-tbody');
+            let labelsChanged = 0;
+            
+            testMetrics.forEach(metric => {
+                const friendlyLabel = window.getFriendlyLabel(metric);
+                const changed = friendlyLabel !== metric;
+                if (changed) labelsChanged++;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="old-label">${metric}</td>
+                    <td class="new-label">${friendlyLabel}</td>
+                    <td>${changed ? '✅ Mais claro' : '⚪ Sem mudança'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // Teste 3: Status dos labels
+            document.getElementById('labels-working').innerHTML = labelsChanged > 0 ? 
+                `<span style="color: #52f7ad;">✅ ${labelsChanged} métricas melhoradas</span>` :
+                '<span style="color: #ff9800;">⚠️ Nenhuma métrica alterada</span>';
+            
+            // Teste 4: Testar direções
+            if (typeof window.createDirectionIndicator === 'function') {
+                document.getElementById('directions-working').innerHTML = 
+                    '<span style="color: #52f7ad;">✅ SIM</span>';
+                
+                // Exemplos de direções
+                document.getElementById('diff-ideal').innerHTML = 
+                    '+0.1 dB' + window.createDirectionIndicator(0.1, ' dB');
+                document.getElementById('diff-adjust').innerHTML = 
+                    '-2.3 LUFS' + window.createDirectionIndicator(-2.3, ' LUFS');
+                document.getElementById('diff-correct').innerHTML = 
+                    '+5.8 dB' + window.createDirectionIndicator(5.8, ' dB');
+            } else {
+                document.getElementById('directions-working').innerHTML = 
+                    '<span style="color: #ff6b6b;">❌ NÃO</span>';
+            }
+            
+            // Teste 5: Contar métricas e bandas
+            const metricsCount = Object.keys(window.FRIENDLY_METRIC_LABELS || {}).length;
+            const bandsCount = Object.keys(window.FRIENDLY_BAND_LABELS || {}).length;
+            
+            document.getElementById('metrics-count').innerHTML = 
+                `<span style="color: #00ffff;">${metricsCount} métricas</span>`;
+            document.getElementById('bands-count').innerHTML = 
+                `<span style="color: #00ffff;">${bandsCount} bandas</span>`;
+            
+            console.log('✅ Teste completo concluído!');
+            console.log(`📊 Resumo: ${labelsChanged}/${testMetrics.length} métricas melhoradas`);
+        });
+    </script>
+</body>
+</html>

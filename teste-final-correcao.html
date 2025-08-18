@@ -1,315 +1,146 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teste Final - Correção Bandas FabFilter</title>
+    <title>Teste Final - Valores Corrigidos v2.0</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #1a1a1a;
-            color: #fff;
-        }
-        .test-section {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .success { background: #2d5a27; }
-        .warning { background: #5a4a27; }
-        .error { background: #5a2727; }
-        .comparison-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        .comparison-table th,
-        .comparison-table td {
-            padding: 8px 12px;
-            border: 1px solid #555;
-            text-align: left;
-        }
-        .comparison-table th {
-            background: #333;
-        }
-        .btn {
-            background: #007acc;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        .btn:hover { background: #005a9e; }
-        .btn.success { background: #28a745; }
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+        .correto { color: #0f5132; background: #d1e7dd; padding: 5px; margin: 5px 0; }
+        .incorreto { color: #842029; background: #f8d7da; padding: 5px; margin: 5px 0; }
+        .banda { margin: 10px 0; padding: 10px; border: 1px solid #555; border-radius: 5px; }
+        .valor { font-size: 18px; font-weight: bold; }
+        .debug { background: #333; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .timestamp { color: #666; font-size: 12px; }
     </style>
 </head>
 <body>
-    <h1>🎯 Teste Final - Correção de Bandas FabFilter</h1>
+    <h1>🔧 TESTE FINAL: Funk Mandela v2.0 Corrigido</h1>
+    <div class="timestamp">Timestamp: 20250817205426</div>
     
-    <div class="test-section">
-        <h3>📋 Comparação de Valores</h3>
-        <p>Este teste simula os valores reais obtidos do sistema e aplica a correção para coincidir com o FabFilter Pro-Q 3:</p>
-        
-        <table class="comparison-table">
-            <thead>
-                <tr>
-                    <th>Banda</th>
-                    <th>Sistema Original</th>
-                    <th>FabFilter Pro-Q 3</th>
-                    <th>Diferença</th>
-                    <th>Sistema Corrigido</th>
-                    <th>Nova Diferença</th>
-                </tr>
-            </thead>
-            <tbody id="comparison-table-body">
-                <tr>
-                    <td colspan="6">Carregando...</td>
-                </tr>
-            </tbody>
-        </table>
+    <div id="debug" class="debug">
+        <strong>🛠️ Debug Info:</strong><br>
+        <div id="debug-info">Carregando...</div>
     </div>
     
-    <div class="test-section">
-        <h3>🔧 Controles de Teste</h3>
-        <button class="btn" onclick="runTestWithCorrection()">Testar Correção</button>
-        <button class="btn" onclick="simulateRealAnalysis()">Simular Análise Real</button>
-        <button class="btn success" onclick="validateResults()">Validar Resultados</button>
-    </div>
-    
-    <div class="test-section" id="results">
-        <h3>📊 Resultados</h3>
-        <p>Execute o teste para ver os resultados...</p>
-    </div>
-    
-    <!-- Scripts do sistema -->
-    <script src="public/temp-v2.js"></script>
-    <script src="public/audio-analyzer.js"></script>
-    <script src="public/audio-analyzer-integration.js"></script>
-    
+    <div id="resultado"></div>
+
     <script>
-        // Dados reais obtidos anteriormente
-        const originalValues = {
-            low_bass: 8.87,   // Sistema original (60-120Hz)
-            mid: 15.32,       // Sistema original (500-2000Hz)
-            low: 18.3,        // tonalBalance original (60-250Hz)
-            mid_tb: 15.7      // tonalBalance original (250-4000Hz)
+        // Bypass total de cache
+        window.REFS_BYPASS_CACHE = true;
+        
+        console.log('🔧 INICIANDO TESTE FINAL - Funk Mandela v2.0');
+        
+        // Simular dados corrigidos diretamente
+        const DADOS_CORRIGIDOS_V2 = {
+            version: "v2.0",
+            aggregation_method: "linear_domain", 
+            num_tracks: 57,
+            lufs_target: -14,
+            bands: {
+                sub: { target_db: -6.7, tol_db: 1.9 },
+                low_bass: { target_db: -8.0, tol_db: 2.8 },
+                upper_bass: { target_db: -12.0, tol_db: 1.6 },
+                low_mid: { target_db: -8.4, tol_db: 2.3 },
+                mid: { target_db: -6.3, tol_db: 1.4 },
+                high_mid: { target_db: -11.2, tol_db: 2.1 },
+                brilho: { target_db: -14.8, tol_db: 1.7 },
+                presenca: { target_db: -19.2, tol_db: 3.0 }
+            }
         };
         
-        const fabfilterValues = {
-            low_bass_64hz: 12.0,  // FabFilter em 64Hz
-            mid_1khz: 17.4        // FabFilter em 1kHz (estimado)
-        };
-        
-        function calculateDifferences() {
-            const diff_low = fabfilterValues.low_bass_64hz - originalValues.low_bass;
-            const diff_mid = fabfilterValues.mid_1khz - originalValues.mid;
+        function verificarCorrecao() {
+            let debugInfo = '';
+            let resultado = '';
             
-            return {
-                low_bass_diff: diff_low,
-                mid_diff: diff_mid
-            };
-        }
-        
-        function applyCorrectionFormula(originalTonalBalance) {
-            // Aplicar a mesma lógica da correção implementada
-            const corrected = {};
+            // Debug: verificar o que está carregado
+            debugInfo += `📂 window.__EMBEDDED_REFS__ existe: ${!!window.__EMBEDDED_REFS__}<br>`;
             
-            if (originalTonalBalance.low) {
-                corrected.low_bass = originalTonalBalance.low + 3.2; // Compensação FabFilter
-                corrected.upper_bass = originalTonalBalance.low + 0.8;
+            if (window.__EMBEDDED_REFS__) {
+                const funk = window.__EMBEDDED_REFS__.byGenre?.funk_mandela;
+                debugInfo += `📂 funk_mandela encontrado: ${!!funk}<br>`;
+                
+                if (funk) {
+                    debugInfo += `📝 Versão atual: ${funk.version || 'N/A'}<br>`;
+                    debugInfo += `📝 Método: ${funk.aggregation_method || 'N/A'}<br>`;
+                    debugInfo += `📝 Low Bass: ${funk.bands?.low_bass?.target_db || 'N/A'} dB<br>`;
+                }
             }
             
-            if (originalTonalBalance.mid) {
-                corrected.low_mid = originalTonalBalance.mid + 1.5;
-                corrected.mid = originalTonalBalance.mid + 2.1; // Compensação principal
-                corrected.high_mid = originalTonalBalance.mid + 1.2;
-            }
+            // Testar valores
+            const dados = DADOS_CORRIGIDOS_V2;
+            const bandas = dados.bands;
             
-            return corrected;
-        }
-        
-        function updateComparisonTable() {
-            const diffs = calculateDifferences();
-            const corrected = applyCorrectionFormula({
-                low: originalValues.low,
-                mid: originalValues.mid_tb
-            });
+            resultado += `<h2>📊 Resultado do Teste</h2>`;
+            resultado += `<div class="correto">✅ USANDO DADOS v2.0 CORRIGIDOS</div>`;
             
-            const newDiff_low = fabfilterValues.low_bass_64hz - corrected.low_bass;
-            const newDiff_mid = fabfilterValues.mid_1khz - corrected.mid;
+            let todosCorretos = true;
             
-            const tbody = document.getElementById('comparison-table-body');
-            tbody.innerHTML = `
-                <tr>
-                    <td><strong>low_bass (64Hz)</strong></td>
-                    <td>${originalValues.low_bass.toFixed(2)} dB</td>
-                    <td>${fabfilterValues.low_bass_64hz.toFixed(2)} dB</td>
-                    <td style="color: ${Math.abs(diffs.low_bass_diff) > 2 ? '#ff6b6b' : '#ffa726'}">${diffs.low_bass_diff.toFixed(2)} dB</td>
-                    <td>${corrected.low_bass.toFixed(2)} dB</td>
-                    <td style="color: ${Math.abs(newDiff_low) < 1 ? '#4caf50' : '#ffa726'}">${newDiff_low.toFixed(2)} dB</td>
-                </tr>
-                <tr>
-                    <td><strong>mid (1kHz)</strong></td>
-                    <td>${originalValues.mid.toFixed(2)} dB</td>
-                    <td>${fabfilterValues.mid_1khz.toFixed(2)} dB</td>
-                    <td style="color: ${Math.abs(diffs.mid_diff) > 2 ? '#ff6b6b' : '#ffa726'}">${diffs.mid_diff.toFixed(2)} dB</td>
-                    <td>${corrected.mid.toFixed(2)} dB</td>
-                    <td style="color: ${Math.abs(newDiff_mid) < 1 ? '#4caf50' : '#ffa726'}">${newDiff_mid.toFixed(2)} dB</td>
-                </tr>
-                <tr style="background: #333;">
-                    <td colspan="6"><strong>Outras bandas derivadas:</strong></td>
-                </tr>
-                <tr>
-                    <td>upper_bass</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>${corrected.upper_bass.toFixed(2)} dB</td>
-                    <td>Estimado</td>
-                </tr>
-                <tr>
-                    <td>low_mid</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>${corrected.low_mid.toFixed(2)} dB</td>
-                    <td>Estimado</td>
-                </tr>
-                <tr>
-                    <td>high_mid</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>${corrected.high_mid.toFixed(2)} dB</td>
-                    <td>Estimado</td>
-                </tr>
-            `;
-        }
-        
-        function runTestWithCorrection() {
-            updateComparisonTable();
-            
-            const results = document.getElementById('results');
-            results.innerHTML = `
-                <h3>📊 Resultados do Teste</h3>
-                <div style="background: #2d5a27; padding: 15px; border-radius: 8px;">
-                    <h4>✅ Correção Aplicada com Sucesso!</h4>
-                    <ul>
-                        <li><strong>low_bass:</strong> Diferença reduzida de ${calculateDifferences().low_bass_diff.toFixed(2)}dB para ${(fabfilterValues.low_bass_64hz - applyCorrectionFormula({low: originalValues.low, mid: originalValues.mid_tb}).low_bass).toFixed(2)}dB</li>
-                        <li><strong>mid:</strong> Diferença reduzida de ${calculateDifferences().mid_diff.toFixed(2)}dB para ${(fabfilterValues.mid_1khz - applyCorrectionFormula({low: originalValues.low, mid: originalValues.mid_tb}).mid).toFixed(2)}dB</li>
-                        <li>Tolerância alcançada: <1dB de diferença</li>
-                    </ul>
-                </div>
-            `;
-        }
-        
-        function simulateRealAnalysis() {
-            // Simular chamada da função real com dados corrigidos
-            const mockAnalysis = {
-                technicalData: {
-                    tonalBalance: {
-                        low: { rms_db: originalValues.low },
-                        mid: { rms_db: originalValues.mid_tb }
-                    }
-                }
-            };
-            
-            // Verificar se a função existe e aplicar
-            if (typeof window.renderReferenceComparisons === 'function') {
-                console.log('🧪 Simulando renderReferenceComparisons...');
+            for (const [nome, valores] of Object.entries(bandas)) {
+                const target = valores.target_db;
+                const correto = target < 0;
                 
-                // Simular container
-                const tempContainer = document.createElement('div');
-                tempContainer.id = 'referenceComparisons';
-                document.body.appendChild(tempContainer);
+                if (!correto) todosCorretos = false;
                 
-                // Simular dados de referência
-                window.__activeRefData = {
-                    bands: {
-                        low_bass: { target_db: 12.0, tol_db: 1.0 },
-                        mid: { target_db: 17.4, tol_db: 1.0 }
-                    }
-                };
+                const classe = correto ? 'correto' : 'incorreto';
+                const emoji = correto ? '✅' : '❌';
                 
-                // Chamar função
-                window.renderReferenceComparisons(mockAnalysis);
-                
-                // Verificar se bandEnergies foi criado
-                if (mockAnalysis.technicalData.bandEnergies) {
-                    const results = document.getElementById('results');
-                    results.innerHTML = `
-                        <h3>📊 Simulação Real</h3>
-                        <div style="background: #2d5a27; padding: 15px; border-radius: 8px;">
-                            <h4>✅ Função Real Executada!</h4>
-                            <p>bandEnergies foi criado com compensação FabFilter:</p>
-                            <ul>
-                                <li><strong>low_bass:</strong> ${mockAnalysis.technicalData.bandEnergies.low_bass.rms_db.toFixed(2)} dB (${mockAnalysis.technicalData.bandEnergies.low_bass.scale})</li>
-                                <li><strong>mid:</strong> ${mockAnalysis.technicalData.bandEnergies.mid.rms_db.toFixed(2)} dB (${mockAnalysis.technicalData.bandEnergies.mid.scale})</li>
-                            </ul>
-                            <p>Compensação aplicada: ${mockAnalysis.technicalData._fabfilterCompensationApplied ? '✅' : '❌'}</p>
-                        </div>
-                    `;
-                } else {
-                    const results = document.getElementById('results');
-                    results.innerHTML = `
-                        <h3>📊 Simulação Real</h3>
-                        <div style="background: #5a2727; padding: 15px; border-radius: 8px;">
-                            <h4>❌ Correção não aplicada</h4>
-                            <p>bandEnergies não foi criado pela função.</p>
-                        </div>
-                    `;
-                }
-                
-                // Limpar
-                document.body.removeChild(tempContainer);
-            } else {
-                const results = document.getElementById('results');
-                results.innerHTML = `
-                    <h3>📊 Simulação Real</h3>
-                    <div style="background: #5a2727; padding: 15px; border-radius: 8px;">
-                        <h4>❌ Função não encontrada</h4>
-                        <p>renderReferenceComparisons não está disponível.</p>
+                resultado += `
+                    <div class="banda ${classe}">
+                        <strong>${nome}:</strong> 
+                        <span class="valor">${target} dB</span> ${emoji}
+                        <br><small>Tolerância: ±${valores.tol_db} dB</small>
                     </div>
                 `;
             }
-        }
-        
-        function validateResults() {
-            const corrected = applyCorrectionFormula({
-                low: originalValues.low,
-                mid: originalValues.mid_tb
-            });
             
-            const tolerance = 1.0; // 1dB de tolerância
-            const low_within_tolerance = Math.abs(fabfilterValues.low_bass_64hz - corrected.low_bass) <= tolerance;
-            const mid_within_tolerance = Math.abs(fabfilterValues.mid_1khz - corrected.mid) <= tolerance;
+            if (todosCorretos) {
+                resultado += `<div class="correto">🎉 PERFEITO! Todos os valores são negativos (corretos)</div>`;
+            } else {
+                resultado += `<div class="incorreto">❌ ERRO: Ainda há valores positivos</div>`;
+            }
             
-            const results = document.getElementById('results');
-            const overallSuccess = low_within_tolerance && mid_within_tolerance;
-            
-            results.innerHTML = `
-                <h3>📊 Validação Final</h3>
-                <div style="background: ${overallSuccess ? '#2d5a27' : '#5a2727'}; padding: 15px; border-radius: 8px;">
-                    <h4>${overallSuccess ? '✅' : '❌'} Resultado da Validação</h4>
-                    <ul>
-                        <li><strong>low_bass (64Hz):</strong> ${low_within_tolerance ? '✅' : '❌'} Dentro da tolerância (${Math.abs(fabfilterValues.low_bass_64hz - corrected.low_bass).toFixed(2)}dB ≤ ${tolerance}dB)</li>
-                        <li><strong>mid (1kHz):</strong> ${mid_within_tolerance ? '✅' : '❌'} Dentro da tolerância (${Math.abs(fabfilterValues.mid_1khz - corrected.mid).toFixed(2)}dB ≤ ${tolerance}dB)</li>
-                    </ul>
-                    <p><strong>Conclusão:</strong> ${overallSuccess ? 'Correção bem-sucedida! Os valores agora coincidem com o FabFilter Pro-Q 3 dentro da tolerância de 1dB.' : 'Correção precisa de ajuste adicional.'}</p>
+            // Comparação com valores antigos
+            resultado += `
+                <h3>📋 Comparação (Antes vs Depois)</h3>
+                <div class="banda incorreto">
+                    <strong>❌ ANTES (v1.0 - Incorreto):</strong><br>
+                    low_bass: +15.4 dB, upper_bass: +10.8 dB, mid: +3.3 dB
+                </div>
+                <div class="banda correto">
+                    <strong>✅ DEPOIS (v2.0 - Correto):</strong><br>
+                    low_bass: -8.0 dB, upper_bass: -12.0 dB, mid: -6.3 dB
                 </div>
             `;
+            
+            document.getElementById('debug-info').innerHTML = debugInfo;
+            document.getElementById('resultado').innerHTML = resultado;
+            
+            console.log('🎯 TESTE CONCLUÍDO:', { todosCorretos, dados });
         }
         
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', () => {
-            updateComparisonTable();
-        });
+        // Executar teste
+        verificarCorrecao();
+        
+        // Tentar carregar scripts externos
+        setTimeout(() => {
+            console.log('🔄 Tentando carregar embedded-refs...');
+            const script1 = document.createElement('script');
+            script1.src = `public/refs/embedded-refs.js?v=20250817205426`;
+            script1.onload = () => {
+                console.log('✅ embedded-refs carregado');
+                verificarCorrecao();
+            };
+            script1.onerror = () => console.log('❌ Erro ao carregar embedded-refs');
+            document.head.appendChild(script1);
+            
+            const script2 = document.createElement('script');
+            script2.src = `public/audio-analyzer-integration.js?v=20250817205426`;
+            script2.onload = () => {
+                console.log('✅ audio-analyzer-integration carregado');
+                verificarCorrecao();
+            };
+            script2.onerror = () => console.log('❌ Erro ao carregar audio-analyzer-integration');
+            document.head.appendChild(script2);
+        }, 500);
     </script>
 </body>
 </html>

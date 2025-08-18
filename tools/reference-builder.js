@@ -20,6 +20,7 @@ const CONFIG = {
 	lufsTarget: -14, // Se o sistema definir outro, ajuste aqui e no online
 	windowSeconds: 1.0,
 	hopSeconds: 0.5,
+	useLinearAggregation: true, // Flag v2: usar agregação linear correta (default: true)
 	bands: [
 		{ key: 'sub', range: [20, 60] },
 		{ key: 'low_bass', range: [60, 120] },
@@ -175,6 +176,7 @@ function bandToBins(range, freqBins) {
 }
 
 // Energia relativa por banda (dB rel. global 20-16k)
+// CORRIGIDO: agregação no domínio linear para evitar valores positivos incorretos
 function computeBandProfile(left, right, sampleRate) {
 	// Janela/hop conforme CONFIG
 	const win = Math.round(CONFIG.windowSeconds * sampleRate);
@@ -189,33 +191,72 @@ function computeBandProfile(left, right, sampleRate) {
 	// Pré-calcular ranges de bins
 	const binRanges = CONFIG.bands.map(b => ({ key: b.key, bins: bandToBins(b.range, freqBins) }));
 
-	// Agregar por frame
-	const bandAccum = new Map(CONFIG.bands.map(b => [b.key, 0]));
-	let totalFrames = 0;
-	for (const frameMag of spectrogram) {
-		// Converter para power
-		const framePow = frameMag.map(v => v * v);
-		// Energia global útil (20..16k)
-		const [g0, g1] = bandToBins([20, 16000], freqBins);
-		let global = 0;
-		for (let i = g0; i < g1; i++) global += framePow[i];
-		if (global <= 0) continue;
-		// Cada banda em dB relativo
-		for (const { key, bins } of binRanges) {
-			let sum = 0;
-			for (let i = bins[0]; i < bins[1]; i++) sum += framePow[i];
-			const rel = sum > 0 ? 10 * Math.log10(sum / global) : -80;
-			bandAccum.set(key, bandAccum.get(key) + rel);
+	if (CONFIG.useLinearAggregation) {
+		// VERSÃO v2: Agregação linear correta
+		const bandLinearAccum = new Map(CONFIG.bands.map(b => [b.key, 0]));
+		let totalFrames = 0;
+		
+		for (const frameMag of spectrogram) {
+			// Converter para power
+			const framePow = frameMag.map(v => v * v);
+			// Energia global útil (20..16k)
+			const [g0, g1] = bandToBins([20, 16000], freqBins);
+			let global = 0;
+			for (let i = g0; i < g1; i++) global += framePow[i];
+			if (global <= 0) continue;
+			
+			// Acumular energias lineares para cada banda
+			for (const { key, bins } of binRanges) {
+				let sum = 0;
+				for (let i = bins[0]; i < bins[1]; i++) sum += framePow[i];
+				// Armazenar razão linear (banda/global) em vez de dB
+				const ratio = sum / global;
+				bandLinearAccum.set(key, bandLinearAccum.get(key) + ratio);
+			}
+			totalFrames++;
 		}
-		totalFrames++;
-	}
 
-	// Média temporal
-	const profile = {};
-	for (const { key } of binRanges) {
-		profile[key] = totalFrames > 0 ? bandAccum.get(key) / totalFrames : -80;
+		// Calcular médias lineares e converter para dB
+		const profile = {};
+		for (const { key } of binRanges) {
+			if (totalFrames > 0) {
+				const avgLinearRatio = bandLinearAccum.get(key) / totalFrames;
+				// Converter média linear para dB relativo
+				profile[key] = avgLinearRatio > 0 ? 10 * Math.log10(avgLinearRatio) : -80;
+			} else {
+				profile[key] = -80;
+			}
+		}
+		return profile;
+	} else {
+		// VERSÃO v1: Agregação original (mantida para compatibilidade)
+		const bandAccum = new Map(CONFIG.bands.map(b => [b.key, 0]));
+		let totalFrames = 0;
+		for (const frameMag of spectrogram) {
+			// Converter para power
+			const framePow = frameMag.map(v => v * v);
+			// Energia global útil (20..16k)
+			const [g0, g1] = bandToBins([20, 16000], freqBins);
+			let global = 0;
+			for (let i = g0; i < g1; i++) global += framePow[i];
+			if (global <= 0) continue;
+			// Cada banda em dB relativo
+			for (const { key, bins } of binRanges) {
+				let sum = 0;
+				for (let i = bins[0]; i < bins[1]; i++) sum += framePow[i];
+				const rel = sum > 0 ? 10 * Math.log10(sum / global) : -80;
+				bandAccum.set(key, bandAccum.get(key) + rel);
+			}
+			totalFrames++;
+		}
+
+		// Média temporal
+		const profile = {};
+		for (const { key } of binRanges) {
+			profile[key] = totalFrames > 0 ? bandAccum.get(key) / totalFrames : -80;
+		}
+		return profile;
 	}
-	return profile;
 }
 
 // Medidas técnicas universais por faixa (após normalização para LUFS alvo)
@@ -278,20 +319,40 @@ function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
 // Pipeline principal
 async function buildGenre(genre) {
 	const inDir = path.resolve(process.cwd(), 'refs', genre);
+	const samplesDir = path.join(inDir, 'samples');
 	const outDir = path.resolve(process.cwd(), 'refs', 'out');
 	await fsp.mkdir(outDir, { recursive: true });
 
-	const files = (await fsp.readdir(inDir)).filter(f => f.toLowerCase().endsWith('.wav'));
+	// Procurar WAVs primeiro na pasta samples/, depois na pasta principal
+	let searchDir = samplesDir;
+	let files = [];
+	try {
+		if (fs.existsSync(samplesDir)) {
+			files = (await fsp.readdir(samplesDir)).filter(f => f.toLowerCase().endsWith('.wav'));
+		}
+	} catch (e) {
+		// Se samples/ não existir ou der erro, usar pasta principal
+	}
+	
 	if (files.length === 0) {
-		console.error(`Nenhum WAV encontrado em ${inDir}. Adicione referências WAV/FLAC (WAV suportado no momento).`);
+		searchDir = inDir;
+		try {
+			files = (await fsp.readdir(inDir)).filter(f => f.toLowerCase().endsWith('.wav'));
+		} catch (e) {
+			// Ignora erro de leitura
+		}
+	}
+
+	if (files.length === 0) {
+		console.error(`Nenhum WAV encontrado em ${samplesDir} ou ${inDir}. Adicione referências WAV.`);
 		process.exit(1);
 	}
 
-	console.log(`Iniciando build para gênero '${genre}' em ${inDir} | WAVs: ${files.length}`);
+	console.log(`Iniciando build para gênero '${genre}' em ${searchDir} | WAVs: ${files.length}`);
 
 	const perTrack = [];
 	for (const f of files) {
-		const fp = path.join(inDir, f);
+		const fp = path.join(searchDir, f);
 		try {
 			const wav = await readWavFile(fp);
 			let L = wav.left, R = wav.right;
@@ -362,9 +423,10 @@ async function buildGenre(genre) {
 
 	const outJson = {
 		[genre]: {
-			version: '1.0',
+			version: CONFIG.useLinearAggregation ? 'v2.0' : 'v1.0',
 			generated_at: new Date().toISOString(),
 			num_tracks: perTrack.length,
+			aggregation_method: CONFIG.useLinearAggregation ? 'linear_domain' : 'dB_domain_legacy',
 			lufs_target: CONFIG.lufsTarget,
 			// tol_lufs com clamp 0.3–1.5 (valor inicial padrão 0.5)
 			tol_lufs: clamp(0.5, 0.3, 1.5),
@@ -396,9 +458,24 @@ function round2(x) { return Number.isFinite(x) ? Math.round(x * 100) / 100 : x; 
 try {
 	const thisFile = fileURLToPath(import.meta.url);
 	if (thisFile === process.argv[1]) {
-		const genre = process.argv.slice(2).find(a => !a.startsWith('-'));
+		const args = process.argv.slice(2);
+		const genre = args.find(a => !a.startsWith('-'));
+		
+		// Processar flags
+		if (args.includes('--v1') || args.includes('--legacy')) {
+			CONFIG.useLinearAggregation = false;
+			console.log('🔧 Usando agregação v1.0 (legacy dB domain)');
+		} else if (args.includes('--v2') || args.includes('--linear')) {
+			CONFIG.useLinearAggregation = true;
+			console.log('🔧 Usando agregação v2.0 (linear domain corrigida)');
+		} else {
+			console.log('🔧 Usando agregação v2.0 (default - linear domain)');
+		}
+		
 		if (!genre) {
-			console.error('Uso: node tools/reference-builder.js <genero>');
+			console.error('Uso: node tools/reference-builder.js <genero> [--v1|--v2] [--legacy|--linear]');
+			console.error('  --v1/--legacy: usar método antigo (pode gerar valores positivos incorretos)');
+			console.error('  --v2/--linear: usar método corrigido com agregação linear (default)');
 			process.exit(1);
 		}
 		buildGenre(genre).catch(err => {
@@ -408,8 +485,10 @@ try {
 	}
 } catch (e) {
 	// Fallback: tenta sempre rodar se não conseguir resolver
-	const genre = process.argv.slice(2).find(a => !a.startsWith('-'));
+	const args = process.argv.slice(2);
+	const genre = args.find(a => !a.startsWith('-'));
 	if (genre) {
+		if (args.includes('--v1') || args.includes('--legacy')) CONFIG.useLinearAggregation = false;
 		buildGenre(genre).catch(err => { console.error('Erro ao gerar referência:', err); process.exit(1); });
 	}
 }
