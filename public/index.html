@@ -182,9 +182,10 @@
                     <div class="upload-icon">🎵</div>
                     <h4>Analisar seu áudio</h4>
                     <p>Arraste seu arquivo aqui ou clique para selecionar</p>
-                    <p class="supported-formats">Suporta: MP3, WAV, M4A, OGG (máx. 10MB)</p>
+                    <p class="supported-formats">Suporta: WAV, FLAC, MP3 (máx. 60MB)</p>
+                    <p class="format-recommendation">💡 Prefira WAV ou FLAC para maior precisão na análise</p>
                     <input type="file" id="modalAudioFileInput" 
-                           accept="audio/mp3,audio/wav,audio/mpeg,audio/mp4,audio/m4a,audio/aac,audio/ogg,audio/webm,.mp3,.wav,.m4a,.aac,.ogg,.webm" 
+                           accept="audio/wav,audio/flac,audio/mp3,audio/mpeg,.wav,.flac,.mp3" 
                            style="position:absolute;left:-9999px;opacity:0;width:1px;height:1px;" tabindex="-1">
                     <label for="modalAudioFileInput"
                         class="upload-btn"
@@ -255,141 +256,261 @@
                 }
             }, 1000);
 
-            // Patch para botões "+" - setup do menu popover
-            (function setupPlusPopover() {
-              const container = document.querySelector('.chatbot-input-field.chat-input-container');
-              const plusBtn   = container?.querySelector('.chatbot-add-btn.chat-plus-btn');
-              if (!container || !plusBtn) return requestAnimationFrame(setupPlusPopover);
+            // Patch para botões "+" - setup do menu popover CORRIGIDO E OTIMIZADO
+            (function setupPlusPopovers() {
+              let isInitialized = false; // Flag para evitar múltiplas inicializações
+              let initializationTimeout = null;
+              
+              // Helper para criar popover para um container específico
+              function setupPopoverForContainer(container, plusBtn) {
+                if (!container || !plusBtn) return false;
 
-              // Garante que o popover não afete o layout
-              container.style.position = (getComputedStyle(container).position === 'static') ? 'relative' : getComputedStyle(container).position;
+                // Verificar se já foi configurado
+                if (plusBtn.hasAttribute('data-popover-configured')) return true;
 
-              // Remove versões antigas
-              container.querySelector('.chatplus-popover')?.remove();
+                // Garante que o popover não afete o layout
+                container.style.position = (getComputedStyle(container).position === 'static') ? 'relative' : getComputedStyle(container).position;
 
-              // Cria popover
-              const pop = document.createElement('div');
-              pop.className = 'chatplus-popover';
-              pop.setAttribute('role', 'menu');
-              pop.setAttribute('aria-hidden', 'true');
-              Object.assign(pop.style, {
-                position: 'absolute',
-                left: '8px',
-                bottom: 'calc(100% + 10px)',   // fica acima do input
-                minWidth: '220px',
-                background: '#0e0f1a',
-                color: '#e9e9f1',
-                border: '1px solid rgba(255,255,255,.08)',
-                borderRadius: '12px',
-                boxShadow: '0 10px 30px rgba(0,0,0,.35)',
-                padding: '6px',
-                opacity: '0',
-                transform: 'scale(.98) translateY(4px)',
-                pointerEvents: 'none',
-                transition: 'opacity .15s ease, transform .15s ease',
-                zIndex: '9999'
-              });
+                // Remove versões antigas
+                container.querySelector('.chatplus-popover')?.remove();
 
-              // Helper p/ criar item
-              const mkItem = (label, action, svg) => {
-                const b = document.createElement('button');
-               b.className = 'chatplus-item';
-                b.setAttribute('role', 'menuitem');
-                b.dataset.action = action;
-                Object.assign(b.style, {
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 12px',
-                  border: '0',
-                  background: 'transparent',
-                  color: 'inherit',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  display: 'flex',
-                  gap: '10px',
-                  alignItems: 'center',
-                  cursor: 'pointer'
-                });
-                b.onpointerenter = () => (b.style.background = 'rgba(255,255,255,.06)');
-                b.onpointerleave = () => (b.style.background = 'transparent');
-                b.innerHTML = `${svg}<span>${label}</span>`;
-                return b;
-              };
-
-              const clipSVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:block;stroke:#cfcff9;stroke-width:1.8"><path d="M8 12l6-6a4 4 0 1 1 6 6l-8 8a5 5 0 1 1-7-7l8-8"/></svg>`;
-              const audioSVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:block;stroke:#cfcff9;stroke-width:1.8"><path d="M3 12h2m2 0h2m2-6v12m4-9v6m4-3h2"/></svg>`;
-
-              const addPhotos   = mkItem('Adicionar fotos', 'upload',  clipSVG);
-              const analyzeSong = mkItem('Analisar música', 'analyze', audioSVG);
-              pop.append(addPhotos, analyzeSong);
-              container.appendChild(pop);
-
-              // Abrir/fechar
-              function open() {
-                pop.setAttribute('aria-hidden', 'false');
-                pop.style.opacity = '1';
-                pop.style.transform = 'scale(1) translateY(0)';
-                pop.style.pointerEvents = 'auto';
-                plusBtn.setAttribute('aria-expanded', 'true');
-                addPhotos.focus();
-                document.addEventListener('pointerdown', onOutside, { capture: true });
-                document.addEventListener('keydown', onKey);
-              }
-              function close() {
+                // Cria popover
+                const pop = document.createElement('div');
+                pop.className = 'chatplus-popover';
+                pop.setAttribute('role', 'menu');
                 pop.setAttribute('aria-hidden', 'true');
-                pop.style.opacity = '0';
-                pop.style.transform = 'scale(.98) translateY(4px)';
-                pop.style.pointerEvents = 'none';
+                Object.assign(pop.style, {
+                  position: 'absolute',
+                  left: '8px',
+                  bottom: 'calc(100% + 10px)',   // fica acima do input
+                  minWidth: '220px',
+                  background: '#0e0f1a',
+                  color: '#e9e9f1',
+                  border: '1px solid rgba(255,255,255,.08)',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,.35)',
+                  padding: '6px',
+                  opacity: '0',
+                  transform: 'scale(.98) translateY(4px)',
+                  pointerEvents: 'none',
+                  transition: 'opacity .15s ease, transform .15s ease',
+                  zIndex: '9999'
+                });
+
+                // Helper p/ criar item
+                const mkItem = (label, action, svg) => {
+                  const b = document.createElement('button');
+                  b.className = 'chatplus-item';
+                  b.setAttribute('role', 'menuitem');
+                  b.dataset.action = action;
+                  Object.assign(b.style, {
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 12px',
+                    border: '0',
+                    background: 'transparent',
+                    color: 'inherit',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    display: 'flex',
+                    gap: '10px',
+                    alignItems: 'center',
+                    cursor: 'pointer'
+                  });
+                  b.onpointerenter = () => (b.style.background = 'rgba(255,255,255,.06)');
+                  b.onpointerleave = () => (b.style.background = 'transparent');
+                  b.innerHTML = `${svg}<span>${label}</span>`;
+                  return b;
+                };
+
+                const clipSVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:block;stroke:#cfcff9;stroke-width:1.8"><path d="M8 12l6-6a4 4 0 1 1 6 6l-8 8a5 5 0 1 1-7-7l8-8"/></svg>`;
+                const audioSVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:block;stroke:#cfcff9;stroke-width:1.8"><path d="M3 12h2m2 0h2m2-6v12m4-9v6m4-3h2"/></svg>`;
+
+                const addPhotos   = mkItem('Adicionar fotos', 'upload',  clipSVG);
+                const analyzeSong = mkItem('Analisar música', 'analyze', audioSVG);
+                pop.append(addPhotos, analyzeSong);
+                container.appendChild(pop);
+
+                // Abrir/fechar
+                function open() {
+                  // Fechar outros popovers abertos
+                  document.querySelectorAll('.chatplus-popover').forEach(otherPop => {
+                    if (otherPop !== pop && otherPop.getAttribute('aria-hidden') === 'false') {
+                      otherPop.setAttribute('aria-hidden', 'true');
+                      otherPop.style.opacity = '0';
+                      otherPop.style.transform = 'scale(.98) translateY(4px)';
+                      otherPop.style.pointerEvents = 'none';
+                    }
+                  });
+
+                  pop.setAttribute('aria-hidden', 'false');
+                  pop.style.opacity = '1';
+                  pop.style.transform = 'scale(1) translateY(0)';
+                  pop.style.pointerEvents = 'auto';
+                  plusBtn.setAttribute('aria-expanded', 'true');
+                  addPhotos.focus();
+                  document.addEventListener('pointerdown', onOutside, { capture: true });
+                  document.addEventListener('keydown', onKey);
+                }
+                function close() {
+                  pop.setAttribute('aria-hidden', 'true');
+                  pop.style.opacity = '0';
+                  pop.style.transform = 'scale(.98) translateY(4px)';
+                  pop.style.pointerEvents = 'none';
+                  plusBtn.setAttribute('aria-expanded', 'false');
+                  document.removeEventListener('pointerdown', onOutside, { capture: true });
+                  document.removeEventListener('keydown', onKey);
+                }
+                function toggle() {
+                  (pop.getAttribute('aria-hidden') === 'true') ? open() : close();
+                }
+                function onOutside(e) {
+                  if (!pop.contains(e.target) && e.target !== plusBtn) close();
+                }
+                function onKey(e) {
+                  if (e.key === 'Escape') return close();
+                  const items = [addPhotos, analyzeSong];
+                  const i = items.indexOf(document.activeElement);
+                  if (e.key === 'ArrowDown') { (items[i+1] || items[0]).focus(); e.preventDefault(); }
+                  if (e.key === 'ArrowUp')   { (items[i-1] || items.at(-1)).focus(); e.preventDefault(); }
+                }
+
+                plusBtn.setAttribute('aria-haspopup', 'menu');
                 plusBtn.setAttribute('aria-expanded', 'false');
-                document.removeEventListener('pointerdown', onOutside, { capture: true });
-                document.removeEventListener('keydown', onKey);
-              }
-              function toggle() {
-                (pop.getAttribute('aria-hidden') === 'true') ? open() : close();
-              }
-              function onOutside(e) {
-                if (!pop.contains(e.target) && e.target !== plusBtn) close();
-              }
-              function onKey(e) {
-                if (e.key === 'Escape') return close();
-                const items = [addPhotos, analyzeSong];
-                const i = items.indexOf(document.activeElement);
-                if (e.key === 'ArrowDown') { (items[i+1] || items[0]).focus(); e.preventDefault(); }
-                if (e.key === 'ArrowUp')   { (items[i-1] || items.at(-1)).focus(); e.preventDefault(); }
-              }
+                
+                // Remove listener anterior se existir
+                if (plusBtn._clickHandler) {
+                  plusBtn.removeEventListener('click', plusBtn._clickHandler);
+                }
+                plusBtn._clickHandler = toggle;
+                plusBtn.addEventListener('click', toggle);
 
-              plusBtn.setAttribute('aria-haspopup', 'menu');
-              plusBtn.setAttribute('aria-expanded', 'false');
-              plusBtn.addEventListener('click', toggle);
-
-              // Ações
-              pop.addEventListener('click', (e) => {
-                const btn = e.target.closest('.chatplus-item');
-                if (!btn) return;
-                if (btn.dataset.action === 'upload') {
-                  let fileInput = container.querySelector('input[type="file"].chatplus-file');
-                  if (!fileInput) {
-                    fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.accept = 'image/*';
-                    fileInput.multiple = true;
-                    fileInput.hidden = true;
-                    fileInput.className = 'chatplus-file';
-                    container.appendChild(fileInput);
+                // Ações
+                pop.addEventListener('click', (e) => {
+                  const btn = e.target.closest('.chatplus-item');
+                  if (!btn) return;
+                  if (btn.dataset.action === 'upload') {
+                    let fileInput = container.querySelector('input[type="file"].chatplus-file');
+                    if (!fileInput) {
+                      fileInput = document.createElement('input');
+                      fileInput.type = 'file';
+                      fileInput.accept = 'image/*';
+                      fileInput.multiple = true;
+                      fileInput.hidden = true;
+                      fileInput.className = 'chatplus-file';
+                      container.appendChild(fileInput);
+                    }
+                    fileInput.onchange = () => {
+                      window.dispatchEvent(new CustomEvent('chat:add-photos', { detail: fileInput.files }));
+                      fileInput.value = '';
+                    };
+                    fileInput.click();
+                    close();
                   }
-                  fileInput.onchange = () => {
-                    window.dispatchEvent(new CustomEvent('chat:add-photos', { detail: fileInput.files }));
-                    fileInput.value = '';
-                  };
-                  fileInput.click();
-                  close();
+                  if (btn.dataset.action === 'analyze') {
+                    if (typeof window.openAudioModal === 'function') window.openAudioModal();
+                    else window.dispatchEvent(new CustomEvent('chat:analyze-audio-request'));
+                    close();
+                  }
+                });
+
+                // Marcar como configurado
+                plusBtn.setAttribute('data-popover-configured', 'true');
+                return true;
+              }
+
+              // Configurar popovers para ambos os estados do chat
+              function initializeAllPopovers() {
+                if (isInitialized) return; // Evitar múltiplas execuções
+
+                // Limpar timeout anterior
+                if (initializationTimeout) {
+                  clearTimeout(initializationTimeout);
+                  initializationTimeout = null;
                 }
-                if (btn.dataset.action === 'analyze') {
-                  if (typeof window.openAudioModal === 'function') window.openAudioModal();
-                  else window.dispatchEvent(new CustomEvent('chat:analyze-audio-request'));
-                  close();
+
+                // Estado de boas-vindas
+                const welcomeContainer = document.querySelector('.chatbot-input-field.chat-input-container');
+                const welcomePlusBtn = welcomeContainer?.querySelector('.chatbot-add-btn.chat-plus-btn');
+                
+                // Estado ativo
+                const activeContainer = document.querySelector('.chatbot-active-input-field.chat-input-container');
+                const activePlusBtn = activeContainer?.querySelector('.chatbot-add-btn.chat-plus-btn');
+
+                let setupCount = 0;
+                
+                if (welcomeContainer && welcomePlusBtn && !welcomePlusBtn.hasAttribute('data-popover-configured')) {
+                  if (setupPopoverForContainer(welcomeContainer, welcomePlusBtn)) {
+                    setupCount++;
+                    console.log('✅ Popover configurado para estado de boas-vindas');
+                  }
                 }
-              });
+
+                if (activeContainer && activePlusBtn && !activePlusBtn.hasAttribute('data-popover-configured')) {
+                  if (setupPopoverForContainer(activeContainer, activePlusBtn)) {
+                    setupCount++;
+                    console.log('✅ Popover configurado para estado ativo');
+                  }
+                }
+
+                // Se configurou pelo menos um, considerar inicializado
+                if (setupCount > 0 || (welcomePlusBtn?.hasAttribute('data-popover-configured') && activePlusBtn?.hasAttribute('data-popover-configured'))) {
+                  isInitialized = true;
+                  console.log('✅ Sistema de popovers inicializado completamente');
+                }
+
+                // Se não conseguiu configurar todos, tentar novamente COM LIMITE
+                if (!isInitialized && setupCount === 0) {
+                  initializationTimeout = setTimeout(() => {
+                    isInitialized = false; // Reset para nova tentativa
+                    initializeAllPopovers();
+                  }, 500); // Intervalo maior para evitar loop
+                }
+              }
+
+              // Configurar observador para mudanças no chat (COM THROTTLING)
+              let observerTimeout = null;
+              function setupChatObserver() {
+                const chatContainer = document.getElementById('chatbotContainer');
+                if (chatContainer && !chatContainer.hasAttribute('data-observer-setup')) {
+                  const observer = new MutationObserver((mutations) => {
+                    // Throttling - evitar execuções excessivas
+                    if (observerTimeout) return;
+                    
+                    observerTimeout = setTimeout(() => {
+                      // Verificar se realmente precisa re-configurar
+                      const activeContainer = document.querySelector('.chatbot-active-input-field.chat-input-container');
+                      const activePlusBtn = activeContainer?.querySelector('.chatbot-add-btn.chat-plus-btn');
+                      
+                      if (activePlusBtn && !activePlusBtn.hasAttribute('data-popover-configured')) {
+                        isInitialized = false; // Reset apenas se necessário
+                        initializeAllPopovers();
+                      }
+                      
+                      observerTimeout = null;
+                    }, 200); // Throttling de 200ms
+                  });
+                  
+                  observer.observe(chatContainer, { 
+                    attributes: true, 
+                    childList: true, 
+                    subtree: true 
+                  });
+                  
+                  chatContainer.setAttribute('data-observer-setup', 'true');
+                }
+              }
+
+              // Inicializar quando a página estiver pronta
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                  initializeAllPopovers();
+                  setupChatObserver();
+                });
+              } else {
+                initializeAllPopovers();
+                setupChatObserver();
+              }
             })();
         });
     </script>
@@ -400,7 +521,7 @@
     <script src="plan-monitor.js?v=20250810"></script>
     <script src="force-visibility.js?v=20250810"></script>
     
-    <!-- Debug do analyzer -->
-    <script src="debug-analyzer.js"></script>
+    <!-- Debug do analyzer - caminho corrigido -->
+    <script src="../debug-analyzer.js"></script>
 </body>
 </html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Depuração - API Upload</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1e1e2e;
+            color: #fff;
+        }
+        .test-section {
+            background: #2a2a3e;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        .success { border-left: 4px solid #4CAF50; }
+        .error { border-left: 4px solid #f44336; }
+        .warning { border-left: 4px solid #ff9800; }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #5a5fcf; }
+        pre {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .log {
+            font-size: 12px;
+            color: #888;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Depuração - API Upload</h1>
+    <p>Teste para identificar e resolver o erro "Unexpected end of JSON input"</p>
+
+    <div class="test-section">
+        <h3>1. Teste de Conectividade</h3>
+        <button onclick="testConnectivity()">Testar Conectividade</button>
+        <div id="connectivity-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Teste OPTIONS (CORS)</h3>
+        <button onclick="testOptions()">Testar OPTIONS</button>
+        <div id="options-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Teste POST Vazio</h3>
+        <button onclick="testEmptyPost()">Testar POST Vazio</button>
+        <div id="empty-post-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Teste Upload Arquivo Pequeno</h3>
+        <input type="file" id="test-file" accept="audio/*">
+        <button onclick="testFileUpload()">Testar Upload</button>
+        <div id="file-upload-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>5. Log de Debug</h3>
+        <button onclick="clearLog()">Limpar Log</button>
+        <pre id="debug-log"></pre>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString().substr(11, 12);
+            const logElement = document.getElementById('debug-log');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('debug-log').textContent = '';
+        }
+
+        async function testConnectivity() {
+            const resultDiv = document.getElementById('connectivity-result');
+            resultDiv.innerHTML = '<div class="log">Testando conectividade...</div>';
+            
+            try {
+                log('Testando conectividade com servidor...');
+                const response = await fetch('/', { method: 'GET' });
+                
+                log(`Status: ${response.status} ${response.statusText}`);
+                log(`Content-Type: ${response.headers.get('content-type') || 'não definido'}`);
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = '<div class="success">✅ Servidor conectado e respondendo</div>';
+                    log('Conectividade OK', 'success');
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Erro: ${response.status} ${response.statusText}</div>`;
+                    log(`Erro de conectividade: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Erro de rede: ${error.message}</div>`;
+                log(`Erro de rede: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOptions() {
+            const resultDiv = document.getElementById('options-result');
+            resultDiv.innerHTML = '<div class="log">Testando OPTIONS...</div>';
+            
+            try {
+                log('Testando preflight CORS (OPTIONS)...');
+                const response = await fetch('/api/upload-audio', { method: 'OPTIONS' });
+                
+                log(`Status: ${response.status} ${response.statusText}`);
+                log(`CORS Headers:`);
+                log(`  Access-Control-Allow-Origin: ${response.headers.get('Access-Control-Allow-Origin') || 'não definido'}`);
+                log(`  Access-Control-Allow-Methods: ${response.headers.get('Access-Control-Allow-Methods') || 'não definido'}`);
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = '<div class="success">✅ CORS configurado corretamente</div>';
+                    log('OPTIONS OK', 'success');
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Erro CORS: ${response.status}</div>`;
+                    log(`Erro CORS: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+                log(`Erro OPTIONS: ${error.message}`, 'error');
+            }
+        }
+
+        async function testEmptyPost() {
+            const resultDiv = document.getElementById('empty-post-result');
+            resultDiv.innerHTML = '<div class="log">Testando POST vazio...</div>';
+            
+            try {
+                log('Testando POST sem dados...');
+                const response = await fetch('/api/upload-audio', { 
+                    method: 'POST',
+                    body: new FormData()
+                });
+                
+                log(`Status: ${response.status} ${response.statusText}`);
+                log(`Content-Type: ${response.headers.get('content-type') || 'não definido'}`);
+                
+                const text = await response.text();
+                log(`Resposta (${text.length} chars): ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
+                
+                if (text.trim()) {
+                    try {
+                        const json = JSON.parse(text);
+                        resultDiv.innerHTML = `<div class="warning">⚠️ Resposta válida: ${json.error || json.message || 'OK'}</div>`;
+                        log('JSON válido recebido', 'success');
+                    } catch (jsonError) {
+                        resultDiv.innerHTML = `<div class="error">❌ JSON inválido: ${jsonError.message}</div>`;
+                        log(`JSON inválido: ${jsonError.message}`, 'error');
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ Resposta vazia</div>';
+                    log('Resposta vazia recebida', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+                log(`Erro POST: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFileUpload() {
+            const resultDiv = document.getElementById('file-upload-result');
+            const fileInput = document.getElementById('test-file');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<div class="warning">⚠️ Selecione um arquivo primeiro</div>';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            resultDiv.innerHTML = '<div class="log">Testando upload de arquivo...</div>';
+            
+            try {
+                log(`Testando upload: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
+                
+                const formData = new FormData();
+                formData.append('audio', file);
+                
+                const response = await fetch('/api/upload-audio', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                log(`Status: ${response.status} ${response.statusText}`);
+                log(`Content-Type: ${response.headers.get('content-type') || 'não definido'}`);
+                
+                const text = await response.text();
+                log(`Resposta (${text.length} chars): ${text.substring(0, 300)}${text.length > 300 ? '...' : ''}`);
+                
+                if (text.trim()) {
+                    try {
+                        const json = JSON.parse(text);
+                        if (json.success) {
+                            resultDiv.innerHTML = '<div class="success">✅ Upload realizado com sucesso</div>';
+                            log('Upload bem-sucedido', 'success');
+                        } else {
+                            resultDiv.innerHTML = `<div class="warning">⚠️ Upload rejeitado: ${json.message || json.error}</div>`;
+                            log(`Upload rejeitado: ${json.error}`, 'warning');
+                        }
+                    } catch (jsonError) {
+                        resultDiv.innerHTML = `<div class="error">❌ JSON inválido na resposta</div>`;
+                        log(`JSON inválido: ${jsonError.message}`, 'error');
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ Resposta vazia do servidor</div>';
+                    log('Resposta vazia', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Erro: ${error.message}</div>`;
+                log(`Erro upload: ${error.message}`, 'error');
+            }
+        }
+
+        // Inicialização
+        window.onload = function() {
+            log('Debug tool iniciado');
+            log('URL base: ' + window.location.origin);
+        };
+    </script>
+</body>
+</html>

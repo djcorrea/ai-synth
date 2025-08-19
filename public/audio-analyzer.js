@@ -1251,19 +1251,30 @@ class AudioAnalyzer {
       
       analysis.problems.push({
         type: 'clipping',
-        severity: 'high',
-        message: `Áudio com clipping detectado - ${clippingDetails.join(', ')}`,
-        solution: 'Reduza o volume geral ou use limitador'
+        severity: 'critical',
+        message: `Clipping detectado`,
+        solution: `Reduzir volume geral em ${Math.max(3, Math.min(6, clipPct * 20)).toFixed(1)}dB`,
+        explanation: "Clipping ocorre quando o sinal excede 0dBFS, causando distorção digital",
+        impact: "Distorção audível, perda de qualidade, som áspero e desagradável",
+        frequency_range: "Todas as frequências",
+        adjustment_db: -Math.max(3, Math.min(6, clipPct * 20)),
+        details: clippingDetails.join(', ')
       });
     }
 
     // Problema: Volume muito baixo
     if (rms < -30) {
+      const gainNeeded = Math.abs(rms + 18); // Target para -18dB RMS
       analysis.problems.push({
         type: 'low_volume',
-        severity: 'medium',
-        message: 'Volume RMS muito baixo',
-        solution: 'Aumente o volume ou use compressão'
+        severity: rms < -40 ? 'high' : 'medium',
+        message: `Volume muito baixo`,
+        solution: `Aumentar volume em ${gainNeeded.toFixed(1)}dB`,
+        explanation: "Volume insuficiente reduz impacto e pode soar fraco comparado a outras músicas",
+        impact: "Som sem energia, usuários precisam aumentar o volume manualmente",
+        frequency_range: "Todas as frequências",
+        adjustment_db: gainNeeded,
+        details: `RMS atual: ${rms.toFixed(1)}dB (ideal: -18dB)`
       });
     }
 
@@ -1271,9 +1282,14 @@ class AudioAnalyzer {
     if (dynamicRange < 6) {
       analysis.problems.push({
         type: 'over_compressed',
-        severity: 'medium',
-        message: 'Áudio muito comprimido',
-        solution: 'Reduza compressão ou use compressão multibanda'
+        severity: dynamicRange < 3 ? 'high' : 'medium',
+        message: `Áudio muito comprimido`,
+        solution: `Reduzir compressão para atingir ${Math.max(8, dynamicRange + 3).toFixed(0)}dB de dinâmica`,
+        explanation: "Excesso de compressão remove a dinâmica natural, deixando o som cansativo",
+        impact: "Som sem vida, fadiga auditiva, perda da expressividade musical",
+        frequency_range: "Todas as frequências",
+        adjustment_db: 0, // Ajuste de compressão, não de ganho
+        details: `Dinâmica atual: ${dynamicRange.toFixed(1)}dB (ideal: >8dB)`
       });
     }
 
@@ -1299,17 +1315,45 @@ class AudioAnalyzer {
     if (lufsIntegrated !== null && Number.isFinite(lufsIntegrated)) {
       if (lufsIntegrated >= -16 && lufsIntegrated <= -13) {
         analysis.suggestions.push({
-          type: 'mastering',
-          message: 'Nível ideal para streaming (-14 LUFS)',
-          action: `Seu áudio está no volume ideal para plataformas digitais (${lufsIntegrated.toFixed(1)} LUFS)`
+          type: 'mastering_optimal',
+          message: `Volume ideal para streaming`,
+          action: `Seu áudio está no volume ideal para plataformas digitais`,
+          explanation: "LUFS entre -14 e -16 é o padrão para Spotify, YouTube e Apple Music",
+          impact: "Mantém dinâmica e evita limitação excessiva das plataformas",
+          frequency_range: "N/A",
+          adjustment_db: 0
+        });
+      } else if (lufsIntegrated < -16) {
+        analysis.suggestions.push({
+          type: 'mastering_volume_low',
+          message: `Volume baixo para streaming`,
+          action: `Aumentar volume para -14 LUFS`,
+          explanation: "Áudio muito baixo pode soar fraco comparado a outras músicas",
+          impact: "Usuários vão precisar aumentar o volume manualmente",
+          frequency_range: "N/A",
+          adjustment_db: Math.abs(lufsIntegrated + 14)
+        });
+      } else if (lufsIntegrated > -13) {
+        analysis.suggestions.push({
+          type: 'mastering_volume_high',
+          message: `Volume alto demais`,
+          action: `Reduzir volume para -14 LUFS`,
+          explanation: "Plataformas irão reduzir o volume automaticamente",
+          impact: "Perda de dinâmica e compressão adicional das plataformas",
+          frequency_range: "N/A",
+          adjustment_db: -(lufsIntegrated + 14)
         });
       }
     } else if (rms > -16 && rms < -12) {
-      // Fallback para RMS quando LUFS não disponível (com aviso)
+      // Fallback para RMS quando LUFS não disponível 
       analysis.suggestions.push({
-        type: 'mastering',
-        message: 'Volume adequado (estimativa via RMS)',
-        action: `Volume estimado adequado (${rms.toFixed(1)} dB RMS - LUFS não calculado)`
+        type: 'mastering_rms_ok',
+        message: 'Volume adequado (baseado em RMS)',
+        action: `Volume estimado adequado via RMS`,
+        explanation: "Análise via RMS é menos precisa que LUFS mas indica nível aceitável",
+        impact: "Para resultados mais precisos, use medição LUFS",
+        frequency_range: "N/A",
+        adjustment_db: 0
       });
     }
 
@@ -1330,16 +1374,24 @@ class AudioAnalyzer {
       // Análise principal baseada no centroide espectral
       if (spectralCentroid < thresholds.veryDark) {
         analysis.suggestions.push({
-          type: 'low_end_excess',
-          message: `Excesso de graves (Centroide: ${Math.round(spectralCentroid)}Hz)`,
-          action: `Reduzir 60-200Hz (-2 a -4dB) ou usar high-pass suave`
+          type: 'frequency_low_excess',
+          message: `Excesso de graves detectado`,
+          action: `Reduzir graves para equilibrar o som`,
+          explanation: "Centroide espectral muito baixo indica dominância excessiva de graves",
+          impact: "Som abafado, perda de clareza, mascaramento dos médios",
+          frequency_range: "60–200 Hz",
+          adjustment_db: -3
         });
       } 
       else if (spectralCentroid < thresholds.dark) {
         analysis.suggestions.push({
-          type: 'highs_deficient',
-          message: `Som escuro - agudos insuficientes (${Math.round(spectralCentroid)}Hz)`,
-          action: `Adicionar presença em 3-6kHz (+2 a +3dB) e brilho em 10kHz (+1 a +2dB)`
+          type: 'frequency_highs_deficient',
+          message: `Agudos insuficientes - som escuro`,
+          action: `Adicionar presença e brilho`,
+          explanation: "Falta de energia nas frequências altas deixa o som abafado",
+          impact: "Som sem vida, falta de clareza e espacialidade",
+          frequency_range: "3–6 kHz, 10 kHz",
+          adjustment_db: 2.5
         });
       }
       else if (spectralCentroid >= thresholds.balanced_low && spectralCentroid <= thresholds.balanced_high) {
@@ -1348,16 +1400,24 @@ class AudioAnalyzer {
       }
       else if (spectralCentroid > thresholds.bright) {
         analysis.suggestions.push({
-          type: 'highs_excess',
-          message: `Som muito brilhante (Centroide: ${Math.round(spectralCentroid)}Hz)`,
-          action: `Reduzir 8-12kHz (-1 a -3dB), verificar sibilância em 6-8kHz`
+          type: 'frequency_highs_excess',
+          message: `Excesso de agudos - som muito brilhante`,
+          action: `Suavizar frequências altas`,
+          explanation: "Centroide espectral elevado indica excesso de energia nos agudos",
+          impact: "Som cansativo, sibilância excessiva, fadiga auditiva",
+          frequency_range: "6–10 kHz",
+          adjustment_db: -2
         });
       }
       else if (spectralCentroid > thresholds.balanced_high) {
         analysis.suggestions.push({
-          type: 'bass_deficient',
-          message: `Falta de corpo/graves (Centroide: ${Math.round(spectralCentroid)}Hz)`,
-          action: `Reforçar 100-500Hz (+2 a +4dB) para adicionar corpo`
+          type: 'frequency_bass_deficient',
+          message: `Falta de corpo e graves`,
+          action: `Reforçar graves e médios graves`,
+          explanation: "Centroide espectral alto demais indica falta de energia nos graves",
+          impact: "Som fino, sem peso, falta de groove e presença física",
+          frequency_range: "100–500 Hz",
+          adjustment_db: 3
         });
       }
 
@@ -1498,6 +1558,10 @@ class AudioAnalyzer {
 
     // JSON estruturado otimizado
     try {
+      // Deduplicação de sugestões por tipo - apenas uma por problema
+      const deduplicatedSuggestions = this._deduplicateByType(sugList);
+      const deduplicatedProblems = this._deduplicateByType(analysis.problems || []);
+      
       const data = {
         metrics: {
           peak: td.peak,
@@ -1513,8 +1577,25 @@ class AudioAnalyzer {
         },
         score: analysis.mixScore?.scorePct,
         classification: analysis.mixScore?.classification,
-        suggestions: (window.convertSuggestionsToFriendly && window.convertSuggestionsToFriendly(sugList.map(s => ({ type: s.type, message: s.message, action: s.action })))) || sugList.map(s => ({ type: s.type, message: s.message, action: s.action })),
-        problems: analysis.problems?.map(p => ({ type: p.type, message: p.message, solution: p.solution })) || []
+        suggestions: deduplicatedSuggestions.map(s => ({ 
+          type: s.type, 
+          message: s.message, 
+          action: s.action,
+          frequency_range: s.frequency_range,
+          adjustment_db: s.adjustment_db,
+          impact: s.impact,
+          explanation: s.explanation
+        })),
+        problems: deduplicatedProblems.map(p => ({ 
+          type: p.type, 
+          message: p.message, 
+          solution: p.solution,
+          explanation: p.explanation,
+          impact: p.impact,
+          frequency_range: p.frequency_range,
+          adjustment_db: p.adjustment_db,
+          details: p.details
+        }))
       };
       
       // Remove propriedades null/undefined para economizar espaço
@@ -1526,6 +1607,49 @@ class AudioAnalyzer {
     } catch {}
 
     return prompt;
+  }
+
+  // Função para dedupilcar sugestões/problemas por tipo
+  _deduplicateByType(items) {
+    const seen = new Map();
+    const deduplicated = [];
+    
+    for (const item of items) {
+      if (!item || !item.type) continue;
+      
+      // Se já existe um item deste tipo, manter o mais detalhado
+      if (seen.has(item.type)) {
+        const existing = seen.get(item.type);
+        // Priorizar item com mais detalhes técnicos
+        const currentScore = this._calculateDetailScore(item);
+        const existingScore = this._calculateDetailScore(existing);
+        
+        if (currentScore > existingScore) {
+          // Substituir na lista
+          const index = deduplicated.findIndex(d => d.type === item.type);
+          if (index !== -1) {
+            deduplicated[index] = item;
+            seen.set(item.type, item);
+          }
+        }
+      } else {
+        seen.set(item.type, item);
+        deduplicated.push(item);
+      }
+    }
+    
+    return deduplicated;
+  }
+
+  // Calcular score de detalhamento técnico
+  _calculateDetailScore(item) {
+    let score = 0;
+    if (item.frequency_range) score += 2;
+    if (item.adjustment_db && item.adjustment_db !== 0) score += 2;
+    if (item.impact) score += 1;
+    if (item.explanation) score += 1;
+    if (item.details) score += 1;
+    return score;
   }
 
   // ====== MATRIX: Métricas por banda e por stem (aprox) ======
@@ -2006,8 +2130,8 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                 if (!Number.isFinite(data.rms_db) || data.rms_db === -Infinity) continue;
                 // Usar valor normalizado se disponível
                 const refTarget = (refBandTargetsNormalized && Number.isFinite(refBandTargetsNormalized[band])) ? refBandTargetsNormalized[band] : refBand.target_db;
-                // TESTE: Usar mesmo cálculo da interface visual (target - atual)
-                const diff = refTarget - data.rms_db;
+                // CORREÇÃO: Usar mesmo cálculo da tabela de referência (atual - target)
+                const diff = data.rms_db - refTarget;
                 // Suporte a tolerância assimétrica: tol_min / tol_max. Compat: usar tol_db se não existirem.
                 const tolMin = Number.isFinite(refBand.tol_min) ? refBand.tol_min : refBand.tol_db;
                 const tolMax = Number.isFinite(refBand.tol_max) ? refBand.tol_max : refBand.tol_db;
@@ -2017,7 +2141,7 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                 if (data.rms_db < lowLimit) status = 'BAIXO'; else if (data.rms_db > highLimit) status = 'ALTO';
                 const outOfRange = status !== 'OK';
                 if (outOfRange) {
-                  // CORREÇÃO: Usar a mesma lógica da interface visual
+                  // CORREÇÃO: Usar a mesma lógica da tabela de referência
                   // diff > 0 = valor atual maior que target = DIMINUIR/CORTAR
                   // diff < 0 = valor atual menor que target = AUMENTAR/BOOST
                   const shouldReduce = diff > 0; // valor atual > target
@@ -2031,13 +2155,106 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                   
                   if (shouldReduce) {
                     // Valor atual > target = precisa reduzir
-                    if (band === 'high_mid') action = `Médios Agudos (2-4kHz) acima do alvo (+${baseMag.toFixed(1)}dB). Considere reduzir ~${Math.min(baseMag, sideTol).toFixed(1)} dB em 2–6 kHz`;
-                    else if (band === 'brilho') action = `Agudos (4-8kHz) acima do alvo (+${baseMag.toFixed(1)}dB). Aplique shelf suave >8–10 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
-                    else if (band === 'presenca') action = `Presença (8-12kHz) acima do ideal (+${baseMag.toFixed(1)}dB). Suavize 3–6 kHz (~${Math.min(baseMag, sideTol).toFixed(1)} dB)`;
-                    else action = `Cortar ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB`;
-                  } else {
+                    if (band === 'high_mid') {
+                      action = `Médios Agudos estão ${baseMag.toFixed(1)}dB acima do ideal`;
+                      var explanation = "Excesso nesta faixa causa harshness e fadiga auditiva";
+                      var impact = "Som áspero, vocais agressivos, cymbals cortantes";
+                      var frequency_range = "2–4 kHz";
+                      var adjustment_db = -baseMag;
+                    }
+                    else if (band === 'brilho') {
+                      action = `Agudos estão ${baseMag.toFixed(1)}dB acima do ideal`;
+                      var explanation = "Excesso de brilho pode causar sibilância excessiva";
+                      var impact = "Som muito brilhante, sibilantes exageradas, fadiga";
+                      var frequency_range = "4–8 kHz";
+                      var adjustment_db = -baseMag;
+                    }
+                    else if (band === 'presenca') {
+                      action = `Presença está ${baseMag.toFixed(1)}dB acima do ideal`;
+                      var explanation = "Excesso de presença torna o som artificial e cansativo";
+                      var impact = "Vocais muito na frente, instrumentos artificiais";
+                      var frequency_range = "8–12 kHz";
+                      var adjustment_db = -baseMag;
+                    }
+                    else if (band === 'low_bass') {
+                      action = `Bass está ${baseMag.toFixed(1)}dB acima do ideal`;
+                      var explanation = "Excesso de graves causa perda de definição e mascaramento";
+                      var impact = "Som confuso, perda de punch, mascaramento dos médios";
+                      var frequency_range = "60–200 Hz";
+                      var adjustment_db = -baseMag;
+                    }
+                    else if (band === 'mid_bass') {
+                      action = `Médios Graves estão ${baseMag.toFixed(1)}dB acima do ideal`;
+                      var explanation = "Excesso nesta região causa 'muddy sound' (som enlameado)";
+                      var impact = "Som abafado, instrumentos sem clareza, mix confuso";
+                      var frequency_range = "200–500 Hz";
+                      var adjustment_db = -baseMag;
+                    }
+                    else if (band === 'mid') {
+                      action = `Médios estão ${baseMag.toFixed(1)}dB acima do ideal`;
+                      var explanation = "Excesso de médios deixa o som entediante e sem vida";
+                      var impact = "Som monótono, vocais abafados, falta de dinâmica";
+                      var frequency_range = "500 Hz–2 kHz";
+                      var adjustment_db = -baseMag;
+                    }
+                    else {
+                      action = `${band} precisa ser reduzido em ${baseMag.toFixed(1)}dB`;
+                      var explanation = "Nível acima do recomendado para o gênero";
+                      var impact = "Desequilíbrio tonal geral";
+                      var frequency_range = "N/A";
+                      var adjustment_db = -baseMag;
+                    }
+                  } else if (shouldBoost) {
                     // Valor atual < target = precisa aumentar
-                    action = `Boost ${band} em ~${Math.min(baseMag, sideTol).toFixed(1)}dB`;
+                    if (band === 'high_mid') {
+                      action = `Médios Agudos estão ${baseMag.toFixed(1)}dB abaixo do ideal`;
+                      var explanation = "Falta de definição e clareza na região de presença vocal";
+                      var impact = "Vocais distantes, falta de inteligibilidade, som sem vida";
+                      var frequency_range = "2–4 kHz";
+                      var adjustment_db = baseMag;
+                    }
+                    else if (band === 'brilho') {
+                      action = `Agudos estão ${baseMag.toFixed(1)}dB abaixo do ideal`;
+                      var explanation = "Falta de brilho e air deixa o som sem abertura";
+                      var impact = "Som abafado, cymbals sem crisp, falta de espacialidade";
+                      var frequency_range = "4–8 kHz";
+                      var adjustment_db = baseMag;
+                    }
+                    else if (band === 'presenca') {
+                      action = `Presença está ${baseMag.toFixed(1)}dB abaixo do ideal`;
+                      var explanation = "Falta de presença reduz a proximidade e intimidade";
+                      var impact = "Instrumentos distantes, falta de conexão emocional";
+                      var frequency_range = "8–12 kHz";
+                      var adjustment_db = baseMag;
+                    }
+                    else if (band === 'low_bass') {
+                      action = `Bass está ${baseMag.toFixed(1)}dB abaixo do ideal`;
+                      var explanation = "Falta de fundação graves reduz o impacto e energia";
+                      var impact = "Som fraco, sem peso, falta de groove e energia";
+                      var frequency_range = "60–200 Hz";
+                      var adjustment_db = baseMag;
+                    }
+                    else if (band === 'mid_bass') {
+                      action = `Médios Graves estão ${baseMag.toFixed(1)}dB abaixo do ideal`;
+                      var explanation = "Falta de corpo e warmth na região fundamental";
+                      var impact = "Som fino, instrumentos sem corpo, falta de calor";
+                      var frequency_range = "200–500 Hz";
+                      var adjustment_db = baseMag;
+                    }
+                    else if (band === 'mid') {
+                      action = `Médios estão ${baseMag.toFixed(1)}dB abaixo do ideal`;
+                      var explanation = "Falta de preenchimento na região mais importante para audição";
+                      var impact = "Som oco, vocais distantes, falta de corpo geral";
+                      var frequency_range = "500 Hz–2 kHz";
+                      var adjustment_db = baseMag;
+                    }
+                    else {
+                      action = `${band} precisa ser aumentado em ${baseMag.toFixed(1)}dB`;
+                      var explanation = "Nível abaixo do recomendado para o gênero";
+                      var impact = "Desequilíbrio tonal geral";
+                      var frequency_range = "N/A";
+                      var adjustment_db = baseMag;
+                    }
                   }
                   const key = `band:${band}`;
                   if (!existingKeys.has(key)) {
@@ -2051,9 +2268,13 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                     sug.push({
                       type: 'band_adjust',
                       _bandKey: key,
-                      message: `Banda ${statusMessage}`,
+                      message: `${friendlyBandName}: ${statusMessage}`,
                       action: action.replace(new RegExp(`\\b${band}\\b`, 'gi'), friendlyBandName),
-                      details: `Valor ${data.rms_db.toFixed(2)}dB vs alvo ${refTarget.toFixed(2)}dB | dif ${diff>0?'+':''}${diff.toFixed(2)}dB | limites [${(refTarget-tolMin).toFixed(2)}, ${(refTarget+tolMax).toFixed(2)}] (${severity})${rangeTxt}${refBandTargetsNormalized?' • escala normalizada':''}`
+                      explanation: explanation || "Ajuste necessário para equilibrio tonal",
+                      impact: impact || "Afeta o balanço geral da mixagem",
+                      frequency_range: frequency_range || "N/A",
+                      adjustment_db: adjustment_db || 0,
+                      details: `Atual: ${data.rms_db.toFixed(1)}dB | Alvo: ${refTarget.toFixed(1)}dB | Diferença: ${diff>0?'+':''}${diff.toFixed(1)}dB`
                     });
                     existingKeys.add(key);
                     addedCount++;
@@ -2279,19 +2500,8 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
           
           if (has && !should) {
             baseAnalysis.problems = probs.filter(p=>p.type!=='clipping');
-          } else if (!has && should) {
-            let details = [];
-            if (hasClippingByTruePeak) details.push(`TruePeak: ${tp.toFixed(2)}dBTP`);
-            if (hasClippingByPeak) details.push(`Peak: ${peak.toFixed(2)}dB`);
-            if (hasClippingBySamples) details.push(`${clipSamples} samples`);
-            
-            probs.push({
-              type:'clipping', 
-              severity:'high', 
-              message:`Clipping detectado - ${details.join(', ')}`, 
-              solution:'Reduza ganho / limite picos'
-            });
           }
+          // Nota: Clipping será gerado pela função principal generateTechnicalProblems() com formato melhorado
         } catch {}
         // LUFS ST plausível
         if (Number.isFinite(tdv.lufsIntegrated) && Number.isFinite(tdv.lufsShortTerm) && Math.abs(tdv.lufsShortTerm - tdv.lufsIntegrated) > 25) {

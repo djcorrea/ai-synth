@@ -34,70 +34,313 @@
     left: 0;
     width: 100%;
 
-/* Sugestões Cirúrgicas */
-.suggestion-card.surgical_eq {
-    border-left: 4px solid #ff6b6b;
-    background: linear-gradient(135deg, rgba(255, 107, 107, 0.05), rgba(255, 61, 0, 0.05));
+/* ============ 🎨 ENHANCED CARDS DESIGN ============ */
+
+/* Enhanced Card Container */
+.enhanced-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    position: relative;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    overflow: hidden;
 }
 
-.surgical-header {
+.enhanced-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--card-accent-color, linear-gradient(90deg, #00d4ff, #0096cc));
+    border-radius: 16px 16px 0 0;
+}
+
+.enhanced-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 212, 255, 0.15);
+    border-color: rgba(255,255,255,0.2);
+}
+
+/* Card Header */
+.card-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 12px;
 }
 
+.card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1.3;
+}
+
+.card-badges {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Frequency Badge */
 .frequency-badge {
     background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-.severity-badge {
-    padding: 2px 8px;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 500;
-    text-transform: uppercase;
-}
-
-.severity-badge.leve {
-    background: rgba(255, 193, 7, 0.2);
-    color: #ff8f00;
-    border: 1px solid rgba(255, 193, 7, 0.3);
-}
-
-.severity-badge.moderada {
-    background: rgba(255, 152, 0, 0.2);
-    color: #ff6d00;
-    border: 1px solid rgba(255, 152, 0, 0.3);
-}
-
-.severity-badge.alta {
-    background: rgba(244, 67, 54, 0.2);
-    color: #d32f2f;
-    border: 1px solid rgba(244, 67, 54, 0.3);
-}
-
-.surgical-header + .context {
+    padding: 6px 12px;
+    border-radius: 20px;
     font-size: 13px;
-    color: #666;
-    margin-bottom: 6px;
-    font-style: italic;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.surgical-header + .context + .action {
-    background: rgba(0, 255, 255, 0.1);
-    border: 1px solid rgba(0, 255, 255, 0.2);
-    border-radius: 6px;
-    padding: 8px;
-    font-family: 'Courier New', monospace;
+/* Severity Badges */
+.severity-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid;
+}
+
+.severity-badge.leve { 
+    background: linear-gradient(135deg, #ffeb3b, #ffc107);
+    color: #333;
+    border-color: rgba(255, 193, 7, 0.5);
+}
+
+.severity-badge.moderada { 
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    color: white;
+    border-color: rgba(255, 152, 0, 0.5);
+}
+
+.severity-badge.alta { 
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    color: white;
+    border-color: rgba(244, 67, 54, 0.5);
+}
+
+.severity-badge.severa {
+    background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+    color: white;
+    border-color: rgba(156, 39, 176, 0.5);
+    animation: pulse-severe 2s infinite;
+}
+
+@keyframes pulse-severe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Problem Description */
+.card-description {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #e0e0e0;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    border-left: 3px solid var(--card-accent-color, #00d4ff);
+}
+
+/* Action Section */
+.card-action {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 150, 204, 0.05));
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.card-action-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #00d4ff;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-action-content {
+    font-size: 14px;
+    color: #ffffff;
+    line-height: 1.5;
+}
+
+/* Technical Details */
+.card-technical {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.tech-item {
+    background: rgba(0,0,0,0.3);
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    text-align: center;
+}
+
+.tech-label {
+    font-size: 10px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.tech-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+/* Impact Section */
+.card-impact {
+    padding: 12px 16px;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+
+.card-impact-title {
     font-size: 12px;
+    font-weight: 600;
+    color: #ffc107;
     margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.card-impact-content {
+    font-size: 13px;
+    color: #fff3c4;
+    line-height: 1.4;
+}
+
+/* Card Type Variations */
+.enhanced-card.surgical {
+    --card-accent-color: linear-gradient(90deg, #f44336, #d32f2f);
+}
+
+.enhanced-card.band-adjust {
+    --card-accent-color: linear-gradient(90deg, #2196f3, #1976d2);
+}
+
+.enhanced-card.problem {
+    --card-accent-color: linear-gradient(90deg, #ff9800, #f57c00);
+}
+
+.enhanced-card.clipping {
+    --card-accent-color: linear-gradient(90deg, #e91e63, #c2185b);
+}
+
+.enhanced-card.balance {
+    --card-accent-color: linear-gradient(90deg, #9c27b0, #7b1fa2);
+}
+
+.enhanced-card.critical-alert {
+    --card-accent-color: linear-gradient(90deg, #f44336, #b71c1c);
+    border: 2px solid rgba(244, 67, 54, 0.3);
+    box-shadow: 0 4px 20px rgba(244, 67, 54, 0.2);
+    animation: critical-pulse 3s infinite;
+}
+
+@keyframes critical-pulse {
+    0%, 100% { 
+        border-color: rgba(244, 67, 54, 0.3);
+        box-shadow: 0 4px 20px rgba(244, 67, 54, 0.2);
+    }
+    50% { 
+        border-color: rgba(244, 67, 54, 0.6);
+        box-shadow: 0 8px 30px rgba(244, 67, 54, 0.4);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .enhanced-card {
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .card-title {
+        font-size: 14px;
+    }
+    
+    .card-technical {
+        grid-template-columns: 1fr;
+    }
+    
+    .frequency-badge {
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+}
+
+/* Accessibility Improvements */
+.enhanced-card:focus-within {
+    outline: 2px solid var(--card-accent-color, #00d4ff);
+    outline-offset: 2px;
+}
+
+details summary {
+    transition: color 0.2s ease;
+}
+
+details summary:hover {
+    color: #00d4ff;
+}
+
+details[open] summary {
+    color: #00d4ff;
+    margin-bottom: 8px;
+}
+
+/* Loading Animation for Cards */
+.enhanced-card.loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.enhanced-card.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
 }
 
 .surgical-header + .context + .action + .details {
@@ -1068,6 +1311,17 @@
     font-size: 13px;
     color: rgba(255, 255, 255, 0.6);
     margin-top: 16px;
+}
+
+.audio-modal .format-recommendation {
+    color: #4CAF50 !important;
+    font-size: 12px !important;
+    font-weight: 500;
+    background: rgba(76, 175, 80, 0.1);
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(76, 175, 80, 0.2);
+    margin: 10px 0 !important;
 }
 
 .audio-modal .upload-btn {

@@ -1,54 +1,108 @@
 {
   "funk_mandela": {
-    "version": "v2.0",
-    "generated_at": "2025-08-17T23:47:19.913Z",
+    "version": "2025-08-fixed-flex",
+    "generated_at": "2025-08-18T15:30:00.000Z",
     "num_tracks": 57,
-    "aggregation_method": "linear_domain",
-    "lufs_target": -14,
-    "tol_lufs": 0.5,
-    "true_peak_target": -10.46,
-    "tol_true_peak": 1.77,
-    "dr_target": 7.5,
-    "tol_dr": 1.2,
-    "lra_target": 7.4,
-    "tol_lra": 2.9,
-    "stereo_target": 0.22,
-    "tol_stereo": 0.1,
-    "calor_target": -8.42,
-    "brilho_target": -14.83,
-    "clareza_target": -0.35,
-    "bands": {
-      "sub": {
-        "target_db": -6.7,
-        "tol_db": 1.9
+    "aggregation_method": "hybrid_fixed_flexible",
+    
+    "fixed": {
+      "lufs": {
+        "integrated": {
+          "target": -8.0,
+          "tolerance": 1.0
+        }
       },
-      "low_bass": {
-        "target_db": -8,
-        "tol_db": 2.8
+      "rms": {
+        "policy": "deriveFromLUFS"
       },
-      "upper_bass": {
-        "target_db": -12,
-        "tol_db": 1.6
+      "truePeak": {
+        "streamingMax": -0.3,
+        "baileMax": 0.0
       },
-      "low_mid": {
-        "target_db": -8.4,
-        "tol_db": 2.3
+      "dynamicRange": {
+        "dr": {
+          "target": 8.0,
+          "tolerance": 1.0
+        }
       },
-      "mid": {
-        "target_db": -6.3,
-        "tol_db": 1.4
+      "lowEnd": {
+        "mono": {
+          "cutoffHz": 100
+        }
       },
-      "high_mid": {
-        "target_db": -11.2,
-        "tol_db": 2.1
+      "vocalPresence": {
+        "bandHz": [1000, 4000],
+        "vocalBandMinDeltaDb": -1.5,
+        "note": "garantir audibilidade; não deixar a banda vocal >3 dB abaixo do alvo"
+      }
+    },
+    
+    "flex": {
+      "clipping": {
+        "samplePctMax": 0.02
       },
-      "brilho": {
-        "target_db": -14.8,
-        "tol_db": 1.7
+      "lra": {
+        "min": 1.0,
+        "max": 4.0
       },
-      "presenca": {
-        "target_db": -19.2,
-        "tol_db": 3
+      "stereo": {
+        "width": {
+          "midsHighsTolerance": "wide"
+        }
+      },
+      "tonalCurve": {
+        "bands": [
+          { "name": "sub", "rangeHz": [20, 60], "target_db": -6.7, "toleranceDb": 3.0 },
+          { "name": "low_bass", "rangeHz": [60, 100], "target_db": -8.0, "toleranceDb": 2.5 },
+          { "name": "upper_bass", "rangeHz": [100, 200], "target_db": -12.0, "toleranceDb": 2.5 },
+          { "name": "low_mid", "rangeHz": [200, 500], "target_db": -8.4, "toleranceDb": 2.0 },
+          { "name": "mid", "rangeHz": [500, 2000], "target_db": -6.3, "toleranceDb": 2.0 },
+          { "name": "high_mid", "rangeHz": [2000, 6000], "target_db": -11.2, "toleranceDb": 2.5 },
+          { "name": "brilho", "rangeHz": [6000, 12000], "target_db": -14.8, "toleranceDb": 3.0 },
+          { "name": "presenca", "rangeHz": [12000, 20000], "target_db": -19.2, "toleranceDb": 3.5 }
+        ]
+      }
+    },
+    
+    "notes": "Manter demais métricas como estão; este gênero aceita clipping controlado e abertura estéreo mais agressiva em médios/agudos.",
+    
+    "legacy_compatibility": {
+      "lufs_target": -8,
+      "tol_lufs": 1,
+      "tol_lufs_min": 1,
+      "tol_lufs_max": 1,
+      "true_peak_target": -0.3,
+      "tol_true_peak": 0.3,
+      "true_peak_streaming_max": -0.3,
+      "true_peak_baile_max": 0.0,
+      "dr_target": 8,
+      "tol_dr": 1,
+      "lra_target": 2.5,
+      "lra_min": 1.0,
+      "lra_max": 4.0,
+      "tol_lra": 1.5,
+      "stereo_target": 0.22,
+      "tol_stereo": 0.2,
+      "stereo_width_mids_highs_tolerance": "wide",
+      "low_end_mono_cutoff": 100,
+      "clipping_sample_pct_max": 0.02,
+      "vocal_band_min_delta": -1.5,
+      "calor_target": -8.42,
+      "brilho_target": -14.83,
+      "clareza_target": -0.35,
+      "pattern_rules": {
+        "hard_constraints": ["lufs", "truePeak", "dynamicRange", "lowEnd", "vocalPresence"],
+        "soft_constraints": ["clipping", "lra", "stereo", "tonalCurve"]
+      },
+      "bands": {
+        "sub": { "target_db": -6.7, "tol_db": 3.0, "severity": "soft" },
+        "low_bass": { "target_db": -8, "tol_db": 2.5, "severity": "soft" },
+        "upper_bass": { "target_db": -12, "tol_db": 2.5, "severity": "soft" },
+        "low_mid": { "target_db": -8.4, "tol_db": 2.0, "severity": "soft" },
+        "mid": { "target_db": -6.3, "tol_db": 2.0, "severity": "hard", "vocal_presence_range": true },
+        "high_mid": { "target_db": -11.2, "tol_db": 2.5, "severity": "soft" },
+        "brilho": { "target_db": -14.8, "tol_db": 3.0, "severity": "soft" },
+        "presenca": { "target_db": -19.2, "tol_db": 3.5, "severity": "hard", "vocal_presence_range": true }
       }
     }
   }

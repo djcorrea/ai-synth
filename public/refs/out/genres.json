@@ -1,7 +1,7 @@
 {
   "genres": [
     { "key": "trance", "label": "Trance" },
-    { "key": "funk_mandela", "label": "Funk Mandela" },
+  { "key": "funk_mandela", "label": "Funk Mandela" },
     { "key": "funk_bruxaria", "label": "Funk Bruxaria" },
     { "key": "eletronico", "label": "Eletrônico" },
     { "key": "eletrofunk", "label": "Eletrofunk" },

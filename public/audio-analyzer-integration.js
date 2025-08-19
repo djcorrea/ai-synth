@@ -16,9 +16,9 @@ if (typeof window !== 'undefined' && !window.SuggestionTextGenerator) {
 }
 
 // Debug flag (silencia logs em produção; defina window.DEBUG_ANALYZER = true para habilitar)
-const __DEBUG_ANALYZER__ = (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true);
-const __dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log(...a); };
-const __dwrn = (...a) => { if (__DEBUG_ANALYZER__) console.warn(...a); };
+const __DEBUG_ANALYZER__ = true; // 🔧 TEMPORÁRIO: Ativado para debug do problema
+const __dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log('[AUDIO-DEBUG]', ...a); };
+const __dwrn = (...a) => { if (__DEBUG_ANALYZER__) console.warn('[AUDIO-WARN]', ...a); };
 
 let currentModalAnalysis = null;
 let __audioIntegrationInitialized = false; // evita listeners duplicados
@@ -105,6 +105,7 @@ function enrichReferenceObject(refObj, genreKey) {
 }
 
 // Fallback embutido inline para evitar 404 em produção
+// 🎛️ ATUALIZADO: Funk Mandela 2025-08-fixed-flex (18/08/2025) - Estrutura Fixed/Flex Implementada
 const __INLINE_EMBEDDED_REFS__ = {
     manifest: { genres: [
         { key: 'trance', label: 'Trance' },
@@ -117,8 +118,43 @@ const __INLINE_EMBEDDED_REFS__ = {
     ]},
     byGenre: {
         trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:2.5}, low_bass:{target_db:-14.6,tol_db:4.3}, upper_bass:{target_db:-14.8,tol_db:2.5}, low_mid:{target_db:-12.6,tol_db:3.7}, mid:{target_db:-12,tol_db:4.0}, high_mid:{target_db:-20.2,tol_db:3.6}, brilho:{target_db:-24.7,tol_db:2.5}, presenca:{target_db:-32.1,tol_db:3.6} } },
-    // Perfil corrigido Funk Mandela v2.0 (57 faixas) - Agregação Linear Domain
-    funk_mandela:   { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -10.46, tol_true_peak: 1.77, dr_target: 7.5, tol_dr: 1.2, lra_target: 7.4, tol_lra: 2.9, stereo_target: 0.22, tol_stereo: 0.1, bands: { sub:{target_db:-6.7,tol_db:3.4}, low_bass:{target_db:-8.0,tol_db:4.3}, upper_bass:{target_db:-12.0,tol_db:3.1}, low_mid:{target_db:-8.4,tol_db:3.8}, mid:{target_db:-6.3,tol_db:2.9}, high_mid:{target_db:-11.2,tol_db:3.6}, brilho:{target_db:-14.8,tol_db:3.2}, presenca:{target_db:-19.2,tol_db:4.5} } },
+    // Perfil atualizado Funk Mandela 2025-08-fixed-flex - Padrões Fixos + Flexíveis estruturados
+    funk_mandela:   { 
+        version: "2025-08-fixed-flex", 
+        lufs_target: -8, tol_lufs: 1, tol_lufs_min: 1, tol_lufs_max: 1, 
+        true_peak_target: -0.3, tol_true_peak: 0.3, true_peak_streaming_max: -0.3, true_peak_baile_max: 0.0, 
+        dr_target: 8, tol_dr: 1, 
+        lra_target: 2.5, lra_min: 1.0, lra_max: 4.0, tol_lra: 1.5, 
+        stereo_target: 0.22, tol_stereo: 0.2, stereo_width_mids_highs_tolerance: "wide", 
+        low_end_mono_cutoff: 100, clipping_sample_pct_max: 0.02, vocal_band_min_delta: -1.5,
+        fixed: {
+            lufs: { integrated: { target: -8.0, tolerance: 1.0 } },
+            rms: { policy: "deriveFromLUFS" },
+            truePeak: { streamingMax: -0.3, baileMax: 0.0 },
+            dynamicRange: { dr: { target: 8.0, tolerance: 1.0 } },
+            lowEnd: { mono: { cutoffHz: 100 } },
+            vocalPresence: { bandHz: [1000, 4000], vocalBandMinDeltaDb: -1.5 }
+        },
+        flex: {
+            clipping: { samplePctMax: 0.02 },
+            lra: { min: 1.0, max: 4.0 },
+            stereo: { width: { midsHighsTolerance: "wide" } }
+        },
+        pattern_rules: { 
+            hard_constraints: ["lufs", "truePeak", "dynamicRange", "lowEnd", "vocalPresence"], 
+            soft_constraints: ["clipping", "lra", "stereo", "tonalCurve"] 
+        }, 
+        bands: { 
+            sub:{target_db:-6.7,tol_db:3.0,severity:"soft"}, 
+            low_bass:{target_db:-8.0,tol_db:2.5,severity:"soft"}, 
+            upper_bass:{target_db:-12.0,tol_db:2.5,severity:"soft"}, 
+            low_mid:{target_db:-8.4,tol_db:2.0,severity:"soft"}, 
+            mid:{target_db:-6.3,tol_db:2.0,severity:"hard",vocal_presence_range:true}, 
+            high_mid:{target_db:-11.2,tol_db:2.5,severity:"soft"}, 
+            brilho:{target_db:-14.8,tol_db:3.0,severity:"soft"}, 
+            presenca:{target_db:-19.2,tol_db:3.5,severity:"hard",vocal_presence_range:true} 
+        } 
+    },
         funk_bruxaria:  { lufs_target: -10, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
         eletronico:     { lufs_target: -12, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 8, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
         eletrofunk:     { lufs_target: -9,  tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.12, tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
@@ -186,7 +222,20 @@ async function fetchRefJsonWithFallback(paths) {
             });
             if (res.ok) {
                 if (__DEBUG_ANALYZER__) console.log('[refs] OK:', p);
-                return await res.json();
+                
+                // Verificar se a resposta tem conteúdo JSON válido
+                const text = await res.text();
+                if (text.trim()) {
+                    try {
+                        return JSON.parse(text);
+                    } catch (jsonError) {
+                        console.warn('[refs] JSON inválido em', p, ':', text.substring(0, 100));
+                        throw new Error(`JSON inválido em ${p}`);
+                    }
+                } else {
+                    console.warn('[refs] Resposta vazia em', p);
+                    throw new Error(`Resposta vazia em ${p}`);
+                }
             } else {
                 if (__DEBUG_ANALYZER__) console.warn('[refs] Falha', res.status, 'em', p);
                 lastErr = new Error(`HTTP ${res.status} @ ${p}`);
@@ -621,11 +670,28 @@ function closeAudioModal() {
         modal.style.display = 'none';
         currentModalAnalysis = null;
         resetModalState();
+        
+        // 🔧 CORREÇÃO: Garantir que o modal pode ser usado novamente
+        // Limpar cache de arquivos para forçar novo processamento
+        const fileInput = document.getElementById('modalAudioFileInput');
+        if (fileInput) {
+            fileInput.value = ''; // Limpar input para permitir re-seleção do mesmo arquivo
+        }
+        
+        // Resetar flags globais para próxima análise
+        if (typeof window !== 'undefined') {
+            delete window.__AUDIO_ADVANCED_READY__;
+            delete window.__MODAL_ANALYSIS_IN_PROGRESS__;
+        }
+        
+        __dbg('✅ Modal resetado e pronto para próxima análise');
     }
 }
 
 // 🔄 Reset estado do modal
 function resetModalState() {
+    __dbg('🔄 Resetando estado do modal...');
+    
     // Mostrar área de upload
     const uploadArea = document.getElementById('audioUploadArea');
     const loading = document.getElementById('audioAnalysisLoading');
@@ -637,7 +703,26 @@ function resetModalState() {
     
     // Reset progress
     const progressFill = document.getElementById('audioProgressFill');
+    const progressText = document.getElementById('audioProgressText');
     if (progressFill) progressFill.style.width = '0%';
+    if (progressText) progressText.textContent = '';
+    
+    // 🔧 CORREÇÃO: Limpar análise anterior e flags
+    currentModalAnalysis = null;
+    
+    // Limpar input de arquivo para permitir re-seleção
+    const fileInput = document.getElementById('modalAudioFileInput');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    
+    // Limpar flags globais
+    if (typeof window !== 'undefined') {
+        delete window.__AUDIO_ADVANCED_READY__;
+        delete window.__MODAL_ANALYSIS_IN_PROGRESS__;
+    }
+    
+    __dbg('✅ Estado do modal resetado completamente');
 }
 
 // ⚙️ Configurar modal de áudio
@@ -710,27 +795,58 @@ function setupAudioModal() {
 async function handleModalFileSelection(file) {
     __dbg('📁 Arquivo selecionado no modal:', file.name);
     
-    // Validar tipo de arquivo
-    if (!file.type.startsWith('audio/')) {
-        showModalError('Por favor, selecione um arquivo de áudio válido.');
-        return;
-    }
-    
-    // Validar tamanho (max 20MB)
-    if (file.size > 20 * 1024 * 1024) {
-        showModalError('Arquivo muito grande. Tamanho máximo: 20MB');
+    // 🔧 CORREÇÃO: Prevenir múltiplas análises simultâneas
+    if (typeof window !== 'undefined' && window.__MODAL_ANALYSIS_IN_PROGRESS__) {
+        __dbg('⚠️ Análise já em progresso, ignorando nova seleção');
         return;
     }
     
     try {
-        // Mostrar loading com progresso detalhado
+        // Marcar análise em progresso
+        if (typeof window !== 'undefined') {
+            window.__MODAL_ANALYSIS_IN_PROGRESS__ = true;
+        }
+        
+        // Configuração de upload (aumentado para 60MB)
+        const MAX_UPLOAD_MB = 60;
+        const MAX_UPLOAD_SIZE = MAX_UPLOAD_MB * 1024 * 1024;
+        
+        // Formatos aceitos: WAV, FLAC, MP3 (simplificado)
+        const allowedTypes = ['audio/wav', 'audio/flac', 'audio/mpeg', 'audio/mp3'];
+        const allowedExtensions = ['.wav', '.flac', '.mp3'];
+        
+        // Validar tipo de arquivo
+        const isValidType = allowedTypes.includes(file.type.toLowerCase()) || 
+                           allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+        
+        if (!isValidType) {
+            showModalError(`Formato não suportado. Apenas WAV, FLAC e MP3 são aceitos.
+                          💡 Prefira WAV ou FLAC para maior precisão na análise.`);
+            return;
+        }
+        
+        // Validar tamanho (novo limite: 60MB)
+        if (file.size > MAX_UPLOAD_SIZE) {
+            const sizeInMB = (file.size / 1024 / 1024).toFixed(1);
+            showModalError(`Arquivo muito grande: ${sizeInMB}MB. 
+                          Limite máximo: ${MAX_UPLOAD_MB}MB.`);
+            return;
+        }
+        
+        // Mostrar recomendação para MP3
+        if (file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3')) {
+            console.log('💡 MP3 detectado - Recomendação: Use WAV ou FLAC para maior precisão');
+        }
+        
+        // 🔧 CORREÇÃO: Sempre mostrar loading primeiro, mesmo se já houve análise anterior
+        __dbg('🔄 Iniciando nova análise - forçando exibição do loading');
         showModalLoading();
         updateModalProgress(10, '⚡ Carregando Algoritmos Avançados...');
         
         // Aguardar audio analyzer carregar se necessário
         if (!window.audioAnalyzer) {
             __dbg('⏳ Aguardando Audio Analyzer carregar...');
-            updateModalProgress(20, '🔧 Inicializando V2 Engine...');
+            updateModalProgress(30, '🔧 Inicializando V2 Engine...');
             await waitForAudioAnalyzer();
         }
 
@@ -771,11 +887,23 @@ async function handleModalFileSelection(file) {
             };
             __dbg('🛰️ [Telemetry] Front antes de preencher modal (existência de elementos):', exists);
             displayModalResults(analysis);
+            
+            // 🔧 CORREÇÃO: Limpar flag de análise em progresso após sucesso
+            if (typeof window !== 'undefined') {
+                delete window.__MODAL_ANALYSIS_IN_PROGRESS__;
+            }
+            __dbg('✅ Análise concluída com sucesso - flag removida');
         }, 800);
         
     } catch (error) {
         console.error('❌ Erro na análise do modal:', error);
         showModalError(`Erro ao analisar arquivo: ${error.message}`);
+    } finally {
+        // 🔧 CORREÇÃO: Sempre limpar flag de análise em progresso
+        if (typeof window !== 'undefined') {
+            delete window.__MODAL_ANALYSIS_IN_PROGRESS__;
+        }
+        __dbg('✅ Flag de análise em progresso removida');
     }
 }
 
@@ -854,16 +982,31 @@ function showModalError(message) {
 
 // �🔄 Mostrar loading no modal
 function showModalLoading() {
+    __dbg('🔄 Exibindo tela de loading no modal...');
+    
     const uploadArea = document.getElementById('audioUploadArea');
     const loading = document.getElementById('audioAnalysisLoading');
     const results = document.getElementById('audioAnalysisResults');
     
-    if (uploadArea) uploadArea.style.display = 'none';
-    if (results) results.style.display = 'none';
-    if (loading) loading.style.display = 'block';
+    // 🔧 CORREÇÃO: Garantir que o loading seja exibido corretamente
+    if (uploadArea) {
+        uploadArea.style.display = 'none';
+        __dbg('✅ Upload area ocultada');
+    }
+    if (results) {
+        results.style.display = 'none';
+        __dbg('✅ Results area ocultada');
+    }
+    if (loading) {
+        loading.style.display = 'block';
+        __dbg('✅ Loading area exibida');
+    } else {
+        __dbg('❌ Elemento audioAnalysisLoading não encontrado!');
+    }
     
     // Reset progress
     updateModalProgress(0, '🔄 Inicializando Engine de Análise...');
+    __dbg('✅ Progresso resetado e loading configurado');
 }
 
 // 📈 Simular progresso
@@ -1167,57 +1310,9 @@ function displayModalResults(analysis) {
                         }
                     }
                     
-                    // 🚨 VERIFICAR SE É UM AVISO CRÍTICO
-                    if (didacticText?.isCritical) {
-                        return `
-                            <div class="diag-item critical enhanced didactic-card" style="border-left: 4px solid #F44336; background: rgba(244, 67, 54, 0.1); min-height: auto; padding: 12px;">
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                    <div style="flex: 1; font-weight: 700; font-size: 14px; color: #F44336;">${didacticText.title}</div>
-                                    <span style="background: #F44336; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;">CRÍTICO</span>
-                                </div>
-                                <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #ff6b6b; font-weight: 500;">
-                                    ${didacticText.explanation}
-                                </div>
-                                <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(244, 67, 54, 0.15); border-radius: 4px; border-left: 3px solid #F44336;">
-                                    <strong>🚨 Ação Urgente:</strong> ${didacticText.action}
-                                </div>
-                                <div class="didactic-rationale" style="font-size: 11px; opacity: 0.9; font-style: italic; margin: 8px 0; padding: 6px; background: rgba(244, 67, 54, 0.05); border-radius: 3px;">
-                                    <strong>⚠️ Por que é crítico:</strong> ${didacticText.rationale}
-                                </div>
-                                <div class="didactic-technical" style="font-size: 10px; opacity: 0.8; margin-top: 8px; padding: 4px; background: rgba(0,0,0,0.3); border-radius: 3px; font-family: monospace;">
-                                    🔍 ${didacticText.technical}
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
-                    // 🔍 VERIFICAR SE É UMA INCONSISTÊNCIA
-                    if (didacticText?.isInconsistent) {
-                        return `
-                            <div class="diag-item inconsistent enhanced didactic-card" style="border-left: 4px solid #FF9800; background: rgba(255, 152, 0, 0.1); min-height: auto; padding: 12px;">
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                    <div style="flex: 1; font-weight: 700; font-size: 14px; color: #FF9800;">${didacticText.title}</div>
-                                    <span style="background: #FF9800; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;">SUSPEITO</span>
-                                </div>
-                                <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #F57C00; font-weight: 500;">
-                                    ${didacticText.explanation}
-                                </div>
-                                <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(255, 152, 0, 0.15); border-radius: 4px; border-left: 3px solid #FF9800;">
-                                    <strong>⚠️ Ação Recomendada:</strong> ${didacticText.action}
-                                </div>
-                                <div class="didactic-rationale" style="font-size: 11px; opacity: 0.9; font-style: italic; margin: 8px 0; padding: 6px; background: rgba(255, 152, 0, 0.05); border-radius: 3px;">
-                                    <strong>🔍 Por que é suspeito:</strong> ${didacticText.rationale}
-                                </div>
-                                <div class="didactic-technical" style="font-size: 10px; opacity: 0.8; margin-top: 8px; padding: 4px; background: rgba(0,0,0,0.3); border-radius: 3px; font-family: monospace;">
-                                    ⚠️ ${didacticText.technical}
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
                     // Usar texto didático se disponível, senão usar texto original
                     const title = didacticText?.title || sug.message || '';
-                    const explanation = didacticText?.explanation || '';
+                    const explanation = didacticText?.explanation || sug.explanation || '';
                     const action = didacticText?.action || sug.action || '';
                     const rationale = didacticText?.rationale || '';
                     const technical = didacticText?.technical || sug.details || '';
@@ -1225,77 +1320,262 @@ function displayModalResults(analysis) {
                     // 🎯 SISTEMA MELHORADO: Verificar se tem informações de severidade e prioridade
                     const hasEnhancedInfo = sug.severity && sug.priority;
                     const severityColor = hasEnhancedInfo ? sug.severity.color : '#9fb3d9';
+                    const severityLevel = hasEnhancedInfo ? sug.severity.level : 'medium';
                     const severityLabel = hasEnhancedInfo ? sug.severity.label : '';
                     const priority = hasEnhancedInfo ? sug.priority : 0;
                     const confidence = hasEnhancedInfo ? sug.confidence : 1;
                     
-                    // Detectar sugestões cirúrgicas
+                    // Detectar tipo de sugestão
                     const isSurgical = sug.type === 'surgical_eq' || (sug.subtype && ['sibilance', 'harshness', 'clipping'].includes(sug.subtype));
+                    const isBandAdjust = sug.type === 'band_adjust';
+                    const isClipping = sug.type === 'clipping' || title.toLowerCase().includes('clipping');
+                    const isBalance = sug.type === 'balance' || title.toLowerCase().includes('balance');
+                    
+                    // Determinar classe do card
+                    let cardClass = 'enhanced-card';
+                    if (isSurgical) cardClass += ' surgical';
+                    else if (isBandAdjust) cardClass += ' band-adjust';
+                    else if (isClipping) cardClass += ' clipping';
+                    else if (isBalance) cardClass += ' balance';
+                    else cardClass += ' problem';
+                    
+                    // Extrair frequência e valores técnicos
+                    const freqMatch = (title + ' ' + action).match(/(\d+(?:\.\d+)?)\s*(?:Hz|hz)/i);
+                    const frequency = freqMatch ? freqMatch[1] : null;
+                    
+                    const dbMatch = action.match(/([+-]?\d+(?:\.\d+)?)\s*dB/i);
+                    const dbValue = dbMatch ? dbMatch[1] : null;
+                    
+                    const qMatch = action.match(/Q\s*[=:]?\s*(\d+(?:\.\d+)?)/i);
+                    const qValue = qMatch ? qMatch[1] : null;
+                    
+                    // Extrair faixa de frequência se disponível
+                    const frequencyRange = sug.frequency_range || '';
+                    const adjustmentDb = sug.adjustment_db;
+                    
+                    // 🚨 VERIFICAR SE É UM AVISO CRÍTICO
+                    if (didacticText?.isCritical) {
+                        return `
+                            <div class="${cardClass} critical-alert">
+                                <div class="card-header">
+                                    <h4 class="card-title">🚨 Problema Crítico</h4>
+                                    <div class="card-badges">
+                                        ${frequency ? `<span class="frequency-badge">${frequency} Hz</span>` : ''}
+                                        <span class="severity-badge severa">CRÍTICO</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="card-description" style="border-left-color: #f44336;">
+                                    <strong>⚠️ Problema:</strong> ${didacticText.explanation}
+                                </div>
+                                
+                                <div class="card-action" style="background: rgba(244, 67, 54, 0.15); border-color: #f44336;">
+                                    <div class="card-action-title" style="color: #f44336;">
+                                        🚨 Ação Urgente
+                                    </div>
+                                    <div class="card-action-content">${didacticText.action}</div>
+                                </div>
+                                
+                                <div class="card-impact" style="background: rgba(244, 67, 54, 0.1); border-color: #f44336;">
+                                    <div class="card-impact-title" style="color: #f44336;">⚠️ Por que é crítico</div>
+                                    <div class="card-impact-content">${didacticText.rationale}</div>
+                                </div>
+                            </div>`;
+                    }
                     
                     if (isSurgical) {
-                        // Formato especial para sugestões cirúrgicas/heurísticas
-                        const freqMatch = title.match(/\[(\d+)Hz\]/) || title.match(/(\d+)Hz/);
-                        const frequency = freqMatch ? freqMatch[1] : (sug.technical?.frequency || sug.technical?.dominantFreq || '?');
+                        // Card cirúrgico aprimorado
                         const context = title.replace(/\[\d+Hz\]/, '').replace(/\d+Hz/, '').trim();
+                        const severity = severityLevel === 'high' ? 'alta' : (severityLevel === 'medium' ? 'moderada' : 'leve');
                         
                         return `
-                            <div class="diag-item surgical enhanced didactic-card" style="border-left: 3px solid ${severityColor}; min-height: auto;">
-                                <div class="surgical-header">
-                                    <span class="frequency-badge">${frequency} Hz</span>
-                                    <span class="severity-badge" style="background: ${severityColor}; color: #fff;">${severityLabel || 'detectado'}</span>
-                                    ${hasEnhancedInfo ? `<span class="priority-badge" style="opacity: 0.7; font-size: 10px;">P:${priority.toFixed(1)}</span>` : ''}
-                                </div>
-                                <div class="context" style="margin: 8px 0; line-height: 1.4;">${context}</div>
-                                ${explanation ? `<div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #e8e8e8;">${explanation}</div>` : ''}
-                                <div class="surgical-action" style="margin: 6px 0; padding: 6px; background: rgba(255,255,255,0.05); border-radius: 4px;">${action}</div>
-                                ${rationale ? `<div class="didactic-rationale" style="font-size: 11px; opacity: 0.85; font-style: italic; margin: 6px 0;">${rationale}</div>` : ''}
-                                ${technical ? `<div class="surgical-details" style="font-size: 10px; opacity: 0.7; margin-top: 6px;">${technical}</div>` : ''}
-                            </div>`;
-                    } else {
-                        // Formato melhorado para outras sugestões com texto didático
-                        // CSS class baseado na severidade
-                        const severityClass = hasEnhancedInfo ? `severity-${sug.severity.level}` : 'info';
-                        
-                        return `
-                            <div class="diag-item ${severityClass} enhanced didactic-card" style="border-left: 3px solid ${severityColor}; min-height: auto; padding: 12px;">
-                                <div class="diag-header" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                    <div class="diag-title" style="flex: 1; font-weight: 600; font-size: 14px;">${title}</div>
-                                    ${hasEnhancedInfo ? `
-                                        <div class="severity-indicators" style="display: flex; gap: 4px; align-items: center;">
-                                            <span class="severity-dot" style="width: 8px; height: 8px; border-radius: 50%; background: ${severityColor};"></span>
-                                            <span class="priority-text" style="font-size: 10px; opacity: 0.7;">P:${priority.toFixed(1)}</span>
-                                        </div>
-                                    ` : ''}
+                            <div class="${cardClass}">
+                                <div class="card-header">
+                                    <h4 class="card-title">🔧 Correção Cirúrgica</h4>
+                                    <div class="card-badges">
+                                        ${frequency ? `<span class="frequency-badge">${frequency} Hz</span>` : ''}
+                                        <span class="severity-badge ${severity}">${severity}</span>
+                                    </div>
                                 </div>
                                 
-                                ${explanation ? `
-                                    <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #e8e8e8;">
-                                        ${explanation}
+                                <div class="card-description">
+                                    <strong>Problema detectado:</strong> ${context || explanation || 'Ressonância problemática identificada'}
+                                </div>
+                                
+                                <div class="card-action">
+                                    <div class="card-action-title">
+                                        🎛️ Ação Recomendada
+                                    </div>
+                                    <div class="card-action-content">${action}</div>
+                                </div>
+                                
+                                ${(frequency || qValue || dbValue) ? `
+                                    <div class="card-technical">
+                                        ${frequency ? `
+                                            <div class="tech-item">
+                                                <div class="tech-label">Frequência</div>
+                                                <div class="tech-value">${frequency} Hz</div>
+                                            </div>
+                                        ` : ''}
+                                        ${dbValue ? `
+                                            <div class="tech-item">
+                                                <div class="tech-label">Ganho</div>
+                                                <div class="tech-value">${dbValue} dB</div>
+                                            </div>
+                                        ` : ''}
+                                        ${qValue ? `
+                                            <div class="tech-item">
+                                                <div class="tech-label">Q Factor</div>
+                                                <div class="tech-value">${qValue}</div>
+                                            </div>
+                                        ` : ''}
                                     </div>
                                 ` : ''}
                                 
-                                ${action ? `
-                                    <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; border-left: 2px solid ${severityColor};">
-                                        <strong>🔧 Ação:</strong> ${action}
-                                    </div>
-                                ` : ''}
-                                
-                                ${rationale ? `
-                                    <div class="didactic-rationale" style="font-size: 11px; opacity: 0.85; font-style: italic; margin: 8px 0; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 3px;">
-                                        <strong>💡 Por quê:</strong> ${rationale}
+                                ${sug.impact ? `
+                                    <div class="card-impact">
+                                        <div class="card-impact-title">⚠️ Impacto</div>
+                                        <div class="card-impact-content">${sug.impact}</div>
                                     </div>
                                 ` : ''}
                                 
                                 ${technical ? `
-                                    <div class="didactic-technical" style="font-size: 10px; opacity: 0.7; margin-top: 8px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 3px; font-family: monospace;">
-                                        📊 ${technical}
+                                    <details style="margin-top: 12px;">
+                                        <summary style="cursor: pointer; font-size: 12px; color: #aaa;">Detalhes Técnicos</summary>
+                                        <div style="font-size: 11px; color: #ccc; margin-top: 8px; font-family: monospace;">${technical}</div>
+                                    </details>
+                                ` : ''}
+                            </div>`;
+                    } 
+                    
+                    else if (isBandAdjust) {
+                        // Card de ajuste de banda aprimorado
+                        const shouldBoost = adjustmentDb > 0 || action.toLowerCase().includes('aumentar') || action.toLowerCase().includes('boost');
+                        const actionIcon = shouldBoost ? '📈' : '📉';
+                        const actionType = shouldBoost ? 'Boost' : 'Corte';
+                        
+                        return `
+                            <div class="${cardClass}">
+                                <div class="card-header">
+                                    <h4 class="card-title">${actionIcon} Ajuste de Banda</h4>
+                                    <div class="card-badges">
+                                        ${frequencyRange ? `<span class="frequency-badge">${frequencyRange}</span>` : ''}
+                                        <span class="severity-badge ${severityLevel}">${actionType}</span>
                                     </div>
+                                </div>
+                                
+                                <div class="card-description">
+                                    <strong>Análise:</strong> ${explanation || title}
+                                </div>
+                                
+                                <div class="card-action">
+                                    <div class="card-action-title">
+                                        🎚️ Como Ajustar
+                                    </div>
+                                    <div class="card-action-content">${action}</div>
+                                </div>
+                                
+                                ${(frequencyRange || adjustmentDb) ? `
+                                    <div class="card-technical">
+                                        ${frequencyRange ? `
+                                            <div class="tech-item">
+                                                <div class="tech-label">Faixa</div>
+                                                <div class="tech-value">${frequencyRange}</div>
+                                            </div>
+                                        ` : ''}
+                                        ${adjustmentDb ? `
+                                            <div class="tech-item">
+                                                <div class="tech-label">Ajuste</div>
+                                                <div class="tech-value">${adjustmentDb > 0 ? '+' : ''}${adjustmentDb.toFixed(1)} dB</div>
+                                            </div>
+                                        ` : ''}
+                                        ${sug.details ? `
+                                            <div class="tech-item" style="grid-column: span 2;">
+                                                <div class="tech-label">Status</div>
+                                                <div class="tech-value" style="font-size: 10px;">${sug.details.replace('Atual:', '').replace('Alvo:', '→')}</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+                                
+                                ${sug.impact ? `
+                                    <div class="card-impact">
+                                        <div class="card-impact-title">💡 Resultado Esperado</div>
+                                        <div class="card-impact-content">${sug.impact}</div>
+                                    </div>
+                                ` : ''}
+                            </div>`;
+                    }
+                    
+                    else {
+                        // Card genérico melhorado
+                        return `
+                            <div class="${cardClass}">
+                                <div class="card-header">
+                                    <h4 class="card-title">🎵 ${title}</h4>
+                                    <div class="card-badges">
+                                        ${frequency ? `<span class="frequency-badge">${frequency} Hz</span>` : ''}
+                                        <span class="severity-badge ${severityLevel}">${severityLabel || 'info'}</span>
+                                    </div>
+                                </div>
+                                
+                                ${explanation ? `
+                                    <div class="card-description">
+                                        <strong>Explicação:</strong> ${explanation}
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="card-action">
+                                    <div class="card-action-title">
+                                        🔧 Ação Recomendada
+                                    </div>
+                                    <div class="card-action-content">${action}</div>
+                                </div>
+                                
+                                ${sug.impact ? `
+                                    <div class="card-impact">
+                                        <div class="card-impact-title">⚠️ Impacto</div>
+                                        <div class="card-impact-content">${sug.impact}</div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${technical ? `
+                                    <details style="margin-top: 12px;">
+                                        <summary style="cursor: pointer; font-size: 12px; color: #aaa;">Detalhes Técnicos</summary>
+                                        <div style="font-size: 11px; color: #ccc; margin-top: 8px; font-family: monospace;">${technical}</div>
+                                    </details>
                                 ` : ''}
                             </div>`;
                     }
                 };
                 if (analysis.problems.length > 0) {
-                    const list = analysis.problems.map(p => {
+                    // 🎯 Função local para deduplicar problemas por tipo
+                    const deduplicateByType = (items) => {
+                        const seen = new Map();
+                        const deduplicated = [];
+                        for (const item of items) {
+                            if (!item || !item.type) continue;
+                            const existing = seen.get(item.type);
+                            if (!existing) {
+                                seen.set(item.type, item);
+                                deduplicated.push(item);
+                            } else {
+                                // Manter o mais detalhado (com mais propriedades)
+                                const currentScore = Object.keys(item).length + (item.explanation ? 10 : 0) + (item.impact ? 5 : 0);
+                                const existingScore = Object.keys(existing).length + (existing.explanation ? 10 : 0) + (existing.impact ? 5 : 0);
+                                if (currentScore > existingScore) {
+                                    seen.set(item.type, item);
+                                    const index = deduplicated.findIndex(d => d.type === item.type);
+                                    if (index >= 0) deduplicated[index] = item;
+                                }
+                            }
+                        }
+                        return deduplicated;
+                    };
+                    
+                    // Aplicar deduplicação dos problemas na UI
+                    const deduplicatedProblems = deduplicateByType(analysis.problems);
+                    const list = deduplicatedProblems.map(p => {
                         const msg = typeof p.message === 'string' ? p.message.replace(/(-?\d+\.\d{3,})/g, m => {
                             const n = parseFloat(m); return Number.isFinite(n) ? n.toFixed(2) : m;
                         }) : p.message;
@@ -1303,50 +1583,150 @@ function displayModalResults(analysis) {
                             const n = parseFloat(m); return Number.isFinite(n) ? n.toFixed(2) : m;
                         }) : p.solution;
                         
-                        // 🚨 USAR CARDS CRÍTICOS VERMELHOS PARA PROBLEMAS
-                        const hasTextGenerator = typeof window.SuggestionTextGenerator !== 'undefined';
-                        let didacticText = null;
+                        // 🚨 USAR FORMATO NATIVO DOS PROBLEMAS - Evitar duplicação do SuggestionTextGenerator
+                        // Os problemas já têm explanation, impact, frequency_range, adjustment_db, details
+                        let didacticText = null; // Desabilitado para evitar duplicação
                         
-                        if (hasTextGenerator) {
-                            try {
-                                const generator = new window.SuggestionTextGenerator();
-                                // Transformar problema em sugestão para usar o gerador
-                                const problemAsSuggestion = {
-                                    message: msg,
-                                    action: sol,
-                                    type: p.type,
-                                    severity: p.severity
-                                };
-                                didacticText = generator.generateDidacticText(problemAsSuggestion);
-                            } catch (error) {
-                                console.warn('[RenderProblem] Erro no gerador de texto:', error);
-                            }
-                        }
-                        
-                        // Se for problema crítico (clipping, etc), usar card crítico vermelho
-                        if (didacticText?.isCritical || p.type === 'clipping' || p.severity === 'high') {
+                        // Se for problema crítico (clipping, etc), usar card crítico aprimorado
+                        if (p.type === 'clipping' || p.severity === 'critical' || p.severity === 'high') {
+                            const freqMatch = (msg + ' ' + sol).match(/(\d+(?:\.\d+)?)\s*(?:Hz|hz)/i);
+                            const frequency = freqMatch ? freqMatch[1] : null;
+                            
                             return `
-                                <div class="diag-item critical enhanced didactic-card" style="border-left: 4px solid #F44336; background: rgba(244, 67, 54, 0.1); min-height: auto; padding: 12px; margin: 8px 0; border-radius: 8px;">
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                        <div style="flex: 1; font-weight: 700; font-size: 14px; color: #F44336;">${didacticText?.title || `🚨 ${msg}`}</div>
-                                        <span style="background: #F44336; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold;">CRÍTICO</span>
+                                <div class="enhanced-card critical-alert">
+                                    <div class="card-header">
+                                        <h4 class="card-title">🚨 Problema Crítico</h4>
+                                        <div class="card-badges">
+                                            ${frequency ? `<span class="frequency-badge">${frequency} Hz</span>` : ''}
+                                            <span class="severity-badge severa">CRÍTICO</span>
+                                        </div>
                                     </div>
-                                    ${didacticText?.explanation ? `
-                                        <div class="didactic-explanation" style="font-size: 13px; line-height: 1.5; margin: 8px 0; color: #ff6b6b; font-weight: 500;">
-                                            ${didacticText.explanation}
+                                    
+                                    <div class="card-description" style="border-left-color: #f44336;">
+                                        <strong>⚠️ Problema:</strong> ${msg}
+                                    </div>
+                                    
+                                    ${p.explanation ? `
+                                        <div class="card-description" style="border-left-color: #f44336; background: rgba(244, 67, 54, 0.05);">
+                                            <strong>Explicação:</strong> ${p.explanation}
                                         </div>
                                     ` : ''}
-                                    <div class="didactic-action" style="margin: 8px 0; padding: 8px; background: rgba(244, 67, 54, 0.15); border-radius: 4px; border-left: 3px solid #F44336;">
-                                        <strong>🚨 Ação Urgente:</strong> ${didacticText?.action || sol || 'Corrija imediatamente este problema'}
+                                    
+                                    <div class="card-action" style="background: rgba(244, 67, 54, 0.15); border-color: #f44336;">
+                                        <div class="card-action-title" style="color: #f44336;">
+                                            🚨 Ação Urgente
+                                        </div>
+                                        <div class="card-action-content">${sol}</div>
                                     </div>
+                                    
+                                    ${(p.frequency_range || p.adjustment_db) ? `
+                                        <div class="card-technical">
+                                            ${p.frequency_range ? `
+                                                <div class="tech-item">
+                                                    <div class="tech-label">Frequências</div>
+                                                    <div class="tech-value">${p.frequency_range}</div>
+                                                </div>
+                                            ` : ''}
+                                            ${p.adjustment_db ? `
+                                                <div class="tech-item">
+                                                    <div class="tech-label">Ajuste</div>
+                                                    <div class="tech-value">${p.adjustment_db} dB</div>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${p.impact ? `
+                                        <div class="card-impact" style="background: rgba(244, 67, 54, 0.1); border-color: #f44336;">
+                                            <div class="card-impact-title" style="color: #f44336;">⚠️ Por que é crítico</div>
+                                            <div class="card-impact-content">${p.impact}</div>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${p.details ? `
+                                        <details style="margin-top: 12px;">
+                                            <summary style="cursor: pointer; font-size: 12px; color: #aaa;">Detalhes Técnicos</summary>
+                                            <div style="font-size: 11px; color: #ccc; margin-top: 8px; font-family: monospace;">${p.details}</div>
+                                        </details>
+                                    ` : ''}
                                 </div>
                             `;
                         } else {
-                            // Para problemas menos críticos, usar o formato padrão melhorado
+                            // Para problemas menos críticos, usar card padrão melhorado
+                            const freqMatch = (msg + ' ' + sol).match(/(\d+(?:\.\d+)?)\s*(?:Hz|hz)/i);
+                            const frequency = freqMatch ? freqMatch[1] : null;
+                            const dbMatch = sol.match(/([+-]?\d+(?:\.\d+)?)\s*dB/i);
+                            const dbValue = dbMatch ? dbMatch[1] : null;
+                            
+                            // Determinar tipo de problema
+                            const problemType = p.type || 'general';
+                            let cardClass = 'enhanced-card problem';
+                            let problemIcon = '⚠️';
+                            
+                            if (problemType.includes('balance')) {
+                                cardClass = 'enhanced-card balance';
+                                problemIcon = '⚖️';
+                            } else if (problemType.includes('dc_offset')) {
+                                cardClass = 'enhanced-card problem';
+                                problemIcon = '📊';
+                            } else if (problemType.includes('phase')) {
+                                cardClass = 'enhanced-card problem';
+                                problemIcon = '🌊';
+                            }
+                            
                             return `
-                                <div class="diag-item danger" style="border-left: 4px solid #FF9800; background: rgba(255, 152, 0, 0.1); padding: 12px; margin: 8px 0; border-radius: 8px;">
-                                    <div class="diag-title" style="font-weight: 600; color: #FF9800; margin-bottom: 8px;">${msg}</div>
-                                    ${sol ? `<div class="diag-tip" style="font-size: 13px; color: #F57C00;">${sol}</div>` : ''}
+                                <div class="${cardClass}">
+                                    <div class="card-header">
+                                        <h4 class="card-title">${problemIcon} ${msg}</h4>
+                                        <div class="card-badges">
+                                            ${frequency ? `<span class="frequency-badge">${frequency} Hz</span>` : ''}
+                                            <span class="severity-badge moderada">problema</span>
+                                        </div>
+                                    </div>
+                                    
+                                    ${p.explanation ? `
+                                        <div class="card-description">
+                                            <strong>Explicação:</strong> ${p.explanation}
+                                        </div>
+                                    ` : ''}
+                                    
+                                    <div class="card-action">
+                                        <div class="card-action-title">
+                                            🔧 Como Resolver
+                                        </div>
+                                        <div class="card-action-content">${sol}</div>
+                                    </div>
+                                    
+                                    ${(p.frequency_range || dbValue) ? `
+                                        <div class="card-technical">
+                                            ${p.frequency_range ? `
+                                                <div class="tech-item">
+                                                    <div class="tech-label">Frequências</div>
+                                                    <div class="tech-value">${p.frequency_range}</div>
+                                                </div>
+                                            ` : ''}
+                                            ${dbValue ? `
+                                                <div class="tech-item">
+                                                    <div class="tech-label">Ajuste</div>
+                                                    <div class="tech-value">${dbValue} dB</div>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${p.impact ? `
+                                        <div class="card-impact">
+                                            <div class="card-impact-title">⚠️ Impacto</div>
+                                            <div class="card-impact-content">${p.impact}</div>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${p.details ? `
+                                        <details style="margin-top: 12px;">
+                                            <summary style="cursor: pointer; font-size: 12px; color: #aaa;">Detalhes Técnicos</summary>
+                                            <div style="font-size: 11px; color: #ccc; margin-top: 8px; font-family: monospace;">${p.details}</div>
+                                        </details>
+                                    ` : ''}
                                 </div>
                             `;
                         }
@@ -1354,23 +1734,49 @@ function displayModalResults(analysis) {
                     blocks.push(`<div class="diag-section"><div class="diag-heading">⚠️ Problemas Detectados:</div>${list}</div>`);
                 }
                 if (analysis.suggestions.length > 0) {
-                    const list = analysis.suggestions.map(s => renderSuggestionItem(s)).join('');
+                    // 🎯 Função local para deduplicar sugestões por tipo
+                    const deduplicateByType = (items) => {
+                        const seen = new Map();
+                        const deduplicated = [];
+                        for (const item of items) {
+                            if (!item || !item.type) continue;
+                            const existing = seen.get(item.type);
+                            if (!existing) {
+                                seen.set(item.type, item);
+                                deduplicated.push(item);
+                            } else {
+                                // Manter o mais detalhado (com mais propriedades)
+                                const currentScore = Object.keys(item).length + (item.explanation ? 10 : 0) + (item.impact ? 5 : 0);
+                                const existingScore = Object.keys(existing).length + (existing.explanation ? 10 : 0) + (existing.impact ? 5 : 0);
+                                if (currentScore > existingScore) {
+                                    seen.set(item.type, item);
+                                    const index = deduplicated.findIndex(d => d.type === item.type);
+                                    if (index >= 0) deduplicated[index] = item;
+                                }
+                            }
+                        }
+                        return deduplicated;
+                    };
+                    
+                    // Aplicar deduplicação das sugestões na UI para evitar duplicatas
+                    const deduplicatedSuggestions = deduplicateByType(analysis.suggestions);
+                    const list = deduplicatedSuggestions.map(s => renderSuggestionItem(s)).join('');
                     
                     // 🎯 Rodapé melhorado com informações do Enhanced System
                     try {
-                        const count = (t) => analysis.suggestions.filter(s => s && s.type === t).length;
+                        const count = (t) => deduplicatedSuggestions.filter(s => s && s.type === t).length;
                         const cBand = count('band_adjust');
                         const cGroup = count('band_group_adjust');
                         const cSurg = count('surgical_eq');
                         const cRef = count('reference_loudness') + count('reference_dynamics') + count('reference_lra') + count('reference_stereo') + count('reference_true_peak');
-                        const cHeuristic = analysis.suggestions.filter(s => s && s.type && s.type.startsWith('heuristic_')).length;
+                        const cHeuristic = deduplicatedSuggestions.filter(s => s && s.type && s.type.startsWith('heuristic_')).length;
                         
                         // Estatísticas do Enhanced System (se disponível)
                         let enhancedStats = '';
                         if (analysis.enhancedMetrics) {
                             const em = analysis.enhancedMetrics;
-                            const avgPriority = analysis.suggestions.length > 0 ? 
-                                (analysis.suggestions.reduce((sum, s) => sum + (s.priority || 0), 0) / analysis.suggestions.length) : 0;
+                            const avgPriority = deduplicatedSuggestions.length > 0 ? 
+                                (deduplicatedSuggestions.reduce((sum, s) => sum + (s.priority || 0), 0) / deduplicatedSuggestions.length) : 0;
                             
                             enhancedStats = ` • 🎯 Enhanced System: conf=${(em.confidence || 1).toFixed(2)} avgP=${avgPriority.toFixed(2)}`;
                             
