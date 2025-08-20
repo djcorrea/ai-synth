@@ -1240,26 +1240,64 @@ async function processMessage(message, images = []) {
     const idToken = await currentUser.getIdToken();
     console.log('✅ Token obtido');
 
-    // 🖼️ Preparar payload com imagens se existirem
-    const payload = { 
-      message, 
-      conversationHistory, 
-      idToken 
-    };
-    
-    if (images.length > 0) {
-      payload.images = images;
-      console.log('📸 Adicionando imagens ao payload:', images.length);
-    }
+    // 🖼️ Preparar payload: multipart para imagens, JSON para texto
+    const hasImages = images && images.length > 0;
+    let requestBody;
+    let requestHeaders;
 
-    console.log('📤 Enviando para API:', API_CONFIG.chatEndpoint);
-    const response = await fetch(API_CONFIG.chatEndpoint, {
-      method: 'POST',
-      headers: { 
+    if (hasImages) {
+      // ✅ CORREÇÃO #1: Usar FormData (multipart) quando há imagens
+      console.log('📸 Preparando multipart com', images.length, 'imagem(ns)');
+      
+      const formData = new FormData();
+      formData.append('message', message);
+      formData.append('conversationHistory', JSON.stringify(conversationHistory));
+      formData.append('idToken', idToken);
+      
+      // Converter imagens base64 para blobs
+      images.forEach((img, index) => {
+        try {
+          const binaryString = atob(img.base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: img.type });
+          formData.append('images', blob, img.filename || `image-${index + 1}.jpg`);
+          console.log(`� Imagem ${index + 1} adicionada:`, img.filename, blob.size, 'bytes');
+        } catch (error) {
+          console.error(`❌ Erro ao processar imagem ${index + 1}:`, error);
+          throw new Error(`Erro ao processar imagem: ${img.filename}`);
+        }
+      });
+      
+      requestBody = formData;
+      // ✅ CORREÇÃO #2: Headers consistentes para multipart
+      requestHeaders = { 
+        'Authorization': `Bearer ${idToken}`
+        // Não definir Content-Type para FormData (browser define automaticamente)
+      };
+    } else {
+      // JSON para mensagens só texto
+      console.log('📝 Preparando JSON para mensagem texto');
+      
+      requestBody = JSON.stringify({ 
+        message, 
+        conversationHistory, 
+        idToken 
+      });
+      // ✅ CORREÇÃO #2: Headers consistentes para JSON
+      requestHeaders = { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${idToken}`
-      },
-      body: JSON.stringify(payload)
+      };
+    }
+
+    console.log('📤 Enviando para API:', API_CONFIG.chatEndpoint, hasImages ? '(multipart)' : '(json)');
+    const response = await fetch(API_CONFIG.chatEndpoint, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: requestBody
     });
 
     console.log('📥 Resposta recebida:', response.status, response.statusText);
@@ -1273,40 +1311,115 @@ async function processMessage(message, images = []) {
         console.log('✅ JSON parseado:', data);
       } catch (parseError) {
         console.error('❌ Erro ao parsear JSON:', parseError);
-        data = { error: 'Erro ao processar resposta do servidor' };
+        data = { error: 'RESPONSE_PARSE_ERROR', message: 'Erro ao processar resposta do servidor' };
       }
     } else {
       const errorText = await response.text();
       console.error('❌ Erro na resposta:', response.status, errorText);
+      
+      // ✅ CORREÇÃO #3: Error handling específico (não mascarado)
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: 'UNKNOWN_ERROR', message: errorText || 'Erro desconhecido' };
+      }
+      
+      // Categorizar erros específicos
       if (response.status === 403) {
-        data = { error: 'limite diário' };
+        data = { error: 'DAILY_LIMIT_EXCEEDED', message: 'limite diário' };
       } else if (response.status === 401) {
-        data = { error: 'Token de autenticação inválido' };
+        data = { error: 'AUTH_TOKEN_INVALID', message: 'Token de autenticação inválido' };
       } else if (response.status === 404) {
-        data = { error: 'API não encontrada. Verifique a configuração.' };
+        data = { error: 'API_NOT_FOUND', message: 'API não encontrada. Verifique a configuração.' };
+      } else if (response.status === 413) {
+        data = { error: 'PAYLOAD_TOO_LARGE', message: 'Imagens muito grandes. Reduza o tamanho.' };
+      } else if (response.status === 422) {
+        data = { error: 'VALIDATION_ERROR', message: errorData.message || 'Dados inválidos' };
+      } else if (response.status === 429) {
+        data = { error: 'RATE_LIMITED', message: 'Muitas tentativas. Aguarde um momento.' };
+      } else if (response.status === 500) {
+        data = { error: 'SERVER_ERROR', message: errorData.message || 'Erro interno do servidor' };
+      } else if (response.status === 502) {
+        data = { error: 'BAD_GATEWAY', message: 'Erro de conexão com o servidor' };
+      } else if (response.status === 503) {
+        data = { error: 'SERVICE_UNAVAILABLE', message: 'Serviço temporariamente indisponível' };
+      } else if (response.status === 504) {
+        data = { error: 'GATEWAY_TIMEOUT', message: 'Tempo limite de processamento excedido' };
       } else {
-        data = { error: 'Erro do servidor' };
+        data = { 
+          error: errorData.error || 'UNKNOWN_ERROR', 
+          message: errorData.message || 'Erro do servidor',
+          status: response.status
+        };
       }
     }
 
     hideTypingIndicator();
 
-    if (data.error && data.error.toLowerCase().includes('limite diário')) {
-      appendMessage(
-        `<strong>Assistente:</strong> 🚫 Você atingiu o limite de <strong>10 mensagens diárias</strong>.<br><br>` +
-        `🔓 <a href="planos.html" class="btn-plus" target="_blank">Assinar versão Plus</a>`,
-        'bot'
-      );
-    } else if (data.error && data.error.includes('API não encontrada')) {
-      appendMessage(
-        `<strong>Assistente:</strong> ⚙️ Sistema em configuração. Tente novamente em alguns minutos.`,
-        'bot'
-      );
-    } else if (data.error && data.error.includes('Token')) {
-      appendMessage(
-        `<strong>Assistente:</strong> 🔒 Sessão expirada. <a href="login.html">Faça login novamente</a>.`,
-        'bot'
-      );
+    // ✅ CORREÇÃO #5: Tratamento específico de erros com códigos categorizados
+    if (data.error) {
+      let userMessage = '';
+      
+      if (data.error === 'AUTH_TOKEN_MISSING' || data.error === 'AUTH_ERROR' || data.error.includes('Token')) {
+        userMessage = '🔒 Sessão expirada. <a href="index.html">Faça login novamente</a>.';
+      } else if (data.error === 'FILE_UPLOAD_ERROR' || data.error === 'REQUEST_FORMAT_ERROR') {
+        userMessage = '📁 Erro no upload de imagens. Verifique se os arquivos são válidos e tente novamente.';
+      } else if (data.error === 'IMAGES_LIMIT_EXCEEDED') {
+        userMessage = '📸 Máximo de 3 imagens por vez. Remova algumas imagens e tente novamente.';
+      } else if (data.error === 'PAYLOAD_TOO_LARGE') {
+        userMessage = '📦 Imagens muito grandes. Comprima as imagens ou use formatos mais leves.';
+      } else if (data.error === 'VALIDATION_ERROR' || data.error === 'MESSAGE_INVALID') {
+        userMessage = `📝 ${data.message || 'Dados enviados são inválidos'}`;
+      } else if (data.error === 'RATE_LIMITED') {
+        userMessage = '⏰ Muitas tentativas simultâneas. Aguarde um momento e tente novamente.';
+      } else if (data.error === 'GATEWAY_TIMEOUT' || data.error === 'AI_SERVICE_ERROR') {
+        userMessage = '⏱️ Processamento demorou muito. Tente uma mensagem mais simples ou aguarde alguns minutos.';
+      } else if (data.error === 'SERVICE_UNAVAILABLE' || data.error === 'SERVER_ERROR') {
+        userMessage = '🔧 Serviço temporariamente indisponível. Nossa equipe foi notificada. Tente novamente em alguns minutos.';
+      } else if (data.error === 'DAILY_LIMIT_EXCEEDED' || data.error.toLowerCase().includes('limite diário')) {
+        userMessage = '🚫 Você atingiu o limite de <strong>10 mensagens diárias</strong>.<br><br>' +
+                     '🔓 <a href="planos.html" class="btn-plus" target="_blank">Assinar versão Plus</a>';
+      } else if (data.error.includes('API não encontrada')) {
+        userMessage = '⚙️ Sistema em configuração. Tente novamente em alguns minutos.';
+      } else {
+        userMessage = `❌ ${data.message || 'Erro inesperado. Nossa equipe foi notificada.'}`;
+      }
+      
+      appendMessage(`<strong>Assistente:</strong> ${userMessage}`, 'bot');
+      
+      // ✅ Mostrar botão de retry para erros temporários
+      if (data.error === 'GATEWAY_TIMEOUT' || data.error === 'SERVICE_UNAVAILABLE' || data.error === 'SERVER_ERROR' || data.error === 'AI_SERVICE_ERROR') {
+        setTimeout(() => {
+          const retryBtn = document.createElement('button');
+          retryBtn.textContent = '🔄 Tentar Novamente';
+          retryBtn.style.cssText = `
+            background: rgba(0, 150, 255, 0.2);
+            border: 1px solid rgba(0, 150, 255, 0.5);
+            color: #0096ff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 8px 0;
+            transition: all 0.2s ease;
+          `;
+          
+          retryBtn.onmouseover = () => retryBtn.style.background = 'rgba(0, 150, 255, 0.3)';
+          retryBtn.onmouseout = () => retryBtn.style.background = 'rgba(0, 150, 255, 0.2)';
+          
+          retryBtn.onclick = () => {
+            retryBtn.remove();
+            processMessage(message, images); // Retry automático
+          };
+          
+          const lastMessage = document.querySelector('.chatbot-conversation-area .chatbot-message:last-child');
+          if (lastMessage) {
+            lastMessage.appendChild(retryBtn);
+          }
+        }, 1500);
+      }
+      
     } else if (data.reply) {
       console.log('✅ Resposta recebida da IA, iniciando validação de conteúdo');
 
