@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { auth, db } from './firebaseAdmin.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import cors from 'cors';
@@ -70,7 +69,8 @@ function validateAndSanitizeInput(req) {
           typeof msg === 'object' && 
           msg.role && 
           msg.content &&
-          (typeof msg.content === 'string' || Array.isArray(msg.content)) &&
+          typeof msg.content === 'string' &&
+          msg.content.trim().length > 0 &&
           ['user', 'assistant', 'system'].includes(msg.role);
       })
   // Reduzir limite de mensagens recentes para 5 (requisito)
@@ -79,10 +79,19 @@ function validateAndSanitizeInput(req) {
   
   // Validar imagens se presentes
   let validImages = [];
-  if (Array.isArray(images)) {
-    validImages = images
-      .filter(img => img && img.base64 && typeof img.base64 === 'string')
-      .slice(0, 5); // Máximo 5 imagens por mensagem
+  if (Array.isArray(images) && images.length > 0) {
+    if (images.length > 3) {
+      throw new Error('IMAGES_LIMIT_EXCEEDED');
+    }
+    
+    validImages = images.filter(img => {
+      return img && 
+        typeof img === 'object' && 
+        img.base64 && 
+        typeof img.base64 === 'string' &&
+        img.filename && 
+        typeof img.filename === 'string';
+    }).slice(0, 3); // Garantir máximo de 3 imagens
   }
   
   return {
@@ -92,12 +101,12 @@ function validateAndSanitizeInput(req) {
     images: validImages,
     // 🎤 Detectar se é voice message (GRATUITO)
     isVoiceMessage: message.startsWith('[VOICE MESSAGE]'),
-    // 🖼️ Detectar se tem imagens
+    // 🖼️ Detectar se tem imagens (requer GPT-4 Vision)
     hasImages: validImages.length > 0
   };
 }
 
-// Função para gerenciar limites de usuário
+// Função para gerenciar limites de usuário e cota de imagens
 async function handleUserLimits(db, uid, email) {
   const userRef = db.collection('usuarios').doc(uid);
 
@@ -106,6 +115,8 @@ async function handleUserLimits(db, uid, email) {
       const snap = await tx.get(userRef);
       const now = Timestamp.now();
       const today = now.toDate().toDateString();
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
 
       let userData;
 
@@ -113,6 +124,182 @@ async function handleUserLimits(db, uid, email) {
         userData = {
           uid,
           plano: 'gratis',
+          mensagensRestantes: 9,
+          dataUltimoReset: now,
+          createdAt: now,
+          // Cota de análise de imagens
+          imagemAnalises: {
+            usadas: 0,
+            limite: 5, // Grátis: 5/mês
+            mesAtual: currentMonth,
+            anoAtual: currentYear,
+            resetEm: now
+          }
+        };
+        if (email) {
+          userData.email = email;
+        }
+        tx.set(userRef, userData);
+      } else {
+        userData = snap.data();
+        const lastReset = userData.dataUltimoReset?.toDate().toDateString();
+
+        // VERIFICAÇÃO AUTOMÁTICA DE EXPIRAÇÃO DO PLANO PLUS
+        if (userData.plano === 'plus' && userData.planExpiresAt) {
+          const currentDate = new Date();
+          const expirationDate = userData.planExpiresAt instanceof Date ? 
+            userData.planExpiresAt : 
+            userData.planExpiresAt.toDate ? userData.planExpiresAt.toDate() : new Date(userData.planExpiresAt);
+          
+          if (expirationDate <= currentDate) {
+            console.log('⏰ Plano Plus expirado, convertendo para gratuito:', uid);
+            
+            // Dados para converter plano expirado
+            const expiredPlanData = {
+              plano: 'gratis',
+              isPlus: false,
+              mensagensRestantes: 10,
+              planExpiredAt: now,
+              previousPlan: 'plus',
+              dataUltimoReset: now,
+              // Reset cota de imagens para plano gratuito
+              imagemAnalises: {
+                usadas: 0,
+                limite: 5,
+                mesAtual: currentMonth,
+                anoAtual: currentYear,
+                resetEm: now
+              }
+            };
+            
+            // Atualizar no Firestore
+            tx.update(userRef, expiredPlanData);
+            
+            // Atualizar userData local para refletir as mudanças
+            userData = { ...userData, ...expiredPlanData };
+            
+            console.log('✅ Usuário convertido de Plus expirado para gratuito:', uid);
+          }
+        }
+
+        // Verificar reset diário das mensagens
+        if (lastReset !== today) {
+          userData.mensagensRestantes = 10;
+          tx.update(userRef, {
+            mensagensRestantes: 10,
+            dataUltimoReset: now,
+          });
+        }
+
+        // Verificar reset mensal da cota de imagens
+        if (!userData.imagemAnalises || 
+            userData.imagemAnalises.mesAtual !== currentMonth || 
+            userData.imagemAnalises.anoAtual !== currentYear) {
+          
+          const limiteImagens = userData.plano === 'plus' ? 20 : 5;
+          userData.imagemAnalises = {
+            usadas: 0,
+            limite: limiteImagens,
+            mesAtual: currentMonth,
+            anoAtual: currentYear,
+            resetEm: now
+          };
+          
+          tx.update(userRef, {
+            imagemAnalises: userData.imagemAnalises
+          });
+          
+          console.log(`🔄 Reset mensal da cota de imagens: ${limiteImagens} análises disponíveis para usuário ${userData.plano}`);
+        }
+
+        // Verificar limite de mensagens diárias (apenas plano gratuito)
+        if (userData.plano === 'gratis') {
+          if (userData.mensagensRestantes <= 0) {
+            throw new Error('LIMIT_EXCEEDED');
+          }
+          tx.update(userRef, {
+            mensagensRestantes: FieldValue.increment(-1),
+          });
+          userData.mensagensRestantes =
+            (userData.mensagensRestantes || 10) - 1;
+        }
+      }
+
+      return userData;
+    });
+
+    const finalSnap = await userRef.get();
+    return { ...result, perfil: finalSnap.data().perfil };
+  } catch (error) {
+    if (error.message === 'LIMIT_EXCEEDED') {
+      console.warn('🚫 Limite de mensagens atingido para:', email);
+      throw error;
+    }
+    console.error('❌ Erro na transação do usuário:', error);
+    throw new Error('Erro ao processar limites do usuário');
+  }
+}
+
+// Função para consumir cota de análise de imagens
+async function consumeImageAnalysisQuota(db, uid, email) {
+  const userRef = db.collection('usuarios').doc(uid);
+  
+  try {
+    const result = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists) {
+        throw new Error('USER_NOT_FOUND');
+      }
+      
+      const userData = snap.data();
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      // Verificar se precisa resetar cota mensal
+      if (!userData.imagemAnalises || 
+          userData.imagemAnalises.mesAtual !== currentMonth || 
+          userData.imagemAnalises.anoAtual !== currentYear) {
+        
+        const limiteImagens = userData.plano === 'plus' ? 20 : 5;
+        userData.imagemAnalises = {
+          usadas: 0,
+          limite: limiteImagens,
+          mesAtual: currentMonth,
+          anoAtual: currentYear,
+          resetEm: Timestamp.now()
+        };
+      }
+      
+      // Verificar se ainda tem cota disponível
+      if (userData.imagemAnalises.usadas >= userData.imagemAnalises.limite) {
+        throw new Error('IMAGE_QUOTA_EXCEEDED');
+      }
+      
+      // Consumir uma unidade da cota
+      const novaQuantidade = userData.imagemAnalises.usadas + 1;
+      tx.update(userRef, {
+        'imagemAnalises.usadas': novaQuantidade,
+        'imagemAnalises.ultimoUso': Timestamp.now()
+      });
+      
+      console.log(`🖼️ Cota de imagem consumida: ${novaQuantidade}/${userData.imagemAnalises.limite} para usuário ${userData.plano}`);
+      
+      return {
+        ...userData.imagemAnalises,
+        usadas: novaQuantidade
+      };
+    });
+    
+    return result;
+  } catch (error) {
+    if (error.message === 'IMAGE_QUOTA_EXCEEDED') {
+      console.warn('🚫 Cota de análise de imagens esgotada para:', email);
+      throw error;
+    }
+    console.error('❌ Erro ao consumir cota de imagens:', error);
+    throw error;
+  }
+}
           mensagensRestantes: 9,
           dataUltimoReset: now,
           createdAt: now,
@@ -1050,54 +1237,8 @@ async function gerenciarContextoTecnico(db, uid, mensagem) {
   }
 }
 
-// Função para processar mensagens com imagens
-function processarMensagensComImagens(messages, images = []) {
-  if (!images || images.length === 0) {
-    return messages;
-  }
-
-  // Processar a última mensagem (do usuário) para incluir imagens
-  const messagesWithImages = [...messages];
-  const lastMessageIndex = messagesWithImages.length - 1;
-  const lastMessage = messagesWithImages[lastMessageIndex];
-
-  if (lastMessage && lastMessage.role === 'user') {
-    // Converter para formato de conteúdo misto (texto + imagens)
-    const content = [
-      {
-        type: "text",
-        text: lastMessage.content
-      }
-    ];
-
-    // Adicionar cada imagem
-    images.forEach((img, index) => {
-      if (img.base64) {
-        content.push({
-          type: "image_url",
-          image_url: {
-            url: `data:image/jpeg;base64,${img.base64}`,
-            detail: "high"
-          }
-        });
-        console.log(`🖼️ Imagem ${index + 1} adicionada à mensagem (${img.base64.length} chars)`);
-      }
-    });
-
-    // Atualizar a mensagem com conteúdo misto
-    messagesWithImages[lastMessageIndex] = {
-      ...lastMessage,
-      content: content
-    };
-
-    console.log(`✅ Mensagem preparada com ${images.length} imagem(ns)`);
-  }
-
-  return messagesWithImages;
-}
-
 // Função para chamar a API da OpenAI
-async function callOpenAI(messages, userData, db, uid, isVoiceMessage = false, images = []) {
+async function callOpenAI(messages, userData, db, uid, isVoiceMessage = false) {
   // 🧠 Gerenciar contexto técnico inteligente
   const currentMessage = messages[messages.length - 1]?.content || '';
   const contextoInfo = await gerenciarContextoTecnico(db, uid, currentMessage);
@@ -1183,33 +1324,6 @@ Responda com excelência absoluta.`;
 - Foque no problema imediato mencionado
 
 Responda com máxima naturalidade e eficiência!`;
-  }
-
-  // 🖼️ PROMPT ESPECIAL PARA ANÁLISE DE IMAGENS
-  if (images && images.length > 0) {
-    systemPrompt += `\n\n🖼️ **ANÁLISE DE IMAGEM DETECTADA - INSTRUÇÕES ESPECIAIS:**
-
-🎯 O usuário enviou ${images.length} imagem(ns) para análise.
-- ANALISE DETALHADAMENTE cada imagem enviada
-- Descreva EXATAMENTE o que você vê na imagem
-- Se for uma captura de tela de DAW (FL Studio, Ableton, etc), identifique:
-  * Plugin ou ferramenta sendo usada
-  * Configurações visíveis (frequências, valores, parâmetros)
-  * Problemas ou melhorias possíveis
-  * Sugestões técnicas específicas
-- Se for uma foto de equipamento, identifique e dê dicas de uso
-- Se for uma partitura ou piano roll, analise a harmonia e ritmo
-- Se for um gráfico/espectrograma, interprete as frequências
-- SEMPRE relacione a análise visual com a pergunta do usuário
-- Use frases como "Vejo na imagem que...", "Analisando a captura...", "Na tela aparece..."
-
-🧠 **REGRA IMPORTANTE:**
-- Seja EXTREMAMENTE específico sobre o que vê
-- Mencione cores, números, textos visíveis, posições
-- Dê dicas baseadas exatamente no que está sendo mostrado
-- Se não conseguir ver algo claramente, mencione
-
-Analise com máxima precisão e detalhe!`;
   }
 
   // 🧠 CONTEXTO TÉCNICO INTELIGENTE - Aplicar prompt específico do estilo detectado
@@ -1303,15 +1417,8 @@ VOCÊ DEVE RESPONDER EXATAMENTE NESTA SEQUÊNCIA - SEM EXCEÇÕES:
     }
   }
 
-  // 🖼️ Processar mensagens com imagens
-  const messagesWithImages = processarMensagensComImagens(messages, images);
-  
-  // 🎯 Selecionar modelo baseado na presença de imagens
-  const model = (images && images.length > 0) ? 'gpt-4o' : 'gpt-3.5-turbo';
-  console.log(`🤖 Usando modelo: ${model} ${images && images.length > 0 ? `(${images.length} imagens)` : '(texto apenas)'}`);
-
   const requestBody = {
-    model: model,
+    model: 'gpt-3.5-turbo',
     temperature: 0.5,
     max_tokens: 1200,
     messages: [
@@ -1319,7 +1426,7 @@ VOCÊ DEVE RESPONDER EXATAMENTE NESTA SEQUÊNCIA - SEM EXCEÇÕES:
         role: 'system',
         content: systemPrompt
       },
-      ...messagesWithImages,
+      ...messages,
     ],
   };
 
@@ -1464,20 +1571,11 @@ export default async function handler(req, res) {
       throw error;
     }
 
-  const { message, conversationHistory, idToken, images, hasImages } = validatedData;
+  const { message, conversationHistory, idToken } = validatedData;
 
     let decoded;
     try {
-      // 🔧 BYPASS TEMPORÁRIO PARA DESENVOLVIMENTO LOCAL
-      if (idToken === 'test-token-local-development') {
-        console.log('🧪 Usando token de desenvolvimento local');
-        decoded = {
-          uid: 'test-user-local',
-          email: 'test@local.dev'
-        };
-      } else {
-        decoded = await auth.verifyIdToken(idToken);
-      }
+      decoded = await auth.verifyIdToken(idToken);
     } catch (err) {
       return res.status(401).json({ error: 'Token inválido ou expirado' });
     }
@@ -1487,22 +1585,7 @@ export default async function handler(req, res) {
 
     let userData;
     try {
-      // 🔧 DADOS TEMPORÁRIOS PARA DESENVOLVIMENTO LOCAL
-      if (uid === 'test-user-local') {
-        console.log('🧪 Usando dados de usuário de desenvolvimento');
-        userData = {
-          uid: uid,
-          plano: 'plus', // Simular usuário Plus para teste completo
-          mensagensRestantes: 999,
-          perfil: {
-            estilo: 'funk',
-            nivelTecnico: 'avancado',
-            daw: 'fl-studio'
-          }
-        };
-      } else {
-        userData = await handleUserLimits(db, uid, email);
-      }
+      userData = await handleUserLimits(db, uid, email);
     } catch (error) {
       if (error.message === 'LIMIT_EXCEEDED') {
         return res.status(403).json({ error: 'Limite diário de mensagens atingido' });
@@ -1525,7 +1608,7 @@ export default async function handler(req, res) {
     ];
 
     // Chamar OpenAI com dados completos do usuário para personalização e contexto técnico
-    let reply = await callOpenAI(messages, userData, db, uid, validatedData.isVoiceMessage, images);
+    let reply = await callOpenAI(messages, userData, db, uid, validatedData.isVoiceMessage);
 
     // 🎹 SISTEMA DE INSERÇÃO DE IMAGENS COM PALAVRAS-CHAVE EXCLUSIVAS
     // 📋 CONFIGURAÇÃO CENTRALIZADA - FÁCIL MANUTENÇÃO
@@ -1744,15 +1827,9 @@ export default async function handler(req, res) {
       console.log('✅ Resposta personalizada gerada para usuário Plus:', email);
     }
 
-    // 🖼️ Log especial para análise de imagens
-    if (hasImages) {
-      console.log(`🖼️ Análise de imagem realizada: ${images.length} imagem(ns) processada(s)`);
-    }
-
     return res.status(200).json({ 
       reply,
-      mensagensRestantes: userData.plano === 'gratis' ? userData.mensagensRestantes : null,
-      imageAnalyzed: hasImages // Indicar se houve análise de imagem
+      mensagensRestantes: userData.plano === 'gratis' ? userData.mensagensRestantes : null
     });
 
   } catch (error) {

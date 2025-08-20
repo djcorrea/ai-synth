@@ -487,8 +487,22 @@ class ProdAIChatbot {
             return;
         }
         
+        // 🖼️ Verificar se há imagens selecionadas
+        let images = [];
+        if (window.imagePreviewSystem && window.imagePreviewSystem.hasImages()) {
+            images = window.imagePreviewSystem.getImagesForSending();
+            console.log('📸 Primeira mensagem com imagens:', images.length);
+        }
+        
+        // Se há imagens mas não há texto, não permitir envio
+        if (images.length > 0 && !message) {
+            console.warn('❌ Não é possível enviar apenas imagens sem texto');
+            this.shakeInput();
+            return;
+        }
+        
         // Integrar com a função sendFirstMessage existente
-        await this.activateChat(message);
+        await this.activateChat(message, images);
     }
     
     shakeInput() {
@@ -506,9 +520,14 @@ class ProdAIChatbot {
         }
     }
     
-    async activateChat(firstMessage) {
+    async activateChat(firstMessage, images = []) {
         if (this.isActive) return;
         this.isActive = true;
+        
+        // 🖼️ Limpar imagens após capturar para envio
+        if (window.imagePreviewSystem && images.length > 0) {
+            window.imagePreviewSystem.clearImages();
+        }
         
         // Aguardar autenticação Firebase (integração com sistema existente)
         await waitForFirebase();
@@ -552,13 +571,13 @@ class ProdAIChatbot {
         }
         
         setTimeout(() => {
-            this.addMessage(firstMessage, 'user');
+            this.addMessage(firstMessage, 'user', images);
             this.activeInput.focus();
             
-            // Integrar com processMessage existente
+            // Integrar com processMessage existente, agora com suporte a imagens
             setTimeout(() => {
                 this.showTyping();
-                processMessage(firstMessage).then(() => {
+                processMessage(firstMessage, images).then(() => {
                     this.hideTyping();
                 });
             }, 200);
@@ -569,25 +588,60 @@ class ProdAIChatbot {
         const message = this.activeInput.value.trim();
         if (!message) return;
         
-        this.addMessage(message, 'user');
+        // 🖼️ Verificar se há imagens selecionadas
+        let images = [];
+        if (window.imagePreviewSystem && window.imagePreviewSystem.hasImages()) {
+            images = window.imagePreviewSystem.getImagesForSending();
+            console.log('📸 Imagens encontradas para envio:', images.length);
+        }
+        
+        // Se há imagens mas não há texto, não permitir envio
+        if (images.length > 0 && !message) {
+            console.warn('❌ Não é possível enviar apenas imagens sem texto');
+            return;
+        }
+        
+        this.addMessage(message, 'user', images);
         this.activeInput.value = '';
         
-        // Usar a função processMessage existente
+        // 🖼️ Limpar imagens após adicionar à mensagem
+        if (window.imagePreviewSystem && images.length > 0) {
+            window.imagePreviewSystem.clearImages();
+        }
+        
+        // Usar a função processMessage existente, agora com suporte a imagens
         setTimeout(() => {
             this.showTyping();
-            processMessage(message).then(() => {
+            processMessage(message, images).then(() => {
                 this.hideTyping();
             });
         }, 100);
     }
     
-    addMessage(text, sender) {
+    addMessage(text, sender, images = []) {
         // Usar a função appendMessage global que já está adaptada ao novo layout
-        const formattedText = sender === 'user' ? `<strong>Você:</strong> ${text}` : `<strong>Assistente:</strong> ${text}`;
+        let formattedText = sender === 'user' ? `<strong>Você:</strong> ${text}` : `<strong>Assistente:</strong> ${text}`;
+        
+        // 🖼️ Se há imagens, adicionar preview na mensagem
+        if (images.length > 0 && sender === 'user') {
+            const imagesPreviews = images.map(img => 
+                `<div class="message-image-preview">
+                    <img src="data:${img.type};base64,${img.base64}" alt="${img.filename}" style="max-width: 200px; max-height: 150px; border-radius: 4px; margin: 4px;">
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.6);">${img.filename}</div>
+                </div>`
+            ).join('');
+            
+            formattedText += `<div class="message-images" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">${imagesPreviews}</div>`;
+        }
+        
         appendMessage(formattedText, sender === 'user' ? 'user' : 'bot');
         
         // Adicionar ao histórico de conversa
-        conversationHistory.push({ role: sender, content: text });
+        const historyEntry = { role: sender, content: text };
+        if (images.length > 0) {
+            historyEntry.images = images;
+        }
+        conversationHistory.push(historyEntry);
         this.messageCount++;
     }
     
@@ -1150,8 +1204,11 @@ function hideTypingIndicator() {
   }
 }
 
-async function processMessage(message) {
+async function processMessage(message, images = []) {
   console.log('🚀 Processando mensagem:', message);
+  if (images.length > 0) {
+    console.log('📸 Processando com imagens:', images.length);
+  }
   
   const mainSendBtn = document.getElementById('sendBtn');
   if (mainSendBtn && chatStarted) {
@@ -1183,6 +1240,18 @@ async function processMessage(message) {
     const idToken = await currentUser.getIdToken();
     console.log('✅ Token obtido');
 
+    // 🖼️ Preparar payload com imagens se existirem
+    const payload = { 
+      message, 
+      conversationHistory, 
+      idToken 
+    };
+    
+    if (images.length > 0) {
+      payload.images = images;
+      console.log('📸 Adicionando imagens ao payload:', images.length);
+    }
+
     console.log('📤 Enviando para API:', API_CONFIG.chatEndpoint);
     const response = await fetch(API_CONFIG.chatEndpoint, {
       method: 'POST',
@@ -1190,11 +1259,7 @@ async function processMessage(message) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${idToken}`
       },
-      body: JSON.stringify({ 
-        message, 
-        conversationHistory, 
-        idToken 
-      })
+      body: JSON.stringify(payload)
     });
 
     console.log('📥 Resposta recebida:', response.status, response.statusText);
