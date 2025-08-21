@@ -158,6 +158,31 @@ async function parseRequestBody(req) {
   }
 }
 
+// ✅ Rate limiting simples em memória (produção recomenda Redis)
+const userRequestCount = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minuto
+const MAX_REQUESTS_PER_MINUTE = 10;
+
+function checkRateLimit(uid) {
+  const now = Date.now();
+  const userRequests = userRequestCount.get(uid) || [];
+  
+  // Remover requests antigos (fora da janela de tempo)
+  const validRequests = userRequests.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+  
+  // Verificar se excedeu o limite
+  if (validRequests.length >= MAX_REQUESTS_PER_MINUTE) {
+    console.warn(`🚫 Rate limit excedido para usuário: ${uid}`);
+    return false;
+  }
+  
+  // Adicionar request atual e atualizar
+  validRequests.push(now);
+  userRequestCount.set(uid, validRequests);
+  
+  return true;
+}
+
 // Middleware CORS dinâmico
 const corsMiddleware = cors({
   origin: (origin, callback) => {
@@ -477,49 +502,99 @@ async function consumeImageAnalysisQuota(db, uid, email, userData) {
   }
 }
 
+// ✅ OTIMIZAÇÃO: Seleção inteligente de modelo para economizar tokens
+function selectOptimalModel(hasImages, conversationHistory, currentMessage) {
+  // Se tem imagens na mensagem atual, sempre usar GPT-4o
+  if (hasImages) {
+    console.log('🎯 GPT-4o selecionado: análise de imagem detectada');
+    return 'gpt-4o';
+  }
+  
+  // Verificar se é follow-up de análise de imagem recente (últimas 2 mensagens)
+  const recentMessages = conversationHistory.slice(-2);
+  const hasRecentImageAnalysis = recentMessages.some(msg => 
+    msg.role === 'assistant' && 
+    (msg.content.includes('imagem') || msg.content.includes('vejo') || msg.content.includes('analise'))
+  );
+  
+  // Se é follow-up sobre imagem e pergunta específica, usar GPT-4o
+  if (hasRecentImageAnalysis && isImageRelatedFollowUp(currentMessage)) {
+    console.log('🎯 GPT-4o selecionado: follow-up sobre análise de imagem');
+    return 'gpt-4o';
+  }
+  
+  // Para conversas gerais, usar GPT-3.5-turbo (mais econômico)
+  console.log('🎯 GPT-3.5-turbo selecionado: conversa geral');
+  return 'gpt-3.5-turbo';
+}
+
+// ✅ Detectar se é pergunta relacionada à imagem analisada
+function isImageRelatedFollowUp(message) {
+  const imageKeywords = [
+    'imagem', 'foto', 'vejo', 'viu', 'mostrei', 'anexei',
+    'screenshot', 'captura', 'interface', 'tela', 'plugin',
+    'waveform', 'espectro', 'eq', 'compressor', 'daw'
+  ];
+  
+  const messageLower = message.toLowerCase();
+  return imageKeywords.some(keyword => messageLower.includes(keyword));
+}
+
 // System prompts para diferentes cenários
 const SYSTEM_PROMPTS = {
-  // Prompt para análise de imagens com GPT-4 Vision
-  imageAnalysis: `Você é o PROD.AI 🎵, um especialista master em produção musical e análise visual.
+  // ✅ MELHORIA: Prompt otimizado para análise de imagens com GPT-4 Vision
+  imageAnalysis: `Você é o PROD.AI 🎵, um especialista master em produção musical e análise visual técnica.
 
-INSTRUÇÕES PARA ANÁLISE DE IMAGENS:
-- Analise detalhadamente todas as imagens fornecidas
-- Identifique: interfaces, plugins, waveforms, espectrogramas, mixers, equipamentos, DAWs
-- Forneça feedback técnico específico sobre configurações visíveis
-- Sugira melhorias baseadas no que você vê
-- Explique problemas identificados nas imagens
-- Dê conselhos práticos e aplicáveis
-- Use valores específicos quando relevante (Hz, dB, ms)
-- Seja direto, técnico e preciso
+🎯 INSTRUÇÕES PARA ANÁLISE DE IMAGENS:
+- Analise detalhadamente todas as imagens com foco técnico e prático
+- Identifique: interfaces de DAW, plugins, waveforms, espectrogramas, mixers, equipamentos
+- Forneça feedback específico sobre configurações visíveis (valores exatos em Hz, dB, ms)
+- Sugira melhorias concretas baseadas no que você vê
+- Explique problemas identificados e suas causas
+- Dê conselhos imediatamente aplicáveis
+- Se vir múltiplas imagens, analise cada uma separadamente
 
-ESPECIALIDADES:
-- Análise de waveforms e espectrogramas
-- Configurações de plugins (EQ, compressores, reverbs)
-- Layouts de DAW e workflow
-- Equipamentos de estúdio
-- Problemas visuais em mixagem
-- Configurações de master chain
+🔍 ESPECIALIDADES DE ANÁLISE VISUAL:
+- Waveforms: dinâmica, clipping, headroom, fases
+- Espectrogramas: frequências dominantes, vazios espectrais, mascaramento
+- Plugins EQ: curvas problemáticas, frequências de corte/boost
+- Compressores: ratios, attack/release, threshold settings
+- DAWs: organização, routing, problemas de workflow
+- Master chain: ordem de plugins, configurações de limiting
 
-Responda de forma detalhada sobre o que você vê nas imagens e como melhorar.`,
+📊 FORMATO DE RESPOSTA:
+- Comece identificando o que vê na(s) imagem(ns)
+- Aponte problemas específicos com valores técnicos
+- Sugira correções práticas e imediatas
+- Finalize com dica pro aplicar agora
 
-  // Prompt padrão para conversas sem imagens
+Seja direto, técnico e focado em soluções práticas.`,
+
+  // Prompt padrão para conversas sem imagens  
   default: `Você é o PROD.AI 🎵, um especialista master em produção musical com conhecimento técnico avançado.
 
-INSTRUÇÕES PRINCIPAIS:
+🎯 INSTRUÇÕES PRINCIPAIS:
 - Seja direto, técnico e preciso em todas as respostas
-- Use valores específicos, frequências exatas (Hz), faixas dinâmicas (dB), tempos (ms)
+- Use valores específicos: frequências exatas (Hz), faixas dinâmicas (dB), tempos (ms)
 - Mencione equipamentos, plugins e técnicas por nome
 - Forneça parâmetros exatos quando relevante
 - Seja conciso mas completo - evite respostas genéricas
 - Dê conselhos práticos e aplicáveis imediatamente
 
-ESPECIALIDADES TÉCNICAS:
+🛠️ ESPECIALIDADES TÉCNICAS:
 - Mixagem: EQ preciso, compressão dinâmica, reverb/delay, automação
 - Mastering: Limiters, maximizers, análise espectral, LUFS, headroom
 - Sound Design: Síntese, sampling, modulação, efeitos
 - Arranjo: Teoria musical aplicada, harmonias, progressões
 - Acústica: Tratamento de sala, posicionamento de monitores
-- Workflow: Técnicas de produção rápida e eficiente`
+- Workflow: Técnicas de produção rápida e eficiente
+
+📋 FORMATO OBRIGATÓRIO:
+- Use emojis relevantes no início de cada parágrafo
+- Apresente valores técnicos quando aplicável
+- Finalize sempre com uma dica prática
+
+Responda com excelência técnica absoluta.`
 };
 
 // Função principal do handler
@@ -614,6 +689,15 @@ export default async function handler(req, res) {
     const uid = decoded.uid;
     const email = decoded.email;
 
+    // ✅ SEGURANÇA: Verificar rate limiting
+    if (!checkRateLimit(uid)) {
+      return sendResponse(429, { 
+        error: 'RATE_LIMIT_EXCEEDED', 
+        message: 'Muitas solicitações. Aguarde um momento antes de tentar novamente.',
+        retryAfter: 60
+      });
+    }
+
     // Gerenciar limites de usuário
     let userData;
     try {
@@ -687,10 +771,10 @@ export default async function handler(req, res) {
 
     messages.push(userMessage);
 
-    // Escolher modelo baseado no tipo de análise
-    const model = hasImages ? 'gpt-4o' : 'gpt-3.5-turbo';
+    // ✅ OTIMIZAÇÃO: Seleção inteligente de modelo para reduzir gastos de tokens
+    const model = selectOptimalModel(hasImages, conversationHistory, message);
     
-    console.log(`🤖 Usando modelo: ${model} ${hasImages ? '(análise de imagem)' : '(texto)'}`);
+    console.log(`🤖 Usando modelo: ${model} ${hasImages ? '(análise de imagem)' : model === 'gpt-4o' ? '(follow-up visual)' : '(texto)'}`);
 
     // Chamar API da OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -707,6 +791,7 @@ export default async function handler(req, res) {
       }),
     });
 
+    // ✅ MELHORIA: Tratamento de erro mais específico e retry em casos específicos
     if (!response.ok) {
       let errorDetails = 'Unknown error';
       try {
@@ -717,14 +802,20 @@ export default async function handler(req, res) {
       console.error('❌ OpenAI API Error:', {
         status: response.status,
         statusText: response.statusText,
-        details: errorDetails
+        details: errorDetails,
+        model: model,
+        hasImages: hasImages
       });
       
       // Mapear erros específicos da OpenAI
       if (response.status === 401) {
         throw new Error('OpenAI API key invalid or expired');
       } else if (response.status === 429) {
-        throw new Error('OpenAI API rate limit exceeded');
+        // Rate limit - sugerir retry
+        throw new Error('OpenAI API rate limit exceeded. Please try again in a moment.');
+      } else if (response.status === 400 && errorDetails.includes('image')) {
+        // Erro específico de imagem
+        throw new Error('Image format not supported or corrupted. Please try a different image.');
       } else if (response.status >= 500) {
         throw new Error('OpenAI service temporarily unavailable');
       } else {
@@ -735,7 +826,14 @@ export default async function handler(req, res) {
     const data = await response.json();
     const reply = data.choices[0].message.content;
 
-    console.log(`✅ [${requestId}] Resposta da IA gerada com sucesso`);
+    console.log(`✅ [${requestId}] Resposta da IA gerada com sucesso`, {
+      model: model,
+      hasImages: hasImages,
+      responseLength: reply.length,
+      tokenEstimate: Math.ceil(reply.length / 4), // Estimativa aproximada
+      imageQuotaUsed: imageQuotaInfo?.usadas || null,
+      userPlan: userData.plano
+    });
 
     // Preparar resposta final
     const responseData = {

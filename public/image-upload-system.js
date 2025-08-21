@@ -242,23 +242,33 @@ class ImagePreviewSystem {
     }
   }
 
-  // Adicionar uma imagem
+  // ✅ SEGURANÇA: Validação robusta de imagem
   async addImage(file) {
     console.log(`📸 Adicionando imagem: ${file.name}`);
 
-    // Validar tipo
+    // ✅ Validar tipo MIME
     if (!this.allowedTypes.includes(file.type)) {
       throw new Error(`Formato não suportado: ${file.name}. Use JPG, PNG ou WebP.`);
     }
 
-    // Validar tamanho
+    // ✅ Validar tamanho
     if (file.size > this.maxSizePerImage) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(1);
       throw new Error(`Imagem muito grande: ${file.name} (${sizeMB}MB). Máximo: 10MB.`);
     }
 
+    // ✅ Validar se é realmente uma imagem (header check)
+    if (!await this.isValidImageFile(file)) {
+      throw new Error(`Arquivo corrompido ou não é uma imagem válida: ${file.name}`);
+    }
+
     // Converter para base64
     const base64 = await this.fileToBase64(file);
+    
+    // ✅ Validar base64 gerado
+    if (!base64 || base64.length < 1000) { // Mínimo razoável para uma imagem
+      throw new Error(`Erro ao processar a imagem: ${file.name}`);
+    }
     
     // Criar thumbnail
     const thumbnail = await this.createThumbnail(base64);
@@ -277,6 +287,51 @@ class ImagePreviewSystem {
 
     this.selectedImages.push(imageObj);
     console.log(`✅ Imagem adicionada: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`);
+  }
+
+  // ✅ NOVA: Verificar se arquivo é realmente uma imagem
+  async isValidImageFile(file) {
+    return new Promise((resolve) => {
+      try {
+        // Verificar primeiros bytes do arquivo (magic numbers)
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const arr = new Uint8Array(e.target.result);
+            
+            // JPEG: FF D8 FF
+            if (arr[0] === 0xFF && arr[1] === 0xD8 && arr[2] === 0xFF) {
+              resolve(true);
+              return;
+            }
+            
+            // PNG: 89 50 4E 47
+            if (arr[0] === 0x89 && arr[1] === 0x50 && arr[2] === 0x4E && arr[3] === 0x47) {
+              resolve(true);
+              return;
+            }
+            
+            // WebP: 52 49 46 46 (RIFF) + WebP signature
+            if (arr[0] === 0x52 && arr[1] === 0x49 && arr[2] === 0x46 && arr[3] === 0x46) {
+              resolve(true);
+              return;
+            }
+            
+            console.warn('⚠️ Magic number não reconhecido para:', file.name);
+            resolve(false);
+          } catch (error) {
+            console.warn('⚠️ Erro ao verificar header da imagem:', error);
+            resolve(false);
+          }
+        };
+        
+        reader.onerror = () => resolve(false);
+        reader.readAsArrayBuffer(file.slice(0, 8)); // Ler apenas primeiros 8 bytes
+      } catch (error) {
+        console.warn('⚠️ Erro na validação de imagem:', error);
+        resolve(false);
+      }
+    });
   }
 
   // Converter arquivo para base64
@@ -622,51 +677,78 @@ class ImagePreviewSystem {
     this.showToast(message, 'success');
   }
 
-  // Sistema de toast simples
-  showToast(message, type = 'info') {
+  // ✅ MELHORIA: Sistema de toast com mais informações
+  showToast(message, type = 'info', duration = 3000) {
     // Remover toasts existentes
     document.querySelectorAll('.image-toast').forEach(toast => toast.remove());
 
     const toast = document.createElement('div');
     toast.className = 'image-toast';
+    
+    // ✅ Cores e ícones melhorados
+    const toastStyles = {
+      error: { bg: 'rgba(220, 38, 38, 0.95)', icon: '❌' },
+      success: { bg: 'rgba(34, 197, 94, 0.95)', icon: '✅' },
+      warning: { bg: 'rgba(245, 158, 11, 0.95)', icon: '⚠️' },
+      info: { bg: 'rgba(59, 130, 246, 0.95)', icon: 'ℹ️' }
+    };
+    
+    const style = toastStyles[type] || toastStyles.info;
+    
     toast.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      padding: 12px 16px;
-      background: ${type === 'error' ? 'rgba(255, 0, 0, 0.9)' : 'rgba(0, 150, 0, 0.9)'};
+      padding: 14px 18px;
+      background: ${style.bg};
       color: white;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 14px;
+      font-weight: 500;
       z-index: 10000;
       animation: slideIn 0.3s ease;
-      max-width: 300px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      max-width: 320px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     `;
 
-    toast.textContent = message;
+    // ✅ Conteúdo com ícone
+    toast.innerHTML = `
+      <div style="display: flex; align-items: flex-start; gap: 8px;">
+        <span style="font-size: 16px; margin-top: 1px;">${style.icon}</span>
+        <span style="flex: 1; line-height: 1.4;">${message}</span>
+      </div>
+    `;
+
     document.body.appendChild(toast);
 
     // Adicionar animação CSS se não existir
     if (!document.querySelector('#toast-styles')) {
-      const style = document.createElement('style');
-      style.id = 'toast-styles';
-      style.textContent = `
+      const styleElement = document.createElement('style');
+      styleElement.id = 'toast-styles';
+      styleElement.textContent = `
         @keyframes slideIn {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
+        @keyframes slideOut {
+          from { transform: translateX(0); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
+        }
       `;
-      document.head.appendChild(style);
+      document.head.appendChild(styleElement);
     }
 
-    // Remover toast após 3 segundos
+    // ✅ Remover toast com animação
     setTimeout(() => {
       if (toast.parentNode) {
-        toast.style.animation = 'slideIn 0.3s ease reverse';
-        setTimeout(() => toast.remove(), 300);
+        toast.style.animation = 'slideOut 0.3s ease forwards';
+        setTimeout(() => {
+          if (toast.parentNode) toast.remove();
+        }, 300);
       }
-    }, 3000);
+    }, duration);
   }
 }
 
