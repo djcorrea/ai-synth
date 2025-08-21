@@ -725,6 +725,13 @@ Responda com excelência técnica absoluta.`
 
 // Função principal do handler
 export default async function handler(req, res) {
+  // ✅ CRÍTICO: Declarar todas as variáveis no início do escopo para evitar ReferenceError
+  let hasImages = false;
+  let modelSelection = null;
+  let requestTimeout = 60000;
+  let requestData = null;
+  let decoded = null;
+  
   const requestId = Math.random().toString(36).substring(7);
   console.log(`🔄 [${requestId}] Nova requisição recebida:`, {
     method: req.method,
@@ -761,13 +768,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ CORREÇÃO: Declarar variáveis no escopo da função
-    let requestData;
-    let decoded = null;
-    let hasImages = false;
-    let modelSelection = null;
-    let requestTimeout = 60000; // Default timeout
-    
     // ✅ CORREÇÃO: Processar body dinamicamente (JSON ou multipart) com error handling
     try {
       requestData = await parseRequestBody(req);
@@ -1008,7 +1008,7 @@ export default async function handler(req, res) {
       stack: error.stack,
       timestamp: new Date().toISOString(),
       userId: 'unknown',
-      hasImages: !!hasImages,
+      hasImages: typeof hasImages !== 'undefined' ? !!hasImages : false,
       userAgent: req.headers['user-agent'],
       origin: req.headers.origin,
       contentType: req.headers['content-type']
@@ -1017,9 +1017,9 @@ export default async function handler(req, res) {
     // ✅ Tratamento específico para AbortError (timeout)
     if (error.name === 'AbortError') {
       console.error('⏰ Timeout na requisição para OpenAI:', {
-        timeout: requestTimeout,
+        timeout: typeof requestTimeout !== 'undefined' ? requestTimeout : 60000,
         model: modelSelection ? modelSelection.model : 'unknown',
-        hasImages
+        hasImages: typeof hasImages !== 'undefined' ? hasImages : false
       });
       return sendResponse(408, { 
         error: 'REQUEST_TIMEOUT', 
