@@ -611,6 +611,9 @@ class AudioAnalyzer {
   // ===== FASE 1 AUDITORIA: UNIFICAÇÃO E OBSERVAÇÃO (ZERO RISCO) =====
   const unifiedData = getUnifiedAnalysisData(baseAnalysis, td, metrics);
   performConsistencyAudit(unifiedData, baseAnalysis);
+  
+  // ===== FASE 2: APLICAR DADOS UNIFICADOS (BAIXO RISCO) =====
+  applyUnifiedCorrections(baseAnalysis, td, unifiedData);
   // ================================================================
   
   try {
@@ -730,7 +733,11 @@ class AudioAnalyzer {
       if (!baseAnalysis.qualityBreakdown) {
         const ref = (typeof window !== 'undefined' && window.PROD_AI_REF_DATA) ? window.PROD_AI_REF_DATA : null;
         const safe = (v,def=0)=> Number.isFinite(v)?v:def;
-        const lufsInt = safe(td.lufsIntegrated, safe(baseAnalysis.technicalData?.rms));
+        // FASE 2: Usar dados unificados para LUFS (sem fallback RMS problemático)
+        const lufsInt = safe(td.lufsIntegrated, null); // Não usar RMS como fallback
+        if (lufsInt === null) {
+          console.warn('🔍 FASE 2: LUFS não disponível, pulando cálculo de loudness score');
+        }
         const dr = safe(baseAnalysis.technicalData?.dynamicRange);
         const crest = safe(td.crestFactor);
         const corr = safe(td.stereoCorrelation,0);
@@ -738,8 +745,10 @@ class AudioAnalyzer {
         const freqIdealLow = 1800, freqIdealHigh = 3200;
         const refLufs = ref?.lufs_target ?? -14;
         const refDR = ref?.dr_target ?? 10;
-        // Scores
-        const scoreLoud = 100 - Math.min(100, Math.abs(lufsInt - refLufs) * 6); // 3 dB -> -18 pontos
+        // Scores - FASE 2: Tratar LUFS nulo de forma segura
+        const scoreLoud = (lufsInt !== null) 
+          ? 100 - Math.min(100, Math.abs(lufsInt - refLufs) * 6) 
+          : 50; // Score neutro quando LUFS não disponível
         const scoreDyn = 100 - Math.min(100, Math.abs(dr - refDR) * 10); // 2 dB -> -20
         let scoreTech = 100;
         if (safe(baseAnalysis.technicalData?.clippingSamples) > 0) scoreTech -= 20;
@@ -2678,6 +2687,97 @@ function performConsistencyAudit(unifiedData, baseAnalysis) {
     // Manter apenas últimos 10 resultados
     if (window.__AUDIT_RESULTS__.length > 10) {
       window.__AUDIT_RESULTS__ = window.__AUDIT_RESULTS__.slice(-10);
+  }
+}
+
+/**
+ * FASE 2: Aplicar correções baseadas em dados unificados
+ * ⚠️ BAIXO RISCO: Correções cosméticas e de consistência
+ */
+function applyUnifiedCorrections(baseAnalysis, technicalData, unifiedData) {
+  if (!window.DEBUG_ANALYZER && !window.ENABLE_PHASE2_CORRECTIONS) return;
+  
+  const corrections = [];
+  
+  // 🔧 CORREÇÃO 1: Garantir dinâmica nunca negativa
+  if (technicalData.lra !== null && technicalData.lra < 0) {
+    const originalLRA = technicalData.lra;
+    technicalData.lra = Math.max(0, technicalData.lra);
+    corrections.push({
+      type: 'NEGATIVE_DYNAMICS_FIXED',
+      description: `LRA corrigido: ${originalLRA.toFixed(2)} → ${technicalData.lra.toFixed(2)}`,
+      original: originalLRA,
+      corrected: technicalData.lra
+    });
+  }
+  
+  // 🔧 CORREÇÃO 2: Formatação de picos (preparar para futuras melhorias)
+  const peakFields = ['truePeakDbtp', 'samplePeakLeftDb', 'samplePeakRightDb'];
+  peakFields.forEach(field => {
+    if (technicalData[field] !== null && Number.isFinite(technicalData[field])) {
+      const original = technicalData[field];
+      // Assegurar precisão de 2 casas decimais para picos
+      technicalData[field] = Math.round(original * 100) / 100;
+      
+      if (Math.abs(original - technicalData[field]) > 0.001) {
+        corrections.push({
+          type: 'PEAK_FORMATTING_IMPROVED',
+          field: field,
+          description: `${field} formatado: ${original} → ${technicalData[field]}`,
+          original: original,
+          corrected: technicalData[field]
+        });
+      }
+    }
+  });
+  
+  // 🔧 CORREÇÃO 3: Filtrar sugestões perigosas quando há clipping
+  if (Array.isArray(baseAnalysis.suggestions) && 
+      (unifiedData.clippingSamples > 0 || unifiedData.truePeakDbtp >= -0.1)) {
+    
+    const originalLength = baseAnalysis.suggestions.length;
+    
+    // Remover sugestões que mencionam aumentar volume/picos
+    baseAnalysis.suggestions = baseAnalysis.suggestions.filter(suggestion => {
+      const message = suggestion?.message || '';
+      const isDangerous = /aumentar.*volume|aumentar.*dBTP|mais.*loudness|push.*limiter/i.test(message);
+      return !isDangerous;
+    });
+    
+    if (baseAnalysis.suggestions.length < originalLength) {
+      corrections.push({
+        type: 'DANGEROUS_SUGGESTIONS_FILTERED',
+        description: `Removidas ${originalLength - baseAnalysis.suggestions.length} sugestões perigosas com clipping presente`,
+        clippingSamples: unifiedData.clippingSamples,
+        truePeak: unifiedData.truePeakDbtp,
+        filtered: originalLength - baseAnalysis.suggestions.length
+      });
+    }
+  }
+  
+  // 📊 Log das correções aplicadas
+  if (corrections.length > 0) {
+    console.group('🔧 FASE 2 - Correções Aplicadas');
+    corrections.forEach(correction => {
+      console.log(`✅ ${correction.type}: ${correction.description}`);
+    });
+    console.groupEnd();
+  } else if (window.DEBUG_ANALYZER) {
+    console.log('🔧 FASE 2: Nenhuma correção necessária');
+  }
+  
+  // Armazenar correções para análise
+  if (typeof window !== 'undefined') {
+    window.__PHASE2_CORRECTIONS__ = window.__PHASE2_CORRECTIONS__ || [];
+    window.__PHASE2_CORRECTIONS__.push({
+      timestamp: Date.now(),
+      corrections: corrections.slice(),
+      unifiedData: { ...unifiedData }
+    });
+    
+    // Manter apenas últimos 10 resultados
+    if (window.__PHASE2_CORRECTIONS__.length > 10) {
+      window.__PHASE2_CORRECTIONS__ = window.__PHASE2_CORRECTIONS__.slice(-10);
     }
   }
 }
