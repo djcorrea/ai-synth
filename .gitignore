@@ -1,11 +1,14 @@
 .vercel
 
-.vercel
-
-.vercel
-
-.vercel
-
 # Ignorar samples de referência (áudio pesado não versionado)
 refs/*/samples/
 refs/*/samples/**
+
+# Ignorar hooks de pre-commit para evitar problemas
+.husky/
+*.husky*
+
+# Ignorar arquivos temporários
+node_modules/
+.env
+.env.local
