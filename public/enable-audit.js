@@ -1,4 +1,4 @@
-// 🔍 ATIVADOR DE AUDITORIA - FASES 1, 2, 3 & 4
+// 🔍 ATIVADOR DE AUDITORIA - FASES 1-5 COMPLETAS
 // Este arquivo ativa os logs de auditoria para detectar inconsistências
 
 // Habilitar logs detalhados de auditoria e correções
@@ -6,9 +6,10 @@ window.DEBUG_ANALYZER = true;
 window.ENABLE_AUDIT_LOGS = true;
 window.ENABLE_PHASE2_CORRECTIONS = true;
 window.ENABLE_PHASE3_LOGIC_ALIGNMENT = true;
-window.ENABLE_PHASE4_FINAL_AUDIT = true; // NOVO: Fase 4
+window.ENABLE_PHASE4_FINAL_AUDIT = true;
+window.ENABLE_PHASE5_CRITICAL_FIXES = true; // NOVO: Fase 5 - Correções Críticas
 
-console.log('🔍 AUDITORIA FASES 1-4 ATIVADAS - Sistema completo de correções habilitado');
+console.log('🔍 AUDITORIA FASES 1-5 ATIVADAS - Sistema completo de correções críticas habilitado');
 
 // Função helper para consultar resultados da auditoria
 window.getAuditResults = function() {
@@ -95,8 +96,9 @@ window.clearAuditResults = function() {
   window.__AUDIT_RESULTS__ = [];
   window.__PHASE2_CORRECTIONS__ = [];
   window.__PHASE3_CORRECTIONS__ = [];
-  window.__PHASE4_CORRECTIONS__ = []; // NOVO: Fase 4
-  console.log('🗑️ Cache de auditoria e correções (Fases 1-4) limpo');
+  window.__PHASE4_CORRECTIONS__ = [];
+  window.__PHASE5_CORRECTIONS__ = []; // NOVO: Fase 5
+  console.log('🗑️ Cache de auditoria e correções (Fases 1-5) limpo');
 };
 
 // 🎯 NOVO: Função para verificar correções da Fase 3
@@ -158,16 +160,20 @@ window.getCompleteAudit = function() {
   console.log('\n🎯 FASE 4 - Auditoria Final Completa:');
   const phase4 = window.getPhase4Corrections();
   
+  console.log('\n🎯 FASE 5 - Correções Críticas Específicas:');
+  const phase5 = window.getPhase5Corrections();
+  
   console.log('\n📈 RESUMO GERAL:');
   console.log(`Análises auditadas: ${phase1.totalAnalyses}`);
   console.log(`Problemas críticos: ${phase1.criticalIssues}`);
   console.log(`Correções Fase 2: ${phase2.totalCorrections}`);
   console.log(`Correções Fase 3: ${phase3.totalCorrections}`);
   console.log(`Correções Fase 4: ${phase4.totalCorrections}`);
+  console.log(`Correções Fase 5: ${phase5.totalCorrections}`);
   
   console.groupEnd();
   
-  return { phase1, phase2, phase3, phase4 };
+  return { phase1, phase2, phase3, phase4, phase5 };
 };
 
 // 🎯 NOVO: Função para verificar correções da Fase 4
@@ -224,6 +230,61 @@ console.log('📋 Comandos disponíveis:');
 console.log('- window.getAuditResults() - Ver resultados da auditoria (Fase 1)');
 console.log('- window.getPhase2Corrections() - Ver correções aplicadas na Fase 2');
 console.log('- window.getPhase3Corrections() - Ver correções aplicadas na Fase 3');
-console.log('- window.getPhase4Corrections() - Ver auditoria final completa na Fase 4 (NOVO)');
+console.log('- window.getPhase4Corrections() - Ver auditoria final completa na Fase 4');
+console.log('- window.getPhase5Corrections() - Ver correções críticas específicas na Fase 5 (NOVO)');
 console.log('- window.getCompleteAudit() - Ver auditoria completa de todas as fases (atualizado)');
 console.log('- window.clearAuditResults() - Limpar cache de auditoria e correções');
+
+// 🎯 NOVO: Função para verificar correções da Fase 5
+window.getPhase5Corrections = function() {
+  const corrections = window.__PHASE5_CORRECTIONS__ || [];
+  
+  console.group('🎯 FASE 5 - CORREÇÕES CRÍTICAS ESPECÍFICAS');
+  console.log(`Total de análises com correções críticas: ${corrections.length}`);
+  
+  const allCorrections = corrections.flatMap(r => r.corrections);
+  const correctionTypes = {};
+  
+  allCorrections.forEach(correction => {
+    correctionTypes[correction.type] = (correctionTypes[correction.type] || 0) + 1;
+  });
+  
+  if (allCorrections.length > 0) {
+    console.group('📈 TIPOS DE CORREÇÕES CRÍTICAS');
+    Object.entries(correctionTypes).forEach(([type, count]) => {
+      console.log(`${type}: ${count} ocorrências`);
+    });
+    console.groupEnd();
+    
+    console.group('📋 DETALHES DAS CORREÇÕES CRÍTICAS');
+    allCorrections.forEach(correction => {
+      console.log(`🎯 ${correction.type}: ${correction.description}`);
+    });
+    console.groupEnd();
+    
+    console.group('📊 VERIFICAÇÕES CRÍTICAS REALIZADAS');
+    corrections.slice(-2).forEach((entry, index) => {
+      if (entry.criticalChecks) {
+        const checks = entry.criticalChecks;
+        console.log(`Análise ${index + 1}:`);
+        console.log(`  LUFS fontes: ${checks.lufsValues?.length || 0}`);
+        console.log(`  Dinâmica: ${checks.dynamicsValue?.toFixed(2) || 'N/A'}`);
+        console.log(`  Score técnico: ${checks.technicalScore || 0}`);
+        console.log(`  Mono compatibility: ${checks.monoCompatibility || 'N/A'}`);
+        console.log(`  Sugestões: ${checks.suggestionsCount || 0}`);
+      }
+    });
+    console.groupEnd();
+  } else {
+    console.log('ℹ️ Nenhuma correção crítica aplicada ainda');
+  }
+  
+  console.groupEnd();
+  
+  return {
+    totalAnalyses: corrections.length,
+    totalCorrections: allCorrections.length,
+    correctionTypes: correctionTypes,
+    corrections: corrections
+  };
+};
