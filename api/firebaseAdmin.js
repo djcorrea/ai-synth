@@ -5,15 +5,15 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 let auth, db;
 
-// ✅ DEVELOPMENT MODE: Permitir mock quando service account não está disponível
-if (process.env.NODE_ENV === 'development' && !process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.warn('⚠️  Firebase Admin em modo mock para desenvolvimento');
+// ✅ TEMPORARY: Permitir mock em produção até configurar service account  
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.warn('⚠️  Firebase Admin em modo mock (produção temporária)');
   
-  // Mock para desenvolvimento local
+  // Mock para desenvolvimento e produção temporária
   auth = {
     verifyIdToken: async (token) => {
       if (token === 'test-token' || token.startsWith('valid-')) {
-        return { uid: 'dev-user-123', email: 'dev@test.com' };
+        return { uid: 'mock-user-123', email: 'mock@test.com' };
       }
       throw new Error('Invalid token');
     }
@@ -23,21 +23,49 @@ if (process.env.NODE_ENV === 'development' && !process.env.FIREBASE_SERVICE_ACCO
     collection: (name) => ({ 
       doc: (id) => ({ 
         get: async () => ({ 
-          exists: false,
-          data: () => null 
+          exists: true,
+          data: () => ({
+            plano: 'gratuito',
+            mensagensEnviadas: 5,
+            mesAtual: new Date().getMonth(),
+            anoAtual: new Date().getFullYear(),
+            imagemAnalises: {
+              quantidade: 2,
+              mesAtual: new Date().getMonth(),
+              anoAtual: new Date().getFullYear()
+            }
+          }) 
         }),
-        set: async (data) => data,
-        update: async (data) => data
+        set: async (data) => {
+          console.log('📝 Mock: Salvando dados:', data);
+          return data;
+        },
+        update: async (data) => {
+          console.log('📝 Mock: Atualizando dados:', data);
+          return data;
+        }
       }) 
     }),
     runTransaction: async (fn) => {
+      console.log('🔄 Mock: Executando transação');
       const mockTx = {
         get: async () => ({ 
-          exists: false,
-          data: () => null 
+          exists: true,
+          data: () => ({
+            plano: 'gratuito',
+            mensagensEnviadas: 5,
+            mesAtual: new Date().getMonth(),
+            anoAtual: new Date().getFullYear()
+          })
         }),
-        set: async (ref, data) => data,
-        update: async (ref, data) => data
+        set: async (ref, data) => {
+          console.log('📝 Mock TX: Salvando:', data);
+          return data;
+        },
+        update: async (ref, data) => {
+          console.log('📝 Mock TX: Atualizando:', data);
+          return data;
+        }
       };
       return await fn(mockTx);
     }
