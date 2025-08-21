@@ -1,13 +1,14 @@
 {
   "version": 2,
   "env": {
-    "FORCE_REBUILD": "1724253600"
+    "FORCE_REBUILD": "1724254320",
+    "NODE_ENV": "production"
   },
   "builds": [
     { "src": "api/**/*.js", "use": "@vercel/node" },
-    { "src": "public/**",    "use": "@vercel/static" },
-  { "src": "refs/out/**",  "use": "@vercel/static" },
-  { "src": "lib/**",       "use": "@vercel/static" }
+    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "refs/out/**", "use": "@vercel/static" },
+    { "src": "lib/**", "use": "@vercel/static" }
   ],
   "routes": [
   { "src": "/refs/out/(.*)", "dest": "/public/refs/out/$1" },
