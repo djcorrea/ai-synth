@@ -572,6 +572,9 @@ async function consumeImageAnalysisQuota(db, uid, email, userData) {
 // ✅ OTIMIZAÇÃO: Seleção inteligente de modelo para economizar tokens
 function selectOptimalModel(hasImages, conversationHistory, currentMessage) {
   try {
+    // ✅ DEBUG: Log entrada da função
+    console.log('🎯 selectOptimalModel chamada com:', { hasImages, messageLength: currentMessage.length });
+    
     // ✅ REGRA CRÍTICA: Imagens sempre usam GPT-4o
     if (hasImages) {
       console.log('🎯 GPT-4o selecionado: análise de imagem detectada');
@@ -807,6 +810,13 @@ export default async function handler(req, res) {
 
     const { message, conversationHistory, idToken, images } = validatedData;
     hasImages = validatedData.hasImages;
+    
+    // ✅ DEBUG: Log critical para diagnosticar seleção de modelo
+    console.log(`🔍 [${requestId}] Estado antes da seleção de modelo:`, {
+      hasImages,
+      imageCount: images ? images.length : 0,
+      validatedDataHasImages: validatedData.hasImages
+    });
 
     // Verificar autenticação
     try {
@@ -903,6 +913,17 @@ export default async function handler(req, res) {
 
     // ✅ OTIMIZAÇÃO: Seleção inteligente de modelo para reduzir gastos de tokens
     modelSelection = selectOptimalModel(hasImages, conversationHistory, message);
+    
+    // ✅ SEGURANÇA CRÍTICA: Garantir GPT-4o para imagens (double-check)
+    if (hasImages && modelSelection.model !== 'gpt-4o') {
+      console.warn('🚨 CORREÇÃO CRÍTICA: Forçando GPT-4o para imagens!');
+      modelSelection = {
+        model: 'gpt-4o',
+        reason: 'FORCED_FOR_IMAGES_SAFETY',
+        maxTokens: MAX_IMAGE_ANALYSIS_TOKENS,
+        temperature: 0.7
+      };
+    }
     
     console.log(`🤖 Usando modelo: ${modelSelection.model}`, {
       reason: modelSelection.reason,
