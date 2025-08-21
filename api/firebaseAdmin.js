@@ -12,10 +12,13 @@ if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   // Mock para desenvolvimento e produção temporária
   auth = {
     verifyIdToken: async (token) => {
-      if (token === 'test-token' || token.startsWith('valid-')) {
-        return { uid: 'mock-user-123', email: 'mock@test.com' };
-      }
-      throw new Error('Invalid token');
+      // ✅ ACEITAR QUALQUER TOKEN para teste temporário
+      console.log(`🔑 Mock: Validando token: ${token?.substring(0, 20)}...`);
+      return { 
+        uid: 'mock-user-123', 
+        email: 'mock@test.com',
+        name: 'Usuário Mock' 
+      };
     }
   };
   
