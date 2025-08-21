@@ -609,11 +609,21 @@ class AudioAnalyzer {
   td.clippingPct = isFinite(core.clippingPercentage) ? core.clippingPercentage : null;
   
   // ===== FASE 1 AUDITORIA: UNIFICAÇÃO E OBSERVAÇÃO (ZERO RISCO) =====
-  const unifiedData = getUnifiedAnalysisData(baseAnalysis, td, metrics);
-  performConsistencyAudit(unifiedData, baseAnalysis);
-  
-  // ===== FASE 2: APLICAR DADOS UNIFICADOS (BAIXO RISCO) =====
-  applyUnifiedCorrections(baseAnalysis, td, unifiedData);
+  try {
+    if (baseAnalysis && td && typeof getUnifiedAnalysisData === 'function') {
+      const unifiedData = getUnifiedAnalysisData(baseAnalysis, td, metrics);
+      if (typeof performConsistencyAudit === 'function') {
+        performConsistencyAudit(unifiedData, baseAnalysis);
+      }
+      
+      // ===== FASE 2: APLICAR DADOS UNIFICADOS (BAIXO RISCO) =====
+      if (typeof applyUnifiedCorrections === 'function') {
+        applyUnifiedCorrections(baseAnalysis, td, unifiedData);
+      }
+    }
+  } catch (auditError) {
+    console.warn('⚠️ Erro nas correções de auditoria:', auditError);
+  }
   // ================================================================
   
   try {
@@ -2542,11 +2552,17 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
  * ⚠️ ZERO RISCO: Apenas observa e organiza, não altera comportamento
  */
 function getUnifiedAnalysisData(baseAnalysis, technicalData, v2Metrics) {
-  const unified = {
-    // LUFS - Prioridade: V2 > V1 fallback
-    lufsIntegrated: technicalData?.lufsIntegrated ?? 
-                   v2Metrics?.loudness?.lufs_integrated ?? 
-                   baseAnalysis?.technicalData?.rms ?? null,
+  try {
+    if (!baseAnalysis || !technicalData) {
+      console.warn('🔍 FASE 1: Dados insuficientes para unificação');
+      return {};
+    }
+    
+    const unified = {
+      // LUFS - Prioridade: V2 > V1 fallback
+      lufsIntegrated: technicalData?.lufsIntegrated ?? 
+                     v2Metrics?.loudness?.lufs_integrated ?? 
+                     baseAnalysis?.technicalData?.rms ?? null,
     
     lufsShortTerm: technicalData?.lufsShortTerm ?? 
                    v2Metrics?.loudness?.lufs_short_term ?? null,
@@ -2586,6 +2602,11 @@ function getUnifiedAnalysisData(baseAnalysis, technicalData, v2Metrics) {
   };
   
   return unified;
+  
+  } catch (unificationError) {
+    console.warn('🔍 FASE 1: Erro na unificação:', unificationError.message);
+    return {}; // Retorna objeto vazio em caso de erro
+  }
 }
 
 /**
@@ -2593,7 +2614,13 @@ function getUnifiedAnalysisData(baseAnalysis, technicalData, v2Metrics) {
  * ⚠️ ZERO RISCO: Apenas logs, não altera comportamento
  */
 function performConsistencyAudit(unifiedData, baseAnalysis) {
-  if (!window.DEBUG_ANALYZER && !window.ENABLE_AUDIT_LOGS) return;
+  try {
+    if (!unifiedData || !baseAnalysis) {
+      console.warn('🔍 FASE 1: Dados insuficientes para auditoria');
+      return;
+    }
+    
+    if (!window.DEBUG_ANALYZER && !window.ENABLE_AUDIT_LOGS) return;
   
   const issues = [];
   const warnings = [];
@@ -2687,6 +2714,11 @@ function performConsistencyAudit(unifiedData, baseAnalysis) {
     // Manter apenas últimos 10 resultados
     if (window.__AUDIT_RESULTS__.length > 10) {
       window.__AUDIT_RESULTS__ = window.__AUDIT_RESULTS__.slice(-10);
+    }
+  }
+  
+  } catch (auditError) {
+    console.warn('🔍 FASE 1: Erro na auditoria:', auditError.message);
   }
 }
 
@@ -2695,7 +2727,13 @@ function performConsistencyAudit(unifiedData, baseAnalysis) {
  * ⚠️ BAIXO RISCO: Correções cosméticas e de consistência
  */
 function applyUnifiedCorrections(baseAnalysis, technicalData, unifiedData) {
-  if (!window.DEBUG_ANALYZER && !window.ENABLE_PHASE2_CORRECTIONS) return;
+  try {
+    if (!baseAnalysis || !technicalData || !unifiedData) {
+      console.warn('🔧 FASE 2: Dados insuficientes para correções');
+      return;
+    }
+    
+    if (!window.DEBUG_ANALYZER && !window.ENABLE_PHASE2_CORRECTIONS) return;
   
   const corrections = [];
   
@@ -2779,6 +2817,11 @@ function applyUnifiedCorrections(baseAnalysis, technicalData, unifiedData) {
     if (window.__PHASE2_CORRECTIONS__.length > 10) {
       window.__PHASE2_CORRECTIONS__ = window.__PHASE2_CORRECTIONS__.slice(-10);
     }
+  }
+  
+  } catch (phase2Error) {
+    console.warn('🔧 FASE 2: Erro nas correções:', phase2Error.message);
+    // Continuar sem as correções em caso de erro
   }
 }
 
