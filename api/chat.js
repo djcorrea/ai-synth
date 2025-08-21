@@ -761,7 +761,7 @@ export default async function handler(req, res) {
       message: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString(),
-      userId: decoded?.uid || 'unknown',
+      userId: 'unknown',
       hasImages: !!hasImages,
       userAgent: req.headers['user-agent'],
       origin: req.headers.origin,
