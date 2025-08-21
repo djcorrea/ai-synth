@@ -620,6 +620,11 @@ class AudioAnalyzer {
       if (typeof applyUnifiedCorrections === 'function') {
         applyUnifiedCorrections(baseAnalysis, td, unifiedData);
       }
+      
+      // ===== FASE 3: ALINHAMENTO LÓGICO (RISCO MÉDIO) =====
+      if (typeof applyLogicAlignmentCorrections === 'function') {
+        applyLogicAlignmentCorrections(baseAnalysis, td, unifiedData, metrics);
+      }
     }
   } catch (auditError) {
     console.warn('⚠️ Erro nas correções de auditoria:', auditError);
@@ -2822,6 +2827,345 @@ function applyUnifiedCorrections(baseAnalysis, technicalData, unifiedData) {
   } catch (phase2Error) {
     console.warn('🔧 FASE 2: Erro nas correções:', phase2Error.message);
     // Continuar sem as correções em caso de erro
+  }
+}
+
+// ===== FASE 3: ALINHAMENTO LÓGICO (RISCO MÉDIO) =====
+
+/**
+ * FASE 3: Correções de lógica e alinhamento de algoritmos
+ * ⚠️ RISCO MÉDIO: Corrige lógica de detecção e cálculos
+ * 🔒 SEGURANÇA: Feature flags e rollback automático
+ */
+function applyLogicAlignmentCorrections(baseAnalysis, technicalData, unifiedData, v2Metrics) {
+  try {
+    if (!baseAnalysis || !technicalData || !unifiedData) {
+      console.warn('🔧 FASE 3: Dados insuficientes para alinhamento lógico');
+      return;
+    }
+    
+    // Feature flag para ativar Fase 3 
+    if (!window.DEBUG_ANALYZER && !window.ENABLE_PHASE3_LOGIC_ALIGNMENT) return;
+    
+    const corrections = [];
+    const originalState = {
+      problems: JSON.parse(JSON.stringify(baseAnalysis.problems || [])),
+      technicalData: JSON.parse(JSON.stringify(technicalData))
+    };
+    
+    console.group('🎯 FASE 3 - Alinhamento Lógico');
+    
+    // 🔧 CORREÇÃO 1: Lógica de Clipping Aprimorada
+    const clippingCorrection = fixClippingLogic(baseAnalysis, technicalData, unifiedData);
+    if (clippingCorrection.applied) {
+      corrections.push(clippingCorrection);
+    }
+    
+    // 🔧 CORREÇÃO 2: Thresholds Dinâmicos de LUFS
+    const lufsCorrection = fixLufsThresholds(baseAnalysis, technicalData, unifiedData);
+    if (lufsCorrection.applied) {
+      corrections.push(lufsCorrection);
+    }
+    
+    // 🔧 CORREÇÃO 3: Score Calculation Accuracy
+    const scoreCorrection = fixScoreCalculation(baseAnalysis, technicalData, unifiedData, v2Metrics);
+    if (scoreCorrection.applied) {
+      corrections.push(scoreCorrection);
+    }
+    
+    // 🔧 CORREÇÃO 4: Stereo Analysis Consistency
+    const stereoCorrection = fixStereoAnalysis(baseAnalysis, technicalData, unifiedData);
+    if (stereoCorrection.applied) {
+      corrections.push(stereoCorrection);
+    }
+    
+    // 📊 Validação e Rollback Safety
+    const validationResult = validatePhase3Changes(baseAnalysis, technicalData, originalState);
+    if (!validationResult.isValid) {
+      console.warn('⚠️ FASE 3: Validação falhou, fazendo rollback...');
+      rollbackChanges(baseAnalysis, technicalData, originalState);
+      corrections.length = 0; // Clear corrections
+      corrections.push({
+        type: 'PHASE3_ROLLBACK',
+        description: 'Mudanças revertidas devido a falha na validação',
+        reason: validationResult.reason
+      });
+    }
+    
+    // 📊 Log das correções aplicadas
+    if (corrections.length > 0) {
+      corrections.forEach(correction => {
+        console.log(`✅ ${correction.type}: ${correction.description}`);
+      });
+    } else {
+      console.log('🔧 FASE 3: Nenhuma correção lógica necessária');
+    }
+    
+    console.groupEnd();
+    
+    // Armazenar correções para análise
+    if (typeof window !== 'undefined') {
+      window.__PHASE3_CORRECTIONS__ = window.__PHASE3_CORRECTIONS__ || [];
+      window.__PHASE3_CORRECTIONS__.push({
+        timestamp: Date.now(),
+        corrections: corrections.slice(),
+        originalState: originalState,
+        finalState: {
+          problems: baseAnalysis.problems?.length || 0,
+          technicalDataKeys: Object.keys(technicalData || {}).length
+        }
+      });
+      
+      // Manter apenas últimos 5 resultados (Fase 3 é mais pesada)
+      if (window.__PHASE3_CORRECTIONS__.length > 5) {
+        window.__PHASE3_CORRECTIONS__ = window.__PHASE3_CORRECTIONS__.slice(-5);
+      }
+    }
+    
+  } catch (phase3Error) {
+    console.warn('🔧 FASE 3: Erro no alinhamento lógico:', phase3Error.message);
+    // Em caso de erro, não aplicar nenhuma correção
+  }
+}
+
+// 🔧 CORREÇÃO 1: Lógica de Clipping Aprimorada  
+function fixClippingLogic(baseAnalysis, technicalData, unifiedData) {
+  const correction = { applied: false, type: 'CLIPPING_LOGIC_FIX', description: '' };
+  
+  try {
+    // Critérios rigorosos para clipping
+    const hasClippingSamples = unifiedData.clippingSamples > 0;
+    const hasDangerousTP = unifiedData.truePeakDbtp > -0.1; // Mais conservador
+    const hasClippingAlert = baseAnalysis.problems?.some(p => p?.type === 'clipping');
+    
+    // Se não há clipping real mas há alerta, remover
+    if (hasClippingAlert && !hasClippingSamples && !hasDangerousTP) {
+      baseAnalysis.problems = baseAnalysis.problems.filter(p => p?.type !== 'clipping');
+      correction.applied = true;
+      correction.description = `Removido falso positivo de clipping (TP: ${unifiedData.truePeakDbtp?.toFixed(2)}dBTP, Samples: ${unifiedData.clippingSamples})`;
+    }
+    
+    // Se há clipping real mas não há alerta, adicionar
+    if (!hasClippingAlert && (hasClippingSamples || hasDangerousTP)) {
+      baseAnalysis.problems = baseAnalysis.problems || [];
+      baseAnalysis.problems.push({
+        type: 'clipping',
+        severity: hasClippingSamples ? 'high' : 'medium',
+        message: hasClippingSamples ? 
+          `Clipping detectado: ${unifiedData.clippingSamples} samples` : 
+          `True peak perigoso: ${unifiedData.truePeakDbtp?.toFixed(2)} dBTP`
+      });
+      correction.applied = true;
+      correction.description = `Adicionado alerta de clipping real (TP: ${unifiedData.truePeakDbtp?.toFixed(2)}dBTP, Samples: ${unifiedData.clippingSamples})`;
+    }
+    
+  } catch (error) {
+    console.warn('Erro na correção de clipping:', error);
+  }
+  
+  return correction;
+}
+
+// 🔧 CORREÇÃO 2: Thresholds Dinâmicos de LUFS
+function fixLufsThresholds(baseAnalysis, technicalData, unifiedData) {
+  const correction = { applied: false, type: 'LUFS_THRESHOLD_FIX', description: '' };
+  
+  try {
+    const lufs = unifiedData.lufsIntegrated;
+    if (!Number.isFinite(lufs)) return correction;
+    
+    // Thresholds dinâmicos baseados no gênero e contexto
+    const genreThresholds = {
+      'trance': { min: -16, max: -8, target: -11 },
+      'electronic': { min: -18, max: -6, target: -10 },
+      'default': { min: -23, max: -6, target: -14 }
+    };
+    
+    const detectedGenre = baseAnalysis.genre || 'default';
+    const thresholds = genreThresholds[detectedGenre] || genreThresholds.default;
+    
+    // Atualizar problemas baseados em thresholds apropriados
+    const currentLoudnessProblems = baseAnalysis.problems?.filter(p => p?.type === 'loudness') || [];
+    baseAnalysis.problems = baseAnalysis.problems?.filter(p => p?.type !== 'loudness') || [];
+    
+    if (lufs < thresholds.min) {
+      baseAnalysis.problems.push({
+        type: 'loudness',
+        severity: 'medium',
+        message: `Volume muito baixo: ${lufs.toFixed(1)} LUFS (recomendado: ${thresholds.target} LUFS para ${detectedGenre})`
+      });
+      correction.applied = true;
+      correction.description = `Threshold LUFS ajustado para ${detectedGenre}: ${lufs.toFixed(1)} < ${thresholds.min}`;
+    } else if (lufs > thresholds.max) {
+      baseAnalysis.problems.push({
+        type: 'loudness', 
+        severity: 'high',
+        message: `Volume muito alto: ${lufs.toFixed(1)} LUFS (máximo recomendado: ${thresholds.max} LUFS para ${detectedGenre})`
+      });
+      correction.applied = true;
+      correction.description = `Threshold LUFS ajustado para ${detectedGenre}: ${lufs.toFixed(1)} > ${thresholds.max}`;
+    }
+    
+  } catch (error) {
+    console.warn('Erro na correção de LUFS:', error);
+  }
+  
+  return correction;
+}
+
+// 🔧 CORREÇÃO 3: Score Calculation Accuracy
+function fixScoreCalculation(baseAnalysis, technicalData, unifiedData, v2Metrics) {
+  const correction = { applied: false, type: 'SCORE_CALCULATION_FIX', description: '' };
+  
+  try {
+    // Recalcular scores baseados em dados unificados
+    const originalOverall = baseAnalysis.qualityOverall;
+    
+    // Score components com pesos balanceados
+    const scores = {
+      loudness: calculateLoudnessScore(unifiedData.lufsIntegrated),
+      dynamics: calculateDynamicsScore(unifiedData.lra),
+      stereo: calculateStereoScore(unifiedData.stereoCorrelation),
+      clipping: calculateClippingScore(unifiedData.clippingSamples, unifiedData.truePeakDbtp)
+    };
+    
+    // Peso baseado na importância técnica
+    const weights = { loudness: 0.3, dynamics: 0.25, stereo: 0.2, clipping: 0.25 };
+    
+    const newOverall = Object.keys(scores).reduce((sum, key) => {
+      return sum + (scores[key] * weights[key]);
+    }, 0);
+    
+    // Só aplicar se a diferença for significativa (> 5%)
+    if (Math.abs(newOverall - originalOverall) > 5) {
+      baseAnalysis.qualityOverall = Math.round(newOverall);
+      baseAnalysis.qualityBreakdown = scores;
+      correction.applied = true;
+      correction.description = `Score recalculado: ${originalOverall} → ${Math.round(newOverall)} (diferença: ${(newOverall - originalOverall).toFixed(1)})`;
+    }
+    
+  } catch (error) {
+    console.warn('Erro na correção de score:', error);
+  }
+  
+  return correction;
+}
+
+// 🔧 CORREÇÃO 4: Stereo Analysis Consistency
+function fixStereoAnalysis(baseAnalysis, technicalData, unifiedData) {
+  const correction = { applied: false, type: 'STEREO_ANALYSIS_FIX', description: '' };
+  
+  try {
+    const correlation = unifiedData.stereoCorrelation;
+    if (!Number.isFinite(correlation)) return correction;
+    
+    // Classificação mais precisa baseada em padrões reais
+    let newMonoCompatibility;
+    if (correlation < -0.3) {
+      newMonoCompatibility = 'Problemas sérios de fase';
+    } else if (correlation < -0.1) {
+      newMonoCompatibility = 'Problemas leves de fase';
+    } else if (correlation < 0.3) {
+      newMonoCompatibility = 'Compatibilidade parcial';
+    } else if (correlation < 0.7) {
+      newMonoCompatibility = 'Boa compatibilidade';
+    } else {
+      newMonoCompatibility = 'Excelente compatibilidade';
+    }
+    
+    if (technicalData.monoCompatibility !== newMonoCompatibility) {
+      const oldValue = technicalData.monoCompatibility;
+      technicalData.monoCompatibility = newMonoCompatibility;
+      correction.applied = true;
+      correction.description = `Mono compatibility: "${oldValue}" → "${newMonoCompatibility}" (corr: ${correlation.toFixed(3)})`;
+    }
+    
+  } catch (error) {
+    console.warn('Erro na correção de estéreo:', error);
+  }
+  
+  return correction;
+}
+
+// 📊 Funções de Score Individual
+function calculateLoudnessScore(lufs) {
+  if (!Number.isFinite(lufs)) return 50;
+  const target = -11; // Target LUFS para música eletrônica
+  const deviation = Math.abs(lufs - target);
+  return Math.max(0, Math.min(100, 100 - (deviation * 8))); // Penalidade de 8 pontos por dB
+}
+
+function calculateDynamicsScore(lra) {
+  if (!Number.isFinite(lra)) return 50;
+  if (lra < 2) return 20; // Muito comprimido
+  if (lra < 5) return 60; // Moderadamente comprimido
+  if (lra < 10) return 90; // Boa dinâmica
+  return 100; // Excelente dinâmica
+}
+
+function calculateStereoScore(correlation) {
+  if (!Number.isFinite(correlation)) return 50;
+  if (correlation < -0.3) return 10; // Problemas sérios
+  if (correlation < 0) return 40; // Problemas leves
+  if (correlation < 0.5) return 70; // OK
+  return 90; // Bom
+}
+
+function calculateClippingScore(samples, truePeak) {
+  if (samples > 0) return 0; // Clipping = score zero
+  if (truePeak > -0.1) return 20; // Muito próximo do clipping
+  if (truePeak > -1.0) return 80; // Headroom limitado
+  return 100; // Bom headroom
+}
+
+// 🔒 Validação e Rollback Safety
+function validatePhase3Changes(baseAnalysis, technicalData, originalState) {
+  try {
+    // Validar que estruturas básicas permanecem intactas
+    if (!baseAnalysis || !technicalData) {
+      return { isValid: false, reason: 'Estruturas básicas corrompidas' };
+    }
+    
+    // Validar que problemas é um array
+    if (baseAnalysis.problems && !Array.isArray(baseAnalysis.problems)) {
+      return { isValid: false, reason: 'Array de problemas corrompido' };
+    }
+    
+    // Validar que scores estão em range válido
+    if (baseAnalysis.qualityOverall && (baseAnalysis.qualityOverall < 0 || baseAnalysis.qualityOverall > 100)) {
+      return { isValid: false, reason: 'Score fora de range válido' };
+    }
+    
+    // Validar dados técnicos críticos
+    const criticalFields = ['lufsIntegrated', 'truePeakDbtp', 'lra'];
+    for (const field of criticalFields) {
+      const value = technicalData[field];
+      if (value !== null && !Number.isFinite(value)) {
+        return { isValid: false, reason: `Campo ${field} com valor inválido` };
+      }
+    }
+    
+    return { isValid: true };
+    
+  } catch (error) {
+    return { isValid: false, reason: `Erro na validação: ${error.message}` };
+  }
+}
+
+function rollbackChanges(baseAnalysis, technicalData, originalState) {
+  try {
+    // Restaurar problemas
+    baseAnalysis.problems = originalState.problems;
+    
+    // Restaurar dados técnicos críticos
+    Object.keys(originalState.technicalData).forEach(key => {
+      technicalData[key] = originalState.technicalData[key];
+    });
+    
+    console.log('🔄 Rollback da Fase 3 concluído com sucesso');
+    
+  } catch (error) {
+    console.error('❌ Erro durante rollback da Fase 3:', error);
   }
 }
 

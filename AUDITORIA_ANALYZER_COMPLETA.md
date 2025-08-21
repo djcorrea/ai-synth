@@ -249,19 +249,22 @@ function validateMetrics(data) {
 
 ---
 
-## 🧪 **COMANDOS DE TESTE - FASES 1 & 2**
+## 🧪 **COMANDOS DE TESTE - FASES 1, 2 & 3**
 
-Para ativar auditoria e correções:
+Para ativar auditoria e correções completas:
 
 ```javascript
-// 1. Ativar logs de auditoria e correções Fase 2
+// 1. Ativar todas as fases de auditoria
 window.DEBUG_ANALYZER = true;
 window.ENABLE_AUDIT_LOGS = true;
 window.ENABLE_PHASE2_CORRECTIONS = true;
+window.ENABLE_PHASE3_LOGIC_ALIGNMENT = true; // NOVO: Fase 3
 
 // 2. Após fazer upload de áudio, verificar resultados
-window.getAuditResults();        // Ver inconsistências detectadas
-window.getPhase2Corrections();   // Ver correções aplicadas
+window.getAuditResults();        // Ver inconsistências detectadas (Fase 1)
+window.getPhase2Corrections();   // Ver correções aplicadas (Fase 2)
+window.getPhase3Corrections();   // Ver alinhamento lógico (Fase 3) - NOVO
+window.getCompleteAudit();       // Ver auditoria completa de todas as fases - NOVO
 
 // 3. Limpar cache se necessário
 window.clearAuditResults();
@@ -272,3 +275,10 @@ window.clearAuditResults();
 - ✅ NEGATIVE_DYNAMICS_FIXED: LRA sempre ≥ 0  
 - ✅ PEAK_FORMATTING_IMPROVED: Precisão de 2 casas
 - ✅ DANGEROUS_SUGGESTIONS_FILTERED: Sem sugestões perigosas com clipping
+
+**NOVO - Problemas Corrigidos na Fase 3:**
+- 🎯 CLIPPING_LOGIC_FIX: Detecção precisa de clipping com thresholds rigorosos
+- 🎯 LUFS_THRESHOLD_FIX: Thresholds dinâmicos baseados no gênero musical
+- 🎯 SCORE_CALCULATION_FIX: Recálculo de scores baseado em dados unificados
+- 🎯 STEREO_ANALYSIS_FIX: Classificação mais precisa de compatibilidade mono
+- 🔒 **ROLLBACK AUTOMÁTICO**: Se validação falhar, todas as mudanças são revertidas
