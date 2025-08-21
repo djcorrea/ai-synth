@@ -970,7 +970,7 @@ export default async function handler(req, res) {
     const reply = data.choices[0].message.content;
 
     console.log(`✅ [${requestId}] Resposta da IA gerada com sucesso`, {
-      model: model,
+      model: modelSelection ? modelSelection.model : 'unknown',
       hasImages: hasImages,
       responseLength: reply.length,
       tokenEstimate: Math.ceil(reply.length / 4), // Estimativa aproximada
@@ -982,7 +982,7 @@ export default async function handler(req, res) {
     const responseData = {
       reply,
       mensagensRestantes: userData.plano === 'gratis' ? userData.mensagensRestantes : null,
-      model: model
+      model: modelSelection ? modelSelection.model : 'unknown'
     };
 
     // Incluir informações de cota de imagem se aplicável
