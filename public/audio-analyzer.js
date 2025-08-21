@@ -795,11 +795,13 @@ class AudioAnalyzer {
           loudness: clamp(scoreLoud),
           frequency: clamp(scoreFreq)
         };
-        // Se qualityOverall ausente, calcular média ponderada
+        // 🎯 FALLBACK MELHORADO: Se Color Ratio V2 falhar, usar pesos rebalanceados
+        // Alinhado com os novos pesos: mais peso para loudness/dynamics, menos para technical
         if (!Number.isFinite(baseAnalysis.qualityOverall)) {
-          console.log('[COLOR_RATIO_V2_FIX] Fallback triggered - qualityOverall was:', baseAnalysis.qualityOverall);
-          baseAnalysis.qualityOverall = clamp((scoreDyn*0.25 + scoreTech*0.25 + scoreLoud*0.3 + scoreFreq*0.2));
-          console.log('[COLOR_RATIO_V2_FIX] Fallback set qualityOverall =', baseAnalysis.qualityOverall);
+          console.log('[FALLBACK_BALANCED] Triggered - qualityOverall was:', baseAnalysis.qualityOverall);
+          // Novos pesos mais balanceados: loudness↑, dynamics=, technical↓, frequency=
+          baseAnalysis.qualityOverall = clamp((scoreDyn*0.30 + scoreTech*0.20 + scoreLoud*0.35 + scoreFreq*0.15));
+          console.log('[FALLBACK_BALANCED] Set qualityOverall =', baseAnalysis.qualityOverall, 'using balanced weights');
         }
       }
     } catch(e){ if (window.DEBUG_ANALYZER) console.warn('Fallback quality breakdown falhou', e); }
