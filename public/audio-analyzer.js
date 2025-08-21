@@ -607,6 +607,12 @@ class AudioAnalyzer {
   td.dcOffset = isFinite(core.dcOffset) ? core.dcOffset : null;
   td.clippingSamples = Number.isFinite(core.clippingEvents) ? core.clippingEvents : null;
   td.clippingPct = isFinite(core.clippingPercentage) ? core.clippingPercentage : null;
+  
+  // ===== FASE 1 AUDITORIA: UNIFICAÇÃO E OBSERVAÇÃO (ZERO RISCO) =====
+  const unifiedData = getUnifiedAnalysisData(baseAnalysis, td, metrics);
+  performConsistencyAudit(unifiedData, baseAnalysis);
+  // ================================================================
+  
   try {
     if (Array.isArray(baseAnalysis.problems)) {
       const tpv = td.truePeakDbtp;
@@ -2519,4 +2525,161 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
     return baseAnalysis;
   }
 };
+
+// ===== FASE 1 AUDITORIA: FUNÇÕES DE UNIFICAÇÃO E OBSERVAÇÃO =====
+
+/**
+ * FASE 1: Unifica dados de múltiplas fontes em single source of truth
+ * ⚠️ ZERO RISCO: Apenas observa e organiza, não altera comportamento
+ */
+function getUnifiedAnalysisData(baseAnalysis, technicalData, v2Metrics) {
+  const unified = {
+    // LUFS - Prioridade: V2 > V1 fallback
+    lufsIntegrated: technicalData?.lufsIntegrated ?? 
+                   v2Metrics?.loudness?.lufs_integrated ?? 
+                   baseAnalysis?.technicalData?.rms ?? null,
+    
+    lufsShortTerm: technicalData?.lufsShortTerm ?? 
+                   v2Metrics?.loudness?.lufs_short_term ?? null,
+    
+    lufsMomentary: technicalData?.lufsMomentary ?? 
+                   v2Metrics?.loudness?.lufs_momentary ?? null,
+    
+    // True Peak - Prioridade: V2 > V1 fallback
+    truePeakDbtp: technicalData?.truePeakDbtp ?? 
+                  v2Metrics?.truePeak?.true_peak_dbtp ?? 
+                  baseAnalysis?.peakDb ?? null,
+    
+    // Clipping - Múltiplas fontes
+    clippingSamples: technicalData?.clippingSamples ?? 
+                     v2Metrics?.core?.clippingEvents ?? 0,
+    
+    clippingPct: technicalData?.clippingPct ?? 
+                 v2Metrics?.core?.clippingPercentage ?? 0,
+    
+    // Dinâmica
+    lra: technicalData?.lra ?? v2Metrics?.loudness?.lra ?? null,
+    
+    // Estéreo
+    stereoCorrelation: technicalData?.stereoCorrelation ?? 
+                       v2Metrics?.stereo?.correlation ?? null,
+    
+    monoCompatibility: technicalData?.monoCompatibility ?? 
+                       v2Metrics?.stereo?.monoCompatibility ?? null,
+    
+    // Timestamp para logs
+    _timestamp: Date.now(),
+    _sources: {
+      hasV2: !!v2Metrics,
+      hasV1: !!baseAnalysis,
+      hasTD: !!technicalData
+    }
+  };
+  
+  return unified;
+}
+
+/**
+ * FASE 1: Auditoria de consistência passiva
+ * ⚠️ ZERO RISCO: Apenas logs, não altera comportamento
+ */
+function performConsistencyAudit(unifiedData, baseAnalysis) {
+  if (!window.DEBUG_ANALYZER && !window.ENABLE_AUDIT_LOGS) return;
+  
+  const issues = [];
+  const warnings = [];
+  
+  // 🔍 AUDITORIA 1: Clipping Logic
+  const hasClippingAlert = baseAnalysis?.problems?.some(p => p?.type === 'clipping');
+  const clippingMetrics = {
+    samples: unifiedData.clippingSamples,
+    percentage: unifiedData.clippingPct,
+    truePeak: unifiedData.truePeakDbtp
+  };
+  
+  if (hasClippingAlert && unifiedData.clippingSamples === 0 && unifiedData.truePeakDbtp < -1.0) {
+    issues.push({
+      type: 'CLIPPING_FALSE_POSITIVE',
+      description: 'Clipping alert com 0% clipping e truePeak < -1.0 dBTP',
+      data: clippingMetrics
+    });
+  }
+  
+  // 🔍 AUDITORIA 2: LUFS Consistency  
+  const lufsValues = {
+    integrated: unifiedData.lufsIntegrated,
+    shortTerm: unifiedData.lufsShortTerm,
+    momentary: unifiedData.lufsMomentary
+  };
+  
+  if (unifiedData.lufsIntegrated && unifiedData.lufsShortTerm) {
+    const diff = Math.abs(unifiedData.lufsIntegrated - unifiedData.lufsShortTerm);
+    if (diff > 10) {
+      warnings.push({
+        type: 'LUFS_INCONSISTENT',
+        description: `Diferença LUFS Integrado vs Short-Term muito alta: ${diff.toFixed(1)} dB`,
+        data: lufsValues
+      });
+    }
+  }
+  
+  // 🔍 AUDITORIA 3: Dynamic Range Validation
+  if (unifiedData.lra !== null && unifiedData.lra < 0) {
+    issues.push({
+      type: 'NEGATIVE_DYNAMICS',
+      description: 'LRA (Loudness Range) negativo detectado',
+      data: { lra: unifiedData.lra }
+    });
+  }
+  
+  // 🔍 AUDITORIA 4: Stereo/Mono Alignment
+  if (unifiedData.stereoCorrelation !== null && unifiedData.monoCompatibility) {
+    const correlation = unifiedData.stereoCorrelation;
+    const mono = unifiedData.monoCompatibility;
+    
+    // Correlação baixa deveria indicar problemas mono
+    if (correlation < -0.2 && mono !== 'Problemas de fase') {
+      warnings.push({
+        type: 'STEREO_MONO_MISALIGN',
+        description: 'Correlação baixa mas compatibilidade mono não indica problemas',
+        data: { correlation, monoCompatibility: mono }
+      });
+    }
+  }
+  
+  // 📊 LOG CONSOLIDADO
+  if (issues.length > 0 || warnings.length > 0) {
+    console.group('🔍 AUDITORIA ANALYZER - Inconsistências Detectadas');
+    
+    if (issues.length > 0) {
+      console.error('🚨 PROBLEMAS CRÍTICOS:', issues);
+    }
+    
+    if (warnings.length > 0) {
+      console.warn('⚠️ AVISOS:', warnings);
+    }
+    
+    console.log('📊 DADOS UNIFICADOS:', unifiedData);
+    console.groupEnd();
+  } else if (window.DEBUG_ANALYZER) {
+    console.log('✅ AUDITORIA: Nenhuma inconsistência detectada');
+  }
+  
+  // Armazenar resultados para análise (não afeta comportamento)
+  if (typeof window !== 'undefined') {
+    window.__AUDIT_RESULTS__ = window.__AUDIT_RESULTS__ || [];
+    window.__AUDIT_RESULTS__.push({
+      timestamp: Date.now(),
+      issues,
+      warnings,
+      unifiedData: { ...unifiedData }
+    });
+    
+    // Manter apenas últimos 10 resultados
+    if (window.__AUDIT_RESULTS__.length > 10) {
+      window.__AUDIT_RESULTS__ = window.__AUDIT_RESULTS__.slice(-10);
+    }
+  }
+}
+
 
