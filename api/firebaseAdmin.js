@@ -6,7 +6,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 let auth, db;
 
 // ✅ TEMPORARY: Permitir mock em produção até configurar service account  
-if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+if (!process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT.includes('demo')) {
   console.warn('⚠️  Firebase Admin em modo mock (produção temporária)');
   
   // Mock para desenvolvimento e produção temporária
@@ -76,11 +76,6 @@ if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   
 } else {
   // Produção: validação segura da variável de ambiente
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    console.error('❌ FIREBASE_SERVICE_ACCOUNT environment variable is required');
-    throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is required');
-  }
-
   let app;
   if (!getApps().length) {
     try {

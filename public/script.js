@@ -23,8 +23,14 @@ const API_CONFIG = {
     const host = window.location.hostname || '';
     // Produção/preview no domínio do frontend -> usar mesma origem para evitar CORS
     const isVercel = host.endsWith('vercel.app');
-    const isAiSynthProject = isVercel && host.toLowerCase().startsWith('ai-synth');
-    if (isAiSynthProject || host === 'ai-synth.vercel.app') {
+    const isAiSynthProject = isVercel && (
+      host.toLowerCase().startsWith('ai-synth') ||
+      host.includes('ai-synth-dj-correas-projects') ||
+      host.includes('ai-synth-czzxlraox-dj-correas-projects')
+    );
+    if (isAiSynthProject || host === 'ai-synth.vercel.app' || 
+        host === 'ai-synth-dj-correas-projects.vercel.app' ||
+        host === 'ai-synth-czzxlraox-dj-correas-projects.vercel.app') {
       return '/api';
     }
     // Ambiente local mantém uso do backend dedicado atual

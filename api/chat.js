@@ -163,8 +163,11 @@ const corsMiddleware = cors({
   origin: (origin, callback) => {
     const fixedOrigin = 'https://prod-ai-teste.vercel.app';
     const prodFrontend = 'https://ai-synth.vercel.app';
+    const newDeployment = 'https://ai-synth-dj-correas-projects.vercel.app';
+    const directUrl = 'https://ai-synth-czzxlraox-dj-correas-projects.vercel.app';
     const apiPreviewRegex = /^https:\/\/prod-ai-teste-[a-z0-9\-]+\.vercel\.app$/;
     const frontendPreviewRegex = /^https:\/\/ai-synth(?:-[a-z0-9\-]+)?\.vercel\.app$/;
+    const newDeploymentRegex = /^https:\/\/ai-synth-[a-z0-9\-]+\.vercel\.app$/;
 
     // Adicionar suporte para desenvolvimento local
     const localOrigins = [
@@ -180,8 +183,11 @@ const corsMiddleware = cors({
     if (!origin ||
         origin === fixedOrigin ||
         origin === prodFrontend ||
+        origin === newDeployment ||
+        origin === directUrl ||
         apiPreviewRegex.test(origin) ||
         frontendPreviewRegex.test(origin) ||
+        newDeploymentRegex.test(origin) ||
         localOrigins.includes(origin) ||
         origin.startsWith('file://')) {
       callback(null, true);
