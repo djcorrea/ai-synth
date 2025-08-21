@@ -554,6 +554,8 @@ export default async function handler(req, res) {
   try {
     // ✅ CORREÇÃO: Processar body dinamicamente (JSON ou multipart) com error handling
     let requestData;
+    let decoded = null; // ✅ Declarar no escopo correto
+    let hasImages = false; // ✅ Declarar no escopo correto também
     try {
       requestData = await parseRequestBody(req);
       console.log('📨 Request data processado:', {
@@ -590,10 +592,10 @@ export default async function handler(req, res) {
       throw error;
     }
 
-    const { message, conversationHistory, idToken, images, hasImages } = validatedData;
+    const { message, conversationHistory, idToken, images } = validatedData;
+    hasImages = validatedData.hasImages;
 
     // Verificar autenticação
-    let decoded;
     try {
       decoded = await auth.verifyIdToken(idToken);
     } catch (err) {
