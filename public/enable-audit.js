@@ -1,13 +1,14 @@
-// 🔍 ATIVADOR DE AUDITORIA - FASES 1, 2 & 3
+// 🔍 ATIVADOR DE AUDITORIA - FASES 1, 2, 3 & 4
 // Este arquivo ativa os logs de auditoria para detectar inconsistências
 
 // Habilitar logs detalhados de auditoria e correções
 window.DEBUG_ANALYZER = true;
 window.ENABLE_AUDIT_LOGS = true;
 window.ENABLE_PHASE2_CORRECTIONS = true;
-window.ENABLE_PHASE3_LOGIC_ALIGNMENT = true; // NOVO: Fase 3
+window.ENABLE_PHASE3_LOGIC_ALIGNMENT = true;
+window.ENABLE_PHASE4_FINAL_AUDIT = true; // NOVO: Fase 4
 
-console.log('🔍 AUDITORIA FASES 1, 2 & 3 ATIVADAS - Logs e correções habilitadas');
+console.log('🔍 AUDITORIA FASES 1-4 ATIVADAS - Sistema completo de correções habilitado');
 
 // Função helper para consultar resultados da auditoria
 window.getAuditResults = function() {
@@ -93,8 +94,9 @@ window.getPhase2Corrections = function() {
 window.clearAuditResults = function() {
   window.__AUDIT_RESULTS__ = [];
   window.__PHASE2_CORRECTIONS__ = [];
-  window.__PHASE3_CORRECTIONS__ = []; // NOVO: Fase 3
-  console.log('🗑️ Cache de auditoria e correções (Fases 1-3) limpo');
+  window.__PHASE3_CORRECTIONS__ = [];
+  window.__PHASE4_CORRECTIONS__ = []; // NOVO: Fase 4
+  console.log('🗑️ Cache de auditoria e correções (Fases 1-4) limpo');
 };
 
 // 🎯 NOVO: Função para verificar correções da Fase 3
@@ -153,20 +155,75 @@ window.getCompleteAudit = function() {
   console.log('\n🎯 FASE 3 - Alinhamento Lógico:');
   const phase3 = window.getPhase3Corrections();
   
+  console.log('\n🎯 FASE 4 - Auditoria Final Completa:');
+  const phase4 = window.getPhase4Corrections();
+  
   console.log('\n📈 RESUMO GERAL:');
   console.log(`Análises auditadas: ${phase1.totalAnalyses}`);
   console.log(`Problemas críticos: ${phase1.criticalIssues}`);
   console.log(`Correções Fase 2: ${phase2.totalCorrections}`);
   console.log(`Correções Fase 3: ${phase3.totalCorrections}`);
+  console.log(`Correções Fase 4: ${phase4.totalCorrections}`);
   
   console.groupEnd();
   
-  return { phase1, phase2, phase3 };
+  return { phase1, phase2, phase3, phase4 };
+};
+
+// 🎯 NOVO: Função para verificar correções da Fase 4
+window.getPhase4Corrections = function() {
+  const corrections = window.__PHASE4_CORRECTIONS__ || [];
+  
+  console.group('🎯 FASE 4 - AUDITORIA FINAL COMPLETA');
+  console.log(`Total de análises com auditoria final: ${corrections.length}`);
+  
+  const allCorrections = corrections.flatMap(r => r.corrections);
+  const correctionTypes = {};
+  
+  allCorrections.forEach(correction => {
+    correctionTypes[correction.type] = (correctionTypes[correction.type] || 0) + 1;
+  });
+  
+  if (allCorrections.length > 0) {
+    console.group('📈 TIPOS DE CORREÇÕES FINAIS');
+    Object.entries(correctionTypes).forEach(([type, count]) => {
+      console.log(`${type}: ${count} ocorrências`);
+    });
+    console.groupEnd();
+    
+    console.group('📋 DETALHES DAS CORREÇÕES FINAIS');
+    allCorrections.forEach(correction => {
+      console.log(`🎯 ${correction.type}: ${correction.description}`);
+    });
+    console.groupEnd();
+    
+    console.group('📊 LUFS UNIFICAÇÃO');
+    corrections.slice(-2).forEach((entry, index) => {
+      if (entry.lufsValues) {
+        console.log(`Análise ${index + 1}:`);
+        console.log(`  Fontes originais: ${entry.lufsValues.original.length}`);
+        console.log(`  LUFS unificado: ${entry.lufsValues.unified?.toFixed(1) || 'N/A'}`);
+      }
+    });
+    console.groupEnd();
+  } else {
+    console.log('ℹ️ Nenhuma correção final aplicada ainda');
+  }
+  
+  console.groupEnd();
+  
+  return {
+    totalAnalyses: corrections.length,
+    totalCorrections: allCorrections.length,
+    correctionTypes: correctionTypes,
+    corrections: corrections
+  };
 };
 
 console.log('📋 Comandos disponíveis:');
 console.log('- window.getAuditResults() - Ver resultados da auditoria (Fase 1)');
 console.log('- window.getPhase2Corrections() - Ver correções aplicadas na Fase 2');
-console.log('- window.getPhase3Corrections() - Ver correções aplicadas na Fase 3 (NOVO)');
-console.log('- window.getCompleteAudit() - Ver auditoria completa de todas as fases (NOVO)');
+console.log('- window.getPhase3Corrections() - Ver correções aplicadas na Fase 3');
+console.log('- window.getPhase4Corrections() - Ver auditoria final completa na Fase 4 (NOVO)');
+console.log('- window.getCompleteAudit() - Ver auditoria completa de todas as fases (atualizado)');
 console.log('- window.clearAuditResults() - Limpar cache de auditoria e correções');
