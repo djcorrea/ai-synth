@@ -1,4 +1,19 @@
 import http from 'http';
+import dotenv from 'dotenv';
+
+// Carregar variáveis de ambiente
+dotenv.config();
+
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('FIREBASE_SERVICE_ACCOUNT defined:', !!process.env.FIREBASE_SERVICE_ACCOUNT);
+
+// Usar mock para desenvolvimento se não há FIREBASE_SERVICE_ACCOUNT
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.log('⚠️  Usando Firebase mock para desenvolvimento');
+  process.env.NODE_ENV = 'development';
+}
+
+// Import após carregar env
 import chatHandler from './api/chat.js';
 
 const PORT = 3001;

@@ -516,17 +516,31 @@ ESPECIALIDADES TÉCNICAS:
 
 // Função principal do handler
 export default async function handler(req, res) {
-  console.log('🔄 Nova requisição recebida:', {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`🔄 [${requestId}] Nova requisição recebida:`, {
     method: req.method,
     timestamp: new Date().toISOString(),
-    hasBody: !!req.body
+    hasBody: !!req.body,
+    contentType: req.headers['content-type'],
+    origin: req.headers.origin
   });
+
+  // Prevenir múltiplas respostas
+  let responseSent = false;
+  const sendResponse = (status, data) => {
+    if (responseSent) {
+      console.warn(`⚠️ [${requestId}] Tentativa de enviar resposta duplicada ignorada`);
+      return;
+    }
+    responseSent = true;
+    return res.status(status).json(data);
+  };
 
   try {
     await runMiddleware(req, res, corsMiddleware);
   } catch (err) {
-    console.error('CORS error:', err);
-    return res.status(403).end();
+    console.error(`❌ [${requestId}] CORS error:`, err);
+    return sendResponse(403, { error: 'CORS_ERROR', message: 'Not allowed by CORS policy' });
   }
 
   if (req.method === 'OPTIONS') {
@@ -534,7 +548,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
+    return sendResponse(405, { error: 'METHOD_NOT_ALLOWED', message: 'Método não permitido' });
   }
 
   try {
@@ -583,7 +597,8 @@ export default async function handler(req, res) {
     try {
       decoded = await auth.verifyIdToken(idToken);
     } catch (err) {
-      return res.status(401).json({ error: 'Token inválido ou expirado' });
+      console.error(`❌ [${requestId}] Token verification failed:`, err.message);
+      return sendResponse(401, { error: 'AUTH_ERROR', message: 'Token inválido ou expirado' });
     }
 
     const uid = decoded.uid;
@@ -683,15 +698,34 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Erro da OpenAI:', error);
-      throw new Error('Erro na API da OpenAI');
+      let errorDetails = 'Unknown error';
+      try {
+        errorDetails = await response.text();
+      } catch (parseErr) {
+        console.error('❌ Failed to parse OpenAI error response:', parseErr);
+      }
+      console.error('❌ OpenAI API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        details: errorDetails
+      });
+      
+      // Mapear erros específicos da OpenAI
+      if (response.status === 401) {
+        throw new Error('OpenAI API key invalid or expired');
+      } else if (response.status === 429) {
+        throw new Error('OpenAI API rate limit exceeded');
+      } else if (response.status >= 500) {
+        throw new Error('OpenAI service temporarily unavailable');
+      } else {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
     }
 
     const data = await response.json();
     const reply = data.choices[0].message.content;
 
-    console.log('✅ Resposta da IA gerada com sucesso');
+    console.log(`✅ [${requestId}] Resposta da IA gerada com sucesso`);
 
     // Preparar resposta final
     const responseData = {
@@ -710,10 +744,10 @@ export default async function handler(req, res) {
       };
     }
 
-    return res.status(200).json(responseData);
+    return sendResponse(200, responseData);
 
   } catch (error) {
-    console.error('💥 ERRO NO SERVIDOR:', {
+    console.error(`💥 [${requestId}] ERRO NO SERVIDOR:`, {
       message: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString(),
@@ -726,42 +760,42 @@ export default async function handler(req, res) {
     
     // ✅ Categorizar erros específicos para melhor debugging
     if (error.message.includes('FORMIDABLE_ERROR')) {
-      return res.status(400).json({ 
+      return sendResponse(400, { 
         error: 'FILE_UPLOAD_ERROR', 
         message: 'Erro ao processar upload de arquivo. Verifique se as imagens são válidas.'
       });
     }
     
     if (error.message.includes('BODY_PARSE_ERROR')) {
-      return res.status(400).json({ 
+      return sendResponse(400, { 
         error: 'REQUEST_FORMAT_ERROR', 
         message: 'Formato de requisição inválido.'
       });
     }
     
     if (error.message.includes('PROCESS_ERROR')) {
-      return res.status(422).json({ 
+      return sendResponse(422, { 
         error: 'DATA_PROCESSING_ERROR', 
         message: 'Erro ao processar dados enviados.'
       });
     }
     
     if (error.message.includes('OpenAI')) {
-      return res.status(503).json({ 
+      return sendResponse(503, { 
         error: 'AI_SERVICE_ERROR', 
         message: 'Serviço de IA temporariamente indisponível. Tente novamente.'
       });
     }
     
     if (error.message.includes('Firebase') || error.message.includes('auth')) {
-      return res.status(401).json({ 
+      return sendResponse(401, { 
         error: 'AUTH_ERROR', 
         message: 'Erro de autenticação. Faça login novamente.'
       });
     }
     
     // Erro genérico
-    return res.status(500).json({ 
+    return sendResponse(500, { 
       error: 'SERVER_ERROR', 
       message: 'Erro interno do servidor. Nossa equipe foi notificada.',
       code: 'INTERNAL_ERROR',
