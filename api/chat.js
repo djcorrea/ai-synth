@@ -199,6 +199,7 @@ const MAX_TOTAL_PAYLOAD_MB = 30;
 const MAX_IMAGE_MB = 10;
 const MAX_IMAGE_SIZE = MAX_IMAGE_MB * 1024 * 1024;
 const MAX_TOTAL_PAYLOAD_SIZE = MAX_TOTAL_PAYLOAD_MB * 1024 * 1024;
+const MAX_IMAGE_ANALYSIS_TOKENS = 1500;
 
 // ✅ CRÍTICO: Validação robusta de magic bytes
 function validateImageMagicBytes(buffer) {
