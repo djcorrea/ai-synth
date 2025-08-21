@@ -761,10 +761,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ CORREÇÃO: Processar body dinamicamente (JSON ou multipart) com error handling
+    // ✅ CORREÇÃO: Declarar variáveis no escopo da função
     let requestData;
-    let decoded = null; // ✅ Declarar no escopo correto
-    let hasImages = false; // ✅ Declarar no escopo correto também
+    let decoded = null;
+    let hasImages = false;
+    let modelSelection = null;
+    let requestTimeout = 60000; // Default timeout
+    
+    // ✅ CORREÇÃO: Processar body dinamicamente (JSON ou multipart) com error handling
     try {
       requestData = await parseRequestBody(req);
       console.log('📨 Request data processado:', {
@@ -898,7 +902,7 @@ export default async function handler(req, res) {
     messages.push(userMessage);
 
     // ✅ OTIMIZAÇÃO: Seleção inteligente de modelo para reduzir gastos de tokens
-    const modelSelection = selectOptimalModel(hasImages, conversationHistory, message);
+    modelSelection = selectOptimalModel(hasImages, conversationHistory, message);
     
     console.log(`🤖 Usando modelo: ${modelSelection.model}`, {
       reason: modelSelection.reason,
@@ -907,7 +911,7 @@ export default async function handler(req, res) {
     });
 
     // ✅ TIMEOUT CONFIGURÁVEL baseado na complexidade
-    const requestTimeout = hasImages ? 180000 : (modelSelection.model === 'gpt-4o' ? 120000 : 60000);
+    requestTimeout = hasImages ? 180000 : (modelSelection.model === 'gpt-4o' ? 120000 : 60000);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
 
