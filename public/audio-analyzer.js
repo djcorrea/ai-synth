@@ -2978,10 +2978,16 @@ function fixLufsThresholds(baseAnalysis, technicalData, unifiedData) {
     const genreThresholds = {
       'trance': { min: -16, max: -8, target: -11 },
       'electronic': { min: -18, max: -6, target: -10 },
+      'funk': { min: -12, max: -6, target: -8 }, // Específico para funk mandela
+      'funk mandela': { min: -12, max: -6, target: -8 }, // Específico para funk mandela
       'default': { min: -23, max: -6, target: -14 }
     };
     
-    const detectedGenre = baseAnalysis.genre || 'default';
+    const detectedGenre = baseAnalysis.genre || 
+                        window.PROD_AI_REF_GENRE || 
+                        window.FORCE_DEFAULT_GENRE ||
+                        (window.FUNK_MANDELA_V3_REF ? 'funk mandela' : null) ||
+                        'default';
     const thresholds = genreThresholds[detectedGenre] || genreThresholds.default;
     
     // Atualizar problemas baseados em thresholds apropriados
