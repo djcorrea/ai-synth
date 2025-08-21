@@ -1,3 +1,5 @@
+// 🚨 FORCE CACHE BUST - 1692582547
+// ✅ CORREÇÃO CRÍTICA: decoded is not defined fixed!
 import { auth, db } from './firebaseAdmin.js';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import cors from 'cors';
