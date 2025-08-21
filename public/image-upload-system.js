@@ -10,13 +10,13 @@ console.log('🖼️ Carregando sistema de upload de imagens...');
 class ImagePreviewSystem {
   constructor() {
     this.selectedImages = [];
-    this.maxImages = 3;
-    this.maxSizePerImage = 10 * 1024 * 1024; // 10MB
+    this.maxImages = 3; // ✅ CORREÇÃO CRÍTICA: Máximo 3 imagens por envio
+    this.maxSizePerImage = 10 * 1024 * 1024; // 10MB por imagem 
     this.allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     this.previewContainer = null;
     this.isInitialized = false;
     
-    console.log('🖼️ ImagePreviewSystem criado');
+    console.log('🖼️ ImagePreviewSystem criado - Máximo:', this.maxImages, 'imagens');
   }
 
   // Inicializar o sistema
@@ -242,7 +242,7 @@ class ImagePreviewSystem {
     }
   }
 
-  // ✅ SEGURANÇA: Validação robusta de imagem
+  // ✅ CORREÇÃO CRÍTICA: Validação robusta de imagem com limite de payload
   async addImage(file) {
     console.log(`📸 Adicionando imagem: ${file.name}`);
 
@@ -251,10 +251,20 @@ class ImagePreviewSystem {
       throw new Error(`Formato não suportado: ${file.name}. Use JPG, PNG ou WebP.`);
     }
 
-    // ✅ Validar tamanho
+    // ✅ Validar tamanho individual (10MB por imagem)
     if (file.size > this.maxSizePerImage) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(1);
       throw new Error(`Imagem muito grande: ${file.name} (${sizeMB}MB). Máximo: 10MB.`);
+    }
+
+    // ✅ Validar tamanho total do payload (30MB total)
+    const currentTotalSize = this.selectedImages.reduce((sum, img) => sum + img.size, 0);
+    const newTotalSize = currentTotalSize + file.size;
+    const maxTotalSize = 30 * 1024 * 1024; // 30MB total
+    
+    if (newTotalSize > maxTotalSize) {
+      const totalMB = (newTotalSize / 1024 / 1024).toFixed(1);
+      throw new Error(`Payload total muito grande: ${totalMB}MB. Máximo: 30MB total.`);
     }
 
     // ✅ Validar se é realmente uma imagem (header check)
@@ -262,7 +272,7 @@ class ImagePreviewSystem {
       throw new Error(`Arquivo corrompido ou não é uma imagem válida: ${file.name}`);
     }
 
-    // Converter para base64
+    // Converter para base64 (sem blob:createObjectURL)
     const base64 = await this.fileToBase64(file);
     
     // ✅ Validar base64 gerado
@@ -273,7 +283,7 @@ class ImagePreviewSystem {
     // Criar thumbnail
     const thumbnail = await this.createThumbnail(base64);
     
-    // Criar objeto da imagem
+    // ✅ CRÍTICO: Objeto da imagem sem blob URLs
     const imageObj = {
       id: Date.now() + Math.random(),
       file: file,
@@ -281,12 +291,13 @@ class ImagePreviewSystem {
       size: file.size,
       type: file.type,
       base64: base64.split(',')[1], // Remover o prefixo data:image/...;base64,
-      dataUrl: base64,
+      dataUrl: base64, // Manter data URL para preview
       preview: thumbnail
+      // ✅ SEM blob:createObjectURL - apenas data: URLs
     };
 
     this.selectedImages.push(imageObj);
-    console.log(`✅ Imagem adicionada: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`);
+    console.log(`✅ Imagem adicionada: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB) - Total: ${(newTotalSize/1024/1024).toFixed(1)}MB`);
   }
 
   // ✅ NOVA: Verificar se arquivo é realmente uma imagem

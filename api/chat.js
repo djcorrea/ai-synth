@@ -57,6 +57,13 @@ async function parseMultipart(req) {
         if (files.images) {
           const imageFiles = Array.isArray(files.images) ? files.images : [files.images];
           
+          // ✅ CRÍTICO: Validar número máximo de imagens
+          if (imageFiles.length > MAX_IMAGES_PER_MESSAGE) {
+            throw new Error(`IMAGES_LIMIT_EXCEEDED: Máximo ${MAX_IMAGES_PER_MESSAGE} imagens por envio`);
+          }
+          
+          let totalImageSize = 0;
+          
           for (const [index, file] of imageFiles.entries()) {
             try {
               console.log(`📸 Processando imagem ${index + 1}:`, {
@@ -65,6 +72,18 @@ async function parseMultipart(req) {
                 type: file.mimetype,
                 exists: fs.existsSync(file.filepath)
               });
+              
+              // ✅ CRÍTICO: Validar tamanho individual
+              if (file.size > MAX_IMAGE_SIZE) {
+                throw new Error(`IMAGE_TOO_LARGE: ${file.originalFilename} excede ${MAX_IMAGE_MB}MB`);
+              }
+              
+              totalImageSize += file.size;
+              
+              // ✅ CRÍTICO: Validar payload total
+              if (totalImageSize > MAX_TOTAL_PAYLOAD_SIZE) {
+                throw new Error(`PAYLOAD_TOO_LARGE: Total excede ${MAX_TOTAL_PAYLOAD_MB}MB`);
+              }
               
               // Verificar se arquivo existe e é válido
               if (!fs.existsSync(file.filepath)) {
@@ -79,6 +98,13 @@ async function parseMultipart(req) {
               
               // Ler arquivo de forma segura
               const buffer = await fs.promises.readFile(file.filepath);
+              
+              // ✅ CRÍTICO: Validar magic bytes
+              const imageFormat = validateImageMagicBytes(buffer);
+              if (!imageFormat) {
+                throw new Error(`INVALID_IMAGE_FORMAT: ${file.originalFilename} não é uma imagem válida (magic bytes)`);
+              }
+              
               const base64 = buffer.toString('base64');
               
               // Validar base64
@@ -91,14 +117,21 @@ async function parseMultipart(req) {
                 base64,
                 filename: file.originalFilename || `image-${index + 1}.jpg`,
                 type: file.mimetype || 'image/jpeg',
-                size: file.size
+                size: file.size,
+                format: imageFormat
               });
               
-              console.log(`✅ Imagem ${index + 1} processada: ${(base64.length/1024).toFixed(1)}KB base64`);
+              console.log(`✅ Imagem ${index + 1} processada: ${(base64.length/1024).toFixed(1)}KB base64 - Formato: ${imageFormat}`);
               
             } catch (fileError) {
               console.error(`❌ Erro ao processar imagem ${index + 1}:`, fileError.message);
-              // Continuar processando outras imagens
+              // Re-throw erros críticos, continue outros
+              if (fileError.message.includes('IMAGE_TOO_LARGE') || 
+                  fileError.message.includes('PAYLOAD_TOO_LARGE') ||
+                  fileError.message.includes('INVALID_IMAGE_FORMAT')) {
+                throw fileError;
+              }
+              // Continuar processando outras imagens para erros menores
             } finally {
               // Sempre tentar limpar arquivo temporário
               try {
@@ -110,6 +143,8 @@ async function parseMultipart(req) {
               }
             }
           }
+          
+          console.log(`✅ Payload validado: ${images.length} imagem(ns), ${(totalImageSize/1024/1024).toFixed(1)}MB total`);
         }
 
         console.log(`✅ Multipart processado: ${images.length} imagem(ns) válida(s)`);
@@ -156,6 +191,38 @@ async function parseRequestBody(req) {
     console.error('❌ Erro ao processar request body:', error);
     throw new Error(`BODY_PARSE_ERROR: ${error.message}`);
   }
+}
+
+// ✅ CRÍTICO: Configuração centralizada de limites
+const MAX_IMAGES_PER_MESSAGE = 3;
+const MAX_TOTAL_PAYLOAD_MB = 30;
+const MAX_IMAGE_MB = 10;
+const MAX_IMAGE_SIZE = MAX_IMAGE_MB * 1024 * 1024;
+const MAX_TOTAL_PAYLOAD_SIZE = MAX_TOTAL_PAYLOAD_MB * 1024 * 1024;
+
+// ✅ CRÍTICO: Validação robusta de magic bytes
+function validateImageMagicBytes(buffer) {
+  if (!buffer || buffer.length < 8) return false;
+  
+  const arr = new Uint8Array(buffer);
+  
+  // JPEG: FF D8 FF
+  if (arr[0] === 0xFF && arr[1] === 0xD8 && arr[2] === 0xFF) {
+    return 'jpeg';
+  }
+  
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (arr[0] === 0x89 && arr[1] === 0x50 && arr[2] === 0x4E && arr[3] === 0x47) {
+    return 'png';
+  }
+  
+  // WebP: 52 49 46 46 (RIFF) + WebP signature at offset 8
+  if (arr[0] === 0x52 && arr[1] === 0x49 && arr[2] === 0x46 && arr[3] === 0x46 &&
+      arr[8] === 0x57 && arr[9] === 0x45 && arr[10] === 0x42 && arr[11] === 0x50) {
+    return 'webp';
+  }
+  
+  return false;
 }
 
 // ✅ Rate limiting simples em memória (produção recomenda Redis)
@@ -504,28 +571,87 @@ async function consumeImageAnalysisQuota(db, uid, email, userData) {
 
 // ✅ OTIMIZAÇÃO: Seleção inteligente de modelo para economizar tokens
 function selectOptimalModel(hasImages, conversationHistory, currentMessage) {
-  // Se tem imagens na mensagem atual, sempre usar GPT-4o
-  if (hasImages) {
-    console.log('🎯 GPT-4o selecionado: análise de imagem detectada');
-    return 'gpt-4o';
+  try {
+    // ✅ REGRA CRÍTICA: Imagens sempre usam GPT-4o
+    if (hasImages) {
+      console.log('🎯 GPT-4o selecionado: análise de imagem detectada');
+      return {
+        model: 'gpt-4o',
+        reason: 'REQUIRED_FOR_IMAGES',
+        maxTokens: MAX_IMAGE_ANALYSIS_TOKENS,
+        temperature: 0.7
+      };
+    }
+    
+    // ✅ Análise de complexidade do texto
+    const messageLength = currentMessage.length;
+    const wordCount = currentMessage.split(/\s+/).length;
+    const hasComplexTerms = /(?:analis|interpreta|desenvol|implement|algorit|arquitet|complex|detail|profund|técnic)/i.test(currentMessage);
+    const hasCode = /(?:```|`|function|class|import|export|const|let|var|if|for|while)/i.test(currentMessage);
+    const isQuestion = /(?:\?|como|qual|onde|quando|por que|explique|descreva)/i.test(currentMessage);
+    
+    // ✅ Verificar se é follow-up de análise de imagem recente
+    const recentMessages = conversationHistory.slice(-2);
+    const hasRecentImageAnalysis = recentMessages.some(msg => 
+      msg.role === 'assistant' && 
+      (msg.content.includes('imagem') || msg.content.includes('vejo') || msg.content.includes('analise'))
+    );
+    
+    // ✅ Cálculo de score de complexidade
+    let complexityScore = 0;
+    
+    // Tamanho e densidade
+    if (messageLength > 500) complexityScore += 2;
+    else if (messageLength > 200) complexityScore += 1;
+    
+    if (wordCount > 100) complexityScore += 2;
+    else if (wordCount > 50) complexityScore += 1;
+    
+    // Conteúdo técnico
+    if (hasComplexTerms) complexityScore += 3;
+    if (hasCode) complexityScore += 2;
+    if (isQuestion && messageLength > 100) complexityScore += 1;
+    
+    // Follow-up de imagem com pergunta específica
+    if (hasRecentImageAnalysis && isImageRelatedFollowUp(currentMessage)) {
+      complexityScore += 4; // Força usar GPT-4o
+    }
+    
+    // ✅ DECISÃO FINAL baseada no threshold
+    const useGPT4 = complexityScore >= GPT4_COMPLEXITY_THRESHOLD;
+    const selectedModel = useGPT4 ? 'gpt-4o' : 'gpt-3.5-turbo';
+    const maxTokens = useGPT4 ? MAX_TEXT_RESPONSE_TOKENS : Math.min(MAX_TEXT_RESPONSE_TOKENS, 1000);
+    
+    const reason = useGPT4 
+      ? `COMPLEX_ANALYSIS: Score ${complexityScore}/${GPT4_COMPLEXITY_THRESHOLD}`
+      : `SIMPLE_RESPONSE: Score ${complexityScore}/${GPT4_COMPLEXITY_THRESHOLD} (economia)`;
+    
+    console.log(`🎯 ${selectedModel} selecionado:`, {
+      complexityScore,
+      threshold: GPT4_COMPLEXITY_THRESHOLD,
+      messageLength,
+      hasComplexTerms,
+      hasRecentImageAnalysis,
+      reason
+    });
+    
+    return {
+      model: selectedModel,
+      reason,
+      maxTokens,
+      temperature: useGPT4 ? 0.7 : 0.8
+    };
+    
+  } catch (error) {
+    console.warn('⚠️ Erro na seleção de modelo, usando padrão:', error.message);
+    // ✅ FALLBACK SEGURO
+    return {
+      model: 'gpt-3.5-turbo',
+      reason: 'FALLBACK_ERROR',
+      maxTokens: 1000,
+      temperature: 0.8
+    };
   }
-  
-  // Verificar se é follow-up de análise de imagem recente (últimas 2 mensagens)
-  const recentMessages = conversationHistory.slice(-2);
-  const hasRecentImageAnalysis = recentMessages.some(msg => 
-    msg.role === 'assistant' && 
-    (msg.content.includes('imagem') || msg.content.includes('vejo') || msg.content.includes('analise'))
-  );
-  
-  // Se é follow-up sobre imagem e pergunta específica, usar GPT-4o
-  if (hasRecentImageAnalysis && isImageRelatedFollowUp(currentMessage)) {
-    console.log('🎯 GPT-4o selecionado: follow-up sobre análise de imagem');
-    return 'gpt-4o';
-  }
-  
-  // Para conversas gerais, usar GPT-3.5-turbo (mais econômico)
-  console.log('🎯 GPT-3.5-turbo selecionado: conversa geral');
-  return 'gpt-3.5-turbo';
 }
 
 // ✅ Detectar se é pergunta relacionada à imagem analisada
@@ -772,9 +898,18 @@ export default async function handler(req, res) {
     messages.push(userMessage);
 
     // ✅ OTIMIZAÇÃO: Seleção inteligente de modelo para reduzir gastos de tokens
-    const model = selectOptimalModel(hasImages, conversationHistory, message);
+    const modelSelection = selectOptimalModel(hasImages, conversationHistory, message);
     
-    console.log(`🤖 Usando modelo: ${model} ${hasImages ? '(análise de imagem)' : model === 'gpt-4o' ? '(follow-up visual)' : '(texto)'}`);
+    console.log(`🤖 Usando modelo: ${modelSelection.model}`, {
+      reason: modelSelection.reason,
+      maxTokens: modelSelection.maxTokens,
+      hasImages: hasImages
+    });
+
+    // ✅ TIMEOUT CONFIGURÁVEL baseado na complexidade
+    const requestTimeout = hasImages ? 180000 : (modelSelection.model === 'gpt-4o' ? 120000 : 60000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
 
     // Chamar API da OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -783,13 +918,17 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({
-        model: model,
+        model: modelSelection.model,
         messages: messages,
-        max_tokens: hasImages ? 2000 : 1500,
-        temperature: 0.7,
+        max_tokens: modelSelection.maxTokens,
+        temperature: modelSelection.temperature,
       }),
     });
+
+    // ✅ Limpar timeout após resposta
+    clearTimeout(timeoutId);
 
     // ✅ MELHORIA: Tratamento de erro mais específico e retry em casos específicos
     if (!response.ok) {
@@ -803,7 +942,7 @@ export default async function handler(req, res) {
         status: response.status,
         statusText: response.statusText,
         details: errorDetails,
-        model: model,
+        model: modelSelection.model,
         hasImages: hasImages
       });
       
@@ -855,6 +994,11 @@ export default async function handler(req, res) {
     return sendResponse(200, responseData);
 
   } catch (error) {
+    // ✅ Limpar timeout em caso de erro
+    if (typeof timeoutId !== 'undefined') {
+      clearTimeout(timeoutId);
+    }
+    
     console.error(`💥 [${requestId}] ERRO NO SERVIDOR:`, {
       message: error.message,
       stack: error.stack,
@@ -866,7 +1010,48 @@ export default async function handler(req, res) {
       contentType: req.headers['content-type']
     });
     
+    // ✅ Tratamento específico para AbortError (timeout)
+    if (error.name === 'AbortError') {
+      console.error('⏰ Timeout na requisição para OpenAI:', {
+        timeout: requestTimeout,
+        model: modelSelection ? modelSelection.model : 'unknown',
+        hasImages
+      });
+      return sendResponse(408, { 
+        error: 'REQUEST_TIMEOUT', 
+        message: 'A análise demorou mais que o esperado. Tente novamente ou reduza a complexidade da mensagem.'
+      });
+    }
+    
     // ✅ Categorizar erros específicos para melhor debugging
+    if (error.message.includes('IMAGES_LIMIT_EXCEEDED')) {
+      return sendResponse(422, { 
+        error: 'IMAGES_LIMIT_EXCEEDED', 
+        message: `Máximo ${MAX_IMAGES_PER_MESSAGE} imagens por envio.`
+      });
+    }
+    
+    if (error.message.includes('IMAGE_TOO_LARGE')) {
+      return sendResponse(413, { 
+        error: 'IMAGE_TOO_LARGE', 
+        message: `Imagem muito grande. Máximo ${MAX_IMAGE_MB}MB por imagem.`
+      });
+    }
+    
+    if (error.message.includes('PAYLOAD_TOO_LARGE')) {
+      return sendResponse(413, { 
+        error: 'PAYLOAD_TOO_LARGE', 
+        message: `Payload total muito grande. Máximo ${MAX_TOTAL_PAYLOAD_MB}MB no total.`
+      });
+    }
+    
+    if (error.message.includes('INVALID_IMAGE_FORMAT')) {
+      return sendResponse(415, { 
+        error: 'INVALID_IMAGE_FORMAT', 
+        message: 'Formato de imagem inválido. Use JPEG, PNG ou WebP.'
+      });
+    }
+    
     if (error.message.includes('FORMIDABLE_ERROR')) {
       return sendResponse(400, { 
         error: 'FILE_UPLOAD_ERROR', 
