@@ -635,6 +635,11 @@ class AudioAnalyzer {
       if (typeof applyCriticalSpecificFixes === 'function') {
         applyCriticalSpecificFixes(baseAnalysis, td, unifiedData, metrics);
       }
+      
+      // ===== DEBUG DETALHADO (SE ATIVADO) =====
+      if (window.DEBUG_ANALYZER_DETAILED === true) {
+        performDetailedAnalysisDebug(baseAnalysis);
+      }
     }
   } catch (auditError) {
     console.warn('⚠️ Erro nas correções de auditoria:', auditError);
@@ -3929,6 +3934,278 @@ function fixContradictorySuggestions(baseAnalysis, technicalData, unifiedData) {
   }
   
   return correction;
+}
+
+// =============== SISTEMA DE DEBUG DETALHADO ===============
+/**
+ * Sistema de debug detalhado para diagnosticar os problemas específicos mencionados
+ */
+function performDetailedAnalysisDebug(analysis) {
+  try {
+    console.group('🐛 DEBUG DETALHADO - Análise Completa');
+    
+    debugLUFSDuplication(analysis);
+    debugNegativeDynamics(analysis);
+    debugTruePeakClippingContradiction(analysis);
+    debugZeroTechnicalScore(analysis);
+    debugMonoCompatibilityIssue(analysis);
+    
+    console.groupEnd();
+  } catch (error) {
+    console.warn('🔍 DEBUG: Erro no debug detalhado:', error.message);
+  }
+}
+
+// Debug 1: LUFS Duplicado
+function debugLUFSDuplication(analysis) {
+  console.group('🎵 DEBUG: LUFS Duplicação');
+  
+  const td = analysis.technicalData || {};
+  const lufsValues = {
+    'lufsIntegrated': td.lufsIntegrated,
+    'lufsShortTerm': td.lufsShortTerm,
+    'lufsMomentary': td.lufsMomentary,
+    'rms': td.rms,
+    'peak': td.peak
+  };
+  
+  console.log('📊 Todos os valores LUFS/Volume encontrados:');
+  Object.entries(lufsValues).forEach(([key, value]) => {
+    const isValid = Number.isFinite(value);
+    console.log(`  ${key}: ${isValid ? value.toFixed(2) : 'N/A'} ${isValid ? (key.includes('lufs') ? 'LUFS' : 'dB') : ''}`);
+  });
+  
+  // Detectar duplicação
+  const validLufs = Object.entries(lufsValues)
+    .filter(([key, value]) => Number.isFinite(value) && key.includes('lufs'))
+    .map(([key, value]) => ({ type: key, value }));
+  
+  if (validLufs.length > 1) {
+    console.warn('⚠️ MÚLTIPLOS LUFS DETECTADOS:');
+    validLufs.forEach(lufs => {
+      console.log(`  - ${lufs.type}: ${lufs.value.toFixed(2)} LUFS`);
+    });
+    
+    const values = validLufs.map(l => l.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const divergence = max - min;
+    
+    console.log(`📏 Divergência máxima: ${divergence.toFixed(2)} dB`);
+    if (divergence > 1.0) {
+      console.error('🚨 PROBLEMA: Divergência de LUFS > 1.0 dB');
+    }
+  } else {
+    console.log('✅ LUFS unificado ou único valor encontrado');
+  }
+  
+  console.groupEnd();
+}
+
+// Debug 2: Dinâmica Negativa  
+function debugNegativeDynamics(analysis) {
+  console.group('📈 DEBUG: Dinâmica Negativa');
+  
+  const td = analysis.technicalData || {};
+  const dynamicFields = {
+    'dynamicRange': td.dynamicRange,
+    'lra': td.lra,
+    'crestFactor': td.crestFactor
+  };
+  
+  console.log('📊 Valores de dinâmica encontrados:');
+  Object.entries(dynamicFields).forEach(([key, value]) => {
+    const isValid = Number.isFinite(value);
+    const isNegative = isValid && value < 0;
+    
+    console.log(`  ${key}: ${isValid ? value.toFixed(2) : 'N/A'} dB ${isNegative ? '⚠️ IMPOSSÍVEL' : ''}`);
+    
+    if (isNegative) {
+      console.error(`🚨 PROBLEMA: ${key} com valor negativo (${value.toFixed(2)}) é fisicamente impossível`);
+    }
+  });
+  
+  console.groupEnd();
+}
+
+// Debug 3: True Peak & Clipping Contradição
+function debugTruePeakClippingContradiction(analysis) {
+  console.group('🔊 DEBUG: True Peak & Clipping');
+  
+  const td = analysis.technicalData || {};
+  const clippingData = {
+    truePeakDbtp: td.truePeakDbtp,
+    peak: td.peak,
+    clippingSamples: td.clippingSamples,
+    clippingPct: td.clippingPct
+  };
+  
+  console.log('📊 Dados de clipping e picos:');
+  Object.entries(clippingData).forEach(([key, value]) => {
+    const isValid = Number.isFinite(value);
+    const unit = key.includes('Pct') ? '%' : key.includes('Samples') ? 'samples' : key.includes('dbtp') ? 'dBTP' : 'dB';
+    console.log(`  ${key}: ${isValid ? value.toFixed(2) + ' ' + unit : 'N/A'}`);
+  });
+  
+  // Analisar contradições
+  const truePeak = td.truePeakDbtp;
+  const clippingSamples = td.clippingSamples || 0;
+  const hasClipping = clippingSamples > 0;
+  const dangerousPeak = Number.isFinite(truePeak) && truePeak > -0.3;
+  
+  console.log('\n⚖️ Análise de consistência:');
+  console.log(`  Tem clipping: ${hasClipping}`);
+  console.log(`  Peak perigoso (>-0.3dBTP): ${dangerousPeak}`);
+  
+  if (hasClipping && !dangerousPeak) {
+    console.warn('🚨 CONTRADIÇÃO: Há clipping mas True Peak não indica perigo');
+  } else if (!hasClipping && dangerousPeak) {
+    console.warn('⚠️ POSSÍVEL INCONSISTÊNCIA: True Peak alto mas sem clipping detectado');
+  } else {
+    console.log('✅ Dados consistentes entre clipping e True Peak');
+  }
+  
+  // Verificar sugestões contraditórias
+  const suggestions = analysis.suggestions || [];
+  if (suggestions.length > 0 && (hasClipping || dangerousPeak)) {
+    const dangerousPatterns = suggestions.filter(s => {
+      const text = (s.action || s.message || '').toLowerCase();
+      return /aumentar|boost|\+.*db/i.test(text);
+    });
+    
+    if (dangerousPatterns.length > 0) {
+      console.error('🚨 SUGESTÕES CONTRADITÓRIAS detectadas:');
+      dangerousPatterns.forEach(s => {
+        console.log(`  - "${s.action || s.message}"`);
+      });
+    } else {
+      console.log('✅ Sugestões consistentes com situação de clipping');
+    }
+  }
+  
+  console.groupEnd();
+}
+
+// Debug 4: Score Técnico Zero
+function debugZeroTechnicalScore(analysis) {
+  console.group('🏆 DEBUG: Score Técnico');
+  
+  const scores = {
+    qualityOverall: analysis.qualityOverall,
+    mixScore: analysis.mixScore,
+    mixScorePct: analysis.mixScorePct
+  };
+  
+  console.log('📊 Scores encontrados:');
+  Object.entries(scores).forEach(([key, value]) => {
+    const isValid = Number.isFinite(value);
+    const isZero = isValid && value === 0;
+    console.log(`  ${key}: ${isValid ? value : 'N/A'} ${isZero ? '⚠️ SEMPRE ZERO' : ''}`);
+  });
+  
+  // Verificar breakdown
+  if (analysis.qualityBreakdown) {
+    console.log('\n📊 Breakdown de scores:');
+    Object.entries(analysis.qualityBreakdown).forEach(([key, value]) => {
+      console.log(`  ${key}: ${Number.isFinite(value) ? value : 'N/A'}`);
+    });
+  }
+  
+  // Verificar se há dados suficientes para calcular
+  const td = analysis.technicalData || {};
+  const metricsForScore = {
+    'LUFS': Number.isFinite(td.lufsIntegrated),
+    'True Peak': Number.isFinite(td.truePeakDbtp),
+    'LRA': Number.isFinite(td.lra),
+    'Stereo Correlation': Number.isFinite(td.stereoCorrelation)
+  };
+  
+  console.log('\n🔧 Métricas disponíveis para cálculo:');
+  Object.entries(metricsForScore).forEach(([metric, available]) => {
+    console.log(`  ${metric}: ${available ? '✅' : '❌'}`);
+  });
+  
+  const availableCount = Object.values(metricsForScore).filter(Boolean).length;
+  if (availableCount >= 2 && analysis.qualityOverall === 0) {
+    console.error('🚨 PROBLEMA: Score zero apesar de métricas disponíveis');
+  } else if (availableCount < 2) {
+    console.warn('⚠️ Métricas insuficientes para calcular score técnico');
+  } else {
+    console.log('✅ Score técnico parece estar calculado corretamente');
+  }
+  
+  console.groupEnd();
+}
+
+// Debug 5: Mono Compatibility sempre "Poor"
+function debugMonoCompatibilityIssue(analysis) {
+  console.group('🎧 DEBUG: Mono Compatibility');
+  
+  const td = analysis.technicalData || {};
+  const monoData = {
+    monoCompatibility: td.monoCompatibility,
+    stereoCorrelation: td.stereoCorrelation,
+    stereoWidth: td.stereoWidth,
+    balanceLR: td.balanceLR
+  };
+  
+  console.log('📊 Dados de estéreo/mono:');
+  Object.entries(monoData).forEach(([key, value]) => {
+    if (key === 'monoCompatibility') {
+      console.log(`  ${key}: "${value || 'N/A'}"`);
+    } else if (Number.isFinite(value)) {
+      console.log(`  ${key}: ${value.toFixed(3)}`);
+    } else {
+      console.log(`  ${key}: N/A`);
+    }
+  });
+  
+  // Analisar consistência
+  const correlation = td.stereoCorrelation;
+  const monoCompat = td.monoCompatibility;
+  
+  if (Number.isFinite(correlation) && monoCompat) {
+    console.log('\n⚖️ Análise de consistência:');
+    
+    // Determinar o que deveria ser baseado na correlação
+    let expectedMono;
+    if (correlation < 0.1) expectedMono = 'Poor';
+    else if (correlation < 0.3) expectedMono = 'Fair';
+    else if (correlation < 0.6) expectedMono = 'Good';
+    else if (correlation < 0.85) expectedMono = 'Very Good';
+    else expectedMono = 'Excellent';
+    
+    const currentMono = monoCompat.replace(/\s*\(.*\)/, ''); // Remove explicação
+    
+    console.log(`  Correlação: ${correlation.toFixed(3)}`);
+    console.log(`  Mono atual: "${monoCompat}"`);
+    console.log(`  Mono esperado: "${expectedMono}"`);
+    
+    if (currentMono.toLowerCase().includes('poor') && correlation > 0.3) {
+      console.error('🚨 PROBLEMA: Mono = "Poor" mas correlação indica qualidade superior');
+    } else if (!currentMono.toLowerCase().includes(expectedMono.toLowerCase())) {
+      console.warn(`⚠️ INCONSISTÊNCIA: Mono não corresponde à correlação (deveria ser "${expectedMono}")`);
+    } else {
+      console.log('✅ Mono compatibility consistente com correlação estéreo');
+    }
+  } else {
+    console.warn('⚠️ Dados insuficientes para analisar consistência mono/estéreo');
+  }
+  
+  console.groupEnd();
+}
+
+// Função global para ativar debug detalhado
+if (typeof window !== 'undefined') {
+  window.enableDetailedAnalyzerDebug = () => {
+    window.DEBUG_ANALYZER_DETAILED = true;
+    console.log('🐛 DEBUG DETALHADO ATIVADO - próxima análise incluirá diagnóstico completo');
+  };
+  
+  window.disableDetailedAnalyzerDebug = () => {
+    window.DEBUG_ANALYZER_DETAILED = false;
+    console.log('🐛 DEBUG DETALHADO DESATIVADO');
+  };
 }
 
 

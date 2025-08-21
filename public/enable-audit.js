@@ -288,3 +288,77 @@ window.getPhase5Corrections = function() {
     corrections: corrections
   };
 };
+
+// 🐛 NOVO: Sistema de Controle de Debug Detalhado
+window.enableDetailedDebug = function() {
+  window.DETAILED_DEBUG_ENABLED = true;
+  window.DEBUG_ANALYZER = true;
+  window.ENABLE_DETAILED_ANALYSIS_DEBUG = true;
+  
+  console.log('🐛 DEBUG DETALHADO ATIVADO');
+  console.log('📊 Funções de debug habilitadas:');
+  console.log('  - performDetailedAnalysisDebug()');
+  console.log('  - debugLUFSDuplication()');
+  console.log('  - debugNegativeDynamics()');
+  console.log('  - debugTruePeakClippingContradiction()');
+  console.log('  - debugZeroTechnicalScore()');
+  console.log('  - debugMonoCompatibilityIssue()');
+  
+  return { status: 'enabled', timestamp: new Date().toISOString() };
+};
+
+window.disableDetailedDebug = function() {
+  window.DETAILED_DEBUG_ENABLED = false;
+  window.ENABLE_DETAILED_ANALYSIS_DEBUG = false;
+  
+  console.log('🔇 DEBUG DETALHADO DESATIVADO');
+  
+  return { status: 'disabled', timestamp: new Date().toISOString() };
+};
+
+window.getDebugStatus = function() {
+  const status = {
+    detailedDebug: !!window.DETAILED_DEBUG_ENABLED,
+    analyzerDebug: !!window.DEBUG_ANALYZER,
+    auditLogs: !!window.ENABLE_AUDIT_LOGS,
+    phase2Corrections: !!window.ENABLE_PHASE2_CORRECTIONS,
+    phase3Logic: !!window.ENABLE_PHASE3_LOGIC_ALIGNMENT,
+    phase4Audit: !!window.ENABLE_PHASE4_FINAL_AUDIT,
+    phase5Critical: !!window.ENABLE_PHASE5_CRITICAL_FIXES,
+    enabledSince: new Date().toISOString()
+  };
+  
+  console.group('🔍 STATUS DO SISTEMA DE DEBUG');
+  console.log('Debug detalhado:', status.detailedDebug ? '✅ Ativo' : '❌ Inativo');
+  console.log('Analyzer debug:', status.analyzerDebug ? '✅ Ativo' : '❌ Inativo');
+  console.log('Audit logs:', status.auditLogs ? '✅ Ativo' : '❌ Inativo');
+  console.log('Correções Fase 2:', status.phase2Corrections ? '✅ Ativo' : '❌ Inativo');
+  console.log('Lógica Fase 3:', status.phase3Logic ? '✅ Ativo' : '❌ Inativo');
+  console.log('Auditoria Fase 4:', status.phase4Audit ? '✅ Ativo' : '❌ Inativo');
+  console.log('Críticas Fase 5:', status.phase5Critical ? '✅ Ativo' : '❌ Inativo');
+  console.groupEnd();
+  
+  return status;
+};
+
+// 🔧 Função para ativar debug específico por problema
+window.enableSpecificDebug = function(problems = []) {
+  const validProblems = ['lufs', 'dynamics', 'clipping', 'score', 'mono'];
+  const selected = problems.filter(p => validProblems.includes(p));
+  
+  window.SPECIFIC_DEBUG_PROBLEMS = selected;
+  window.DETAILED_DEBUG_ENABLED = true;
+  
+  console.group('🎯 DEBUG ESPECÍFICO ATIVADO');
+  console.log(`Problemas selecionados: ${selected.join(', ')}`);
+  console.log('Para debugar todos os problemas: enableSpecificDebug([\'lufs\', \'dynamics\', \'clipping\', \'score\', \'mono\'])');
+  console.groupEnd();
+  
+  return { enabled: selected, total: validProblems };
+};
+
+console.log('🐛 Comandos de debug detalhado adicionados:');
+console.log('- window.enableDetailedDebug() - Ativar debug detalhado completo');
+console.log('- window.disableDetailedDebug() - Desativar debug detalhado');
+console.log('- window.getDebugStatus() - Verificar status de todos os sistemas');
+console.log('- window.enableSpecificDebug([\'problema1\', \'problema2\']) - Debug específico');
