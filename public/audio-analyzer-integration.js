@@ -28,6 +28,447 @@ let __genreManifest = null; // manifesto de gêneros (opcional)
 let __activeRefGenre = null; // chave do gênero atualmente carregado em __activeRefData
 let __refDerivedStats = {}; // estatísticas agregadas (ex: média stereo) por gênero
 
+// 🎯 MODO REFERÊNCIA - Variáveis globais
+let currentAnalysisMode = 'genre'; // 'genre' | 'reference'
+let referenceStepState = {
+    currentStep: 'userAudio', // 'userAudio' | 'referenceAudio' | 'analysis'
+    userAudioFile: null,
+    referenceAudioFile: null,
+    userAnalysis: null,
+    referenceAnalysis: null
+};
+
+// 🎯 Funções de Acessibilidade e Gestão de Modais
+
+function openModeSelectionModal() {
+    const modal = document.getElementById('analysisModeModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        
+        // Foco no primeiro botão
+        const firstButton = modal.querySelector('.mode-card button');
+        if (firstButton) {
+            firstButton.focus();
+        }
+        
+        // Adicionar listener para ESC
+        document.addEventListener('keydown', handleModalEscapeKey);
+        
+        // Trap focus no modal
+        trapFocus(modal);
+    }
+}
+
+function closeModeSelectionModal() {
+    const modal = document.getElementById('analysisModeModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        
+        // Remover listeners
+        document.removeEventListener('keydown', handleModalEscapeKey);
+        
+        // Retornar foco para o botão que abriu o modal
+        const audioAnalysisBtn = document.querySelector('button[onclick="openAudioModal()"]');
+        if (audioAnalysisBtn) {
+            audioAnalysisBtn.focus();
+        }
+    }
+}
+
+function handleModalEscapeKey(e) {
+    if (e.key === 'Escape') {
+        closeModeSelectionModal();
+    }
+}
+
+function trapFocus(modal) {
+    const focusableElements = modal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    
+    if (focusableElements.length === 0) return;
+    
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    
+    const handleTabKey = (e) => {
+        if (e.key === 'Tab') {
+            if (e.shiftKey && document.activeElement === firstElement) {
+                e.preventDefault();
+                lastElement.focus();
+            } else if (!e.shiftKey && document.activeElement === lastElement) {
+                e.preventDefault();
+                firstElement.focus();
+            }
+        }
+    };
+    
+    modal.addEventListener('keydown', handleTabKey);
+}
+
+// 🎯 Função Principal de Seleção de Modo
+function selectAnalysisMode(mode) {
+    console.log('🎯 Modo selecionado:', mode);
+    
+    // Armazenar modo selecionado
+    window.currentAnalysisMode = mode;
+    
+    // Fechar modal de seleção
+    closeModeSelectionModal();
+    
+    if (mode === 'genre') {
+        // Modo tradicional - abrir modal de análise normal
+        openAnalysisModalForMode('genre');
+    } else if (mode === 'reference') {
+        // Modo referência - abrir interface específica
+        openAnalysisModalForMode('reference');
+    }
+}
+
+// 🎯 Modal de Análise por Referência
+function openReferenceAnalysisModal() {
+    const modal = document.getElementById('audioAnalysisModal');
+    if (modal) {
+        // Configurar modal para modo referência
+        const modalContent = modal.querySelector('.modal-content');
+        const title = modalContent.querySelector('h2');
+        const steps = document.getElementById('referenceProgressSteps');
+        
+        if (title) {
+            title.textContent = '🎵 Análise por Música de Referência';
+        }
+        
+        // Mostrar passos do progresso
+        if (steps) {
+            steps.style.display = 'block';
+            updateProgressStep(1); // Primeiro passo ativo
+        }
+        
+        // Modificar texto do botão de upload
+        const uploadBtn = modal.querySelector('#uploadButton');
+        if (uploadBtn) {
+            uploadBtn.textContent = '📤 Upload da Música Original';
+            uploadBtn.onclick = () => handleReferenceFileSelection('original');
+        }
+        
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        
+        // Foco no botão de upload
+        if (uploadBtn) {
+            uploadBtn.focus();
+        }
+    }
+}
+
+// 🎯 Gestão de Progresso para Modo Referência
+function updateProgressStep(step) {
+    const steps = document.querySelectorAll('.progress-step');
+    steps.forEach((stepEl, index) => {
+        const stepNumber = index + 1;
+        stepEl.classList.remove('active', 'completed');
+        
+        if (stepNumber < step) {
+            stepEl.classList.add('completed');
+        } else if (stepNumber === step) {
+            stepEl.classList.add('active');
+        }
+    });
+}
+
+// 🎯 Seleção de Arquivos para Modo Referência
+let uploadedFiles = {
+    original: null,
+    reference: null
+};
+
+function handleReferenceFileSelection(type) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.wav,.flac,.mp3';
+    input.style.display = 'none';
+    
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validar arquivo
+            if (file.size > 60 * 1024 * 1024) { // 60MB
+                alert('❌ Arquivo muito grande. Limite: 60MB');
+                return;
+            }
+            
+            uploadedFiles[type] = file;
+            console.log(`✅ Arquivo ${type} selecionado:`, file.name);
+            
+            // Atualizar interface
+            updateFileStatus(type, file.name);
+            
+            // Avançar para próximo passo
+            if (type === 'original') {
+                updateProgressStep(2);
+                promptReferenceFile();
+            } else if (type === 'reference') {
+                updateProgressStep(3);
+                enableAnalysisButton();
+            }
+        }
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+}
+
+function updateFileStatus(type, filename) {
+    const statusContainer = document.getElementById('fileUploadStatus');
+    if (!statusContainer) return;
+    
+    let statusDiv = statusContainer.querySelector(`#${type}FileStatus`);
+    if (!statusDiv) {
+        statusDiv = document.createElement('div');
+        statusDiv.id = `${type}FileStatus`;
+        statusDiv.className = 'file-status';
+        statusContainer.appendChild(statusDiv);
+    }
+    
+    const label = type === 'original' ? '🎵 Música Original' : '🎯 Referência';
+    statusDiv.innerHTML = `
+        <div class="file-item">
+            <span class="file-label">${label}:</span>
+            <span class="file-name">${filename}</span>
+            <span class="file-check">✅</span>
+        </div>
+    `;
+}
+
+function promptReferenceFile() {
+    const modal = document.getElementById('audioAnalysisModal');
+    const uploadBtn = modal.querySelector('#uploadButton');
+    
+    if (uploadBtn) {
+        uploadBtn.textContent = '🎯 Upload da Música de Referência';
+        uploadBtn.onclick = () => handleReferenceFileSelection('reference');
+    }
+}
+
+function enableAnalysisButton() {
+    const modal = document.getElementById('audioAnalysisModal');
+    let analyzeBtn = modal.querySelector('#analyzeReferenceBtn');
+    
+    if (!analyzeBtn) {
+        analyzeBtn = document.createElement('button');
+        analyzeBtn.id = 'analyzeReferenceBtn';
+        analyzeBtn.className = 'btn btn-primary';
+        analyzeBtn.textContent = '🔬 Iniciar Análise Comparativa';
+        analyzeBtn.onclick = startReferenceAnalysis;
+        
+        const uploadBtn = modal.querySelector('#uploadButton');
+        if (uploadBtn && uploadBtn.parentNode) {
+            uploadBtn.parentNode.insertBefore(analyzeBtn, uploadBtn.nextSibling);
+        }
+    }
+    
+    analyzeBtn.style.display = 'block';
+    analyzeBtn.disabled = false;
+}
+
+// 🎯 Análise Comparativa
+async function startReferenceAnalysis() {
+    if (!uploadedFiles.original || !uploadedFiles.reference) {
+        alert('❌ Por favor, faça upload de ambos os arquivos');
+        return;
+    }
+    
+    updateProgressStep(4);
+    
+    try {
+        // Preparar FormData
+        const formData = new FormData();
+        formData.append('originalFile', uploadedFiles.original);
+        formData.append('referenceFile', uploadedFiles.reference);
+        formData.append('mode', 'reference');
+        
+        // Mostrar loading
+        showAnalysisProgress();
+        
+        // Enviar para API
+        const response = await fetch('/api/audio/analyze', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Erro na análise: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Exibir resultados
+        displayReferenceComparison(result);
+        
+    } catch (error) {
+        console.error('❌ Erro na análise:', error);
+        alert('❌ Erro durante a análise. Tente novamente.');
+    }
+}
+
+function showAnalysisProgress() {
+    const modal = document.getElementById('audioAnalysisModal');
+    const content = modal.querySelector('.modal-content');
+    
+    // Criar overlay de progresso
+    const progressOverlay = document.createElement('div');
+    progressOverlay.id = 'analysisProgressOverlay';
+    progressOverlay.className = 'analysis-progress-overlay';
+    progressOverlay.innerHTML = `
+        <div class="progress-content">
+            <div class="spinner"></div>
+            <h3>🔬 Analisando Arquivos...</h3>
+            <p>Processando características espectrais e comparando com referência...</p>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+    `;
+    
+    content.appendChild(progressOverlay);
+}
+
+function displayReferenceComparison(data) {
+    const modal = document.getElementById('audioAnalysisModal');
+    const progressOverlay = document.getElementById('analysisProgressOverlay');
+    
+    // Remover overlay de progresso
+    if (progressOverlay) {
+        progressOverlay.remove();
+    }
+    
+    // Criar seção de resultados
+    const resultsSection = document.createElement('div');
+    resultsSection.id = 'referenceResults';
+    resultsSection.className = 'reference-results';
+    
+    resultsSection.innerHTML = generateComparisonHTML(data);
+    
+    const content = modal.querySelector('.modal-content');
+    content.appendChild(resultsSection);
+    
+    // Scroll para resultados
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+function generateComparisonHTML(data) {
+    const { original, reference, comparison } = data;
+    
+    return `
+        <div class="comparison-header">
+            <h3>📊 Análise Comparativa Concluída</h3>
+            <div class="overall-similarity">
+                <span class="similarity-label">Similaridade Geral:</span>
+                <span class="similarity-score ${getSimilarityClass(comparison.overallSimilarity)}">
+                    ${comparison.overallSimilarity}%
+                </span>
+            </div>
+        </div>
+        
+        <div class="comparison-grid">
+            <div class="comparison-section">
+                <h4>🎵 Música Original</h4>
+                <div class="audio-analysis-card">
+                    ${generateAudioAnalysisCard(original)}
+                </div>
+            </div>
+            
+            <div class="comparison-section">
+                <h4>🎯 Música de Referência</h4>
+                <div class="audio-analysis-card">
+                    ${generateAudioAnalysisCard(reference)}
+                </div>
+            </div>
+        </div>
+        
+        <div class="differences-section">
+            <h4>🔍 Principais Diferenças</h4>
+            <div class="differences-grid">
+                ${generateDifferencesGrid(comparison.differences)}
+            </div>
+        </div>
+        
+        <div class="suggestions-section">
+            <h4>💡 Sugestões de Melhoria</h4>
+            <div class="suggestions-list">
+                ${generateSuggestionsList(comparison.suggestions)}
+            </div>
+        </div>
+    `;
+}
+
+function generateAudioAnalysisCard(analysis) {
+    return `
+        <div class="spectral-info">
+            <div class="info-item">
+                <span class="label">Frequência Fundamental:</span>
+                <span class="value">${analysis.fundamentalFreq} Hz</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Dinâmica:</span>
+                <span class="value">${analysis.dynamicRange} dB</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Stereo Width:</span>
+                <span class="value">${analysis.stereoWidth}%</span>
+            </div>
+        </div>
+        
+        <div class="frequency-bands">
+            <h5>Bandas de Frequência</h5>
+            ${analysis.frequencyBands.map(band => `
+                <div class="band-item">
+                    <span class="band-name">${band.name}</span>
+                    <span class="band-level">${band.level} dB</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function generateDifferencesGrid(differences) {
+    return differences.map(diff => `
+        <div class="difference-item ${diff.severity}">
+            <div class="diff-header">
+                <span class="diff-parameter">${diff.parameter}</span>
+                <span class="diff-value">${diff.difference}</span>
+            </div>
+            <div class="diff-description">${diff.description}</div>
+        </div>
+    `).join('');
+}
+
+function generateSuggestionsList(suggestions) {
+    return suggestions.map(suggestion => `
+        <div class="suggestion-item">
+            <div class="suggestion-title">${suggestion.title}</div>
+            <div class="suggestion-description">${suggestion.description}</div>
+            <div class="suggestion-priority priority-${suggestion.priority}">
+                Prioridade: ${suggestion.priority.toUpperCase()}
+            </div>
+        </div>
+    `).join('');
+}
+
+function getSimilarityClass(similarity) {
+    if (similarity >= 80) return 'high-similarity';
+    if (similarity >= 60) return 'medium-similarity';
+    return 'low-similarity';
+}
+
+// 🎯 Exposição de Funções Globais
+window.openModeSelectionModal = openModeSelectionModal;
+window.closeModeSelectionModal = closeModeSelectionModal;
+window.selectAnalysisMode = selectAnalysisMode;
+
 // =============== ETAPA 2: Robustez & Completeness Helpers ===============
 // Central logging para métricas ausentes / NaN (evita console spam e facilita auditoria)
 function __logMetricAnomaly(kind, key, context={}) {
@@ -646,19 +1087,182 @@ function initializeAudioAnalyzerIntegration() {
 
 // 🎵 Abrir modal de análise de áudio
 function openAudioModal() {
-    __dbg('🎵 Abrindo modal de análise de áudio...');
+    window.logReferenceEvent('open_modal_requested');
+    
+    // Verificar se modo referência está habilitado
+    const isReferenceEnabled = window.FEATURE_FLAGS?.REFERENCE_MODE_ENABLED;
+    
+    if (isReferenceEnabled) {
+        // Abrir modal de seleção de modo primeiro
+        openModeSelectionModal();
+    } else {
+        // Comportamento original: modo gênero direto
+        selectAnalysisMode('genre');
+    }
+}
+
+// 🎯 NOVO: Modal de Seleção de Modo
+function openModeSelectionModal() {
+    __dbg('� Abrindo modal de seleção de modo...');
+    
+    const modal = document.getElementById('analysisModeModal');
+    if (!modal) {
+        console.error('Modal de seleção de modo não encontrado');
+        return;
+    }
+    
+    // Verificar se modo referência está habilitado e mostrar/esconder botão
+    const referenceModeBtn = document.getElementById('referenceModeBtn');
+    if (referenceModeBtn) {
+        const isEnabled = window.FEATURE_FLAGS?.REFERENCE_MODE_ENABLED;
+        referenceModeBtn.style.display = isEnabled ? 'flex' : 'none';
+        
+        if (!isEnabled) {
+            referenceModeBtn.disabled = true;
+        }
+    }
+    
+    modal.style.display = 'flex';
+    modal.setAttribute('tabindex', '-1');
+    modal.focus();
+    
+    window.logReferenceEvent('mode_selection_modal_opened');
+}
+
+function closeModeSelectionModal() {
+    __dbg('❌ Fechando modal de seleção de modo...');
+    
+    const modal = document.getElementById('analysisModeModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    
+    window.logReferenceEvent('mode_selection_modal_closed');
+}
+
+// 🎯 NOVO: Selecionar modo de análise
+function selectAnalysisMode(mode) {
+    window.logReferenceEvent('analysis_mode_selected', { mode });
+    
+    if (mode === 'reference' && !window.FEATURE_FLAGS?.REFERENCE_MODE_ENABLED) {
+        alert('Modo de análise por referência não está disponível no momento.');
+        return;
+    }
+    
+    currentAnalysisMode = mode;
+    
+    // Fechar modal de seleção de modo
+    closeModeSelectionModal();
+    
+    // Abrir modal de análise configurado para o modo selecionado
+    openAnalysisModalForMode(mode);
+}
+
+// 🎯 NOVO: Abrir modal de análise configurado para o modo
+function openAnalysisModalForMode(mode) {
+    __dbg(`🎵 Abrindo modal de análise para modo: ${mode}`);
     
     const modal = document.getElementById('audioAnalysisModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        
-        // Reset modal state
-        resetModalState();
-        
-        // Focus no modal
-        modal.setAttribute('tabindex', '-1');
-        modal.focus();
+    if (!modal) {
+        console.error('Modal de análise não encontrado');
+        return;
     }
+    
+    // Configurar modal baseado no modo
+    configureModalForMode(mode);
+    
+    // Reset state específico do modo
+    if (mode === 'reference') {
+        resetReferenceState();
+    }
+    
+    modal.style.display = 'flex';
+    resetModalState();
+    modal.setAttribute('tabindex', '-1');
+    modal.focus();
+    
+    window.logReferenceEvent('analysis_modal_opened', { mode });
+}
+
+// 🎯 NOVO: Configurar modal baseado no modo selecionado
+function configureModalForMode(mode) {
+    const title = document.getElementById('audioModalTitle');
+    const subtitle = document.getElementById('audioModalSubtitle');
+    const modeIndicator = document.getElementById('audioModeIndicator');
+    const genreContainer = document.getElementById('audioRefGenreContainer');
+    const progressSteps = document.getElementById('referenceProgressSteps');
+    
+    if (mode === 'genre') {
+        // Modo Gênero: comportamento original
+        if (title) title.textContent = '🎵 Análise de Áudio';
+        if (subtitle) subtitle.style.display = 'none';
+        if (genreContainer) genreContainer.style.display = 'flex';
+        if (progressSteps) progressSteps.style.display = 'none';
+        
+    } else if (mode === 'reference') {
+        // Modo Referência: interface específica
+        if (title) title.textContent = '🎯 Análise por Referência';
+        if (subtitle) {
+            subtitle.style.display = 'block';
+            if (modeIndicator) {
+                modeIndicator.textContent = 'Comparação direta entre suas músicas';
+            }
+        }
+        if (genreContainer) genreContainer.style.display = 'none';
+        if (progressSteps) progressSteps.style.display = 'flex';
+        
+        // Configurar steps iniciais
+        updateReferenceStep('userAudio');
+    }
+}
+
+// 🎯 NOVO: Reset estado do modo referência
+function resetReferenceState() {
+    referenceStepState = {
+        currentStep: 'userAudio',
+        userAudioFile: null,
+        referenceAudioFile: null,
+        userAnalysis: null,
+        referenceAnalysis: null
+    };
+    
+    window.logReferenceEvent('reference_state_reset');
+}
+
+// 🎯 NOVO: Atualizar step ativo no modo referência
+function updateReferenceStep(step) {
+    const steps = ['userAudio', 'referenceAudio', 'analysis'];
+    const stepElements = {
+        userAudio: document.getElementById('stepUserAudio'),
+        referenceAudio: document.getElementById('stepReferenceAudio'),
+        analysis: document.getElementById('stepAnalysis')
+    };
+    
+    // Reset todos os steps
+    Object.values(stepElements).forEach(el => {
+        if (el) {
+            el.classList.remove('active', 'completed');
+        }
+    });
+    
+    // Marcar steps anteriores como completed
+    const currentIndex = steps.indexOf(step);
+    for (let i = 0; i < currentIndex; i++) {
+        const stepElement = stepElements[steps[i]];
+        if (stepElement) {
+            stepElement.classList.add('completed');
+        }
+    }
+    
+    // Marcar step atual como active
+    const currentElement = stepElements[step];
+    if (currentElement) {
+        currentElement.classList.add('active');
+    }
+    
+    referenceStepState.currentStep = step;
+    
+    window.logReferenceEvent('reference_step_updated', { step, currentIndex });
 }
 
 // ❌ Fechar modal de análise de áudio
@@ -807,97 +1411,38 @@ async function handleModalFileSelection(file) {
             window.__MODAL_ANALYSIS_IN_PROGRESS__ = true;
         }
         
-        // Configuração de upload (aumentado para 60MB)
-        const MAX_UPLOAD_MB = 60;
-        const MAX_UPLOAD_SIZE = MAX_UPLOAD_MB * 1024 * 1024;
-        
-        // Formatos aceitos: WAV, FLAC, MP3 (simplificado)
-        const allowedTypes = ['audio/wav', 'audio/flac', 'audio/mpeg', 'audio/mp3'];
-        const allowedExtensions = ['.wav', '.flac', '.mp3'];
-        
-        // Validar tipo de arquivo
-        const isValidType = allowedTypes.includes(file.type.toLowerCase()) || 
-                           allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-        
-        if (!isValidType) {
-            showModalError(`Formato não suportado. Apenas WAV, FLAC e MP3 são aceitos.
-                          💡 Prefira WAV ou FLAC para maior precisão na análise.`);
-            return;
+        // Validação comum de arquivo
+        if (!validateAudioFile(file)) {
+            return; // validateAudioFile já mostra erro
         }
         
-        // Validar tamanho (novo limite: 60MB)
-        if (file.size > MAX_UPLOAD_SIZE) {
-            const sizeInMB = (file.size / 1024 / 1024).toFixed(1);
-            showModalError(`Arquivo muito grande: ${sizeInMB}MB. 
-                          Limite máximo: ${MAX_UPLOAD_MB}MB.`);
-            return;
+        // Processar baseado no modo de análise
+        if (currentAnalysisMode === 'reference') {
+            await handleReferenceFileSelection(file);
+        } else {
+            await handleGenreFileSelection(file);
         }
-        
-        // Mostrar recomendação para MP3
-        if (file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3')) {
-            console.log('💡 MP3 detectado - Recomendação: Use WAV ou FLAC para maior precisão');
-        }
-        
-        // 🔧 CORREÇÃO: Sempre mostrar loading primeiro, mesmo se já houve análise anterior
-        __dbg('🔄 Iniciando nova análise - forçando exibição do loading');
-        showModalLoading();
-        updateModalProgress(10, '⚡ Carregando Algoritmos Avançados...');
-        
-        // Aguardar audio analyzer carregar se necessário
-        if (!window.audioAnalyzer) {
-            __dbg('⏳ Aguardando Audio Analyzer carregar...');
-            updateModalProgress(30, '🔧 Inicializando V2 Engine...');
-            await waitForAudioAnalyzer();
-        }
-
-        // Garantir que referências do gênero selecionado estejam carregadas antes da análise (evita race e gênero errado)
-        try {
-            const genre = (typeof window !== 'undefined') ? window.PROD_AI_REF_GENRE : null;
-            if (genre && (!__activeRefData || __activeRefGenre !== genre)) {
-                updateModalProgress(25, `📚 Carregando referências: ${genre}...`);
-                await loadReferenceData(genre);
-                updateModalProgress(30, '📚 Referências ok');
-            }
-        } catch (_) { /* silencioso */ }
-        
-        // Analisar arquivo
-        __dbg('🔬 Iniciando análise...');
-        updateModalProgress(40, '🎵 Processando Waveform Digital...');
-        
-    const analysis = await window.audioAnalyzer.analyzeAudioFile(file);
-        currentModalAnalysis = analysis;
-        
-        __dbg('✅ Análise concluída:', analysis);
-        
-        updateModalProgress(90, '🧠 Computando Métricas Avançadas...');
-        
-        // Aguardar um pouco para melhor UX
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        updateModalProgress(100, '✨ Análise Completa - Pronto!');
-        
-        // Mostrar resultados
-        setTimeout(() => {
-            // Telemetria: verificar elementos alvo antes de preencher o modal
-            const exists = {
-                audioUploadArea: !!document.getElementById('audioUploadArea'),
-                audioAnalysisLoading: !!document.getElementById('audioAnalysisLoading'),
-                audioAnalysisResults: !!document.getElementById('audioAnalysisResults'),
-                modalTechnicalData: !!document.getElementById('modalTechnicalData')
-            };
-            __dbg('🛰️ [Telemetry] Front antes de preencher modal (existência de elementos):', exists);
-            displayModalResults(analysis);
-            
-            // 🔧 CORREÇÃO: Limpar flag de análise em progresso após sucesso
-            if (typeof window !== 'undefined') {
-                delete window.__MODAL_ANALYSIS_IN_PROGRESS__;
-            }
-            __dbg('✅ Análise concluída com sucesso - flag removida');
-        }, 800);
         
     } catch (error) {
         console.error('❌ Erro na análise do modal:', error);
-        showModalError(`Erro ao analisar arquivo: ${error.message}`);
+        
+        // Verificar se é um erro de fallback para modo gênero
+        if (window.FEATURE_FLAGS?.FALLBACK_TO_GENRE && currentAnalysisMode === 'reference') {
+            window.logReferenceEvent('error_fallback_to_genre', { 
+                error: error.message,
+                originalMode: currentAnalysisMode 
+            });
+            
+            showModalError('Erro na análise por referência. Redirecionando para análise por gênero...');
+            
+            setTimeout(() => {
+                currentAnalysisMode = 'genre';
+                configureModalForMode('genre');
+                handleGenreFileSelection(file);
+            }, 2000);
+        } else {
+            showModalError(`Erro ao analisar arquivo: ${error.message}`);
+        }
     } finally {
         // 🔧 CORREÇÃO: Sempre limpar flag de análise em progresso
         if (typeof window !== 'undefined') {
@@ -905,6 +1450,451 @@ async function handleModalFileSelection(file) {
         }
         __dbg('✅ Flag de análise em progresso removida');
     }
+}
+
+// 🎯 NOVO: Validação comum de arquivo
+function validateAudioFile(file) {
+    const MAX_UPLOAD_MB = 60;
+    const MAX_UPLOAD_SIZE = MAX_UPLOAD_MB * 1024 * 1024;
+    
+    // Formatos aceitos: WAV, FLAC, MP3 (simplificado)
+    const allowedTypes = ['audio/wav', 'audio/flac', 'audio/mpeg', 'audio/mp3'];
+    const allowedExtensions = ['.wav', '.flac', '.mp3'];
+    
+    // Validar tipo de arquivo
+    const isValidType = allowedTypes.includes(file.type.toLowerCase()) || 
+                       allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    
+    if (!isValidType) {
+        showModalError(`Formato não suportado. Apenas WAV, FLAC e MP3 são aceitos.
+                      💡 Prefira WAV ou FLAC para maior precisão na análise.`);
+        return false;
+    }
+    
+    // Validar tamanho (novo limite: 60MB)
+    if (file.size > MAX_UPLOAD_SIZE) {
+        const sizeInMB = (file.size / 1024 / 1024).toFixed(1);
+        showModalError(`Arquivo muito grande: ${sizeInMB}MB. 
+                      Limite máximo: ${MAX_UPLOAD_MB}MB.`);
+        return false;
+    }
+    
+    // Mostrar recomendação para MP3
+    if (file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3')) {
+        console.log('💡 MP3 detectado - Recomendação: Use WAV ou FLAC para maior precisão');
+    }
+    
+    return true;
+}
+
+// 🎯 NOVO: Processar arquivo no modo referência
+async function handleReferenceFileSelection(file) {
+    window.logReferenceEvent('reference_file_selected', { 
+        step: referenceStepState.currentStep,
+        fileName: file.name,
+        fileSize: file.size 
+    });
+    
+    if (referenceStepState.currentStep === 'userAudio') {
+        // Primeiro arquivo: música do usuário
+        referenceStepState.userAudioFile = file;
+        
+        // Analisar arquivo do usuário
+        showModalLoading();
+        updateModalProgress(10, '🎵 Analisando sua música...');
+        
+        const analysis = await window.audioAnalyzer.analyzeAudioFile(file);
+        referenceStepState.userAnalysis = analysis;
+        
+        // Avançar para próximo step
+        updateReferenceStep('referenceAudio');
+        updateUploadAreaForReferenceStep();
+        
+        window.logReferenceEvent('user_audio_analyzed', { 
+            fileName: file.name,
+            hasAnalysis: !!analysis 
+        });
+        
+    } else if (referenceStepState.currentStep === 'referenceAudio') {
+        // Segundo arquivo: música de referência
+        referenceStepState.referenceAudioFile = file;
+        
+        // Analisar arquivo de referência
+        showModalLoading();
+        updateModalProgress(50, '🎯 Analisando música de referência...');
+        
+        const analysis = await window.audioAnalyzer.analyzeAudioFile(file);
+        referenceStepState.referenceAnalysis = analysis;
+        
+        // Executar comparação
+        updateReferenceStep('analysis');
+        await performReferenceComparison();
+        
+        window.logReferenceEvent('reference_audio_analyzed', { 
+            fileName: file.name,
+            hasAnalysis: !!analysis 
+        });
+    }
+}
+
+// 🎯 NOVO: Processar arquivo no modo gênero (comportamento original)
+async function handleGenreFileSelection(file) {
+    __dbg('🔄 Iniciando nova análise - forçando exibição do loading');
+    showModalLoading();
+    updateModalProgress(10, '⚡ Carregando Algoritmos Avançados...');
+    
+    // Aguardar audio analyzer carregar se necessário
+    if (!window.audioAnalyzer) {
+        __dbg('⏳ Aguardando Audio Analyzer carregar...');
+        updateModalProgress(30, '🔧 Inicializando V2 Engine...');
+        await waitForAudioAnalyzer();
+    }
+
+    // Garantir que referências do gênero selecionado estejam carregadas antes da análise (evita race e gênero errado)
+    try {
+        const genre = (typeof window !== 'undefined') ? window.PROD_AI_REF_GENRE : null;
+        if (genre && (!__activeRefData || __activeRefGenre !== genre)) {
+            updateModalProgress(25, `📚 Carregando referências: ${genre}...`);
+            await loadReferenceData(genre);
+            updateModalProgress(30, '📚 Referências ok');
+        }
+    } catch (_) { /* silencioso */ }
+    
+    // Analisar arquivo
+    __dbg('🔬 Iniciando análise...');
+    updateModalProgress(40, '🎵 Processando Waveform Digital...');
+    
+    const analysis = await window.audioAnalyzer.analyzeAudioFile(file);
+    currentModalAnalysis = analysis;
+    
+    __dbg('✅ Análise concluída:', analysis);
+    
+    updateModalProgress(90, '🧠 Computando Métricas Avançadas...');
+    
+    // Aguardar um pouco para melhor UX
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    updateModalProgress(100, '✨ Análise Completa - Pronto!');
+    
+    // Mostrar resultados
+    setTimeout(() => {
+        // Telemetria: verificar elementos alvo antes de preencher o modal
+        const exists = {
+            audioUploadArea: !!document.getElementById('audioUploadArea'),
+            audioAnalysisLoading: !!document.getElementById('audioAnalysisLoading'),
+            audioAnalysisResults: !!document.getElementById('audioAnalysisResults'),
+            modalTechnicalData: !!document.getElementById('modalTechnicalData')
+        };
+        __dbg('🛰️ [Telemetry] Front antes de preencher modal (existência de elementos):', exists);
+        displayModalResults(analysis);
+        
+        // 🔧 CORREÇÃO: Limpar flag de análise em progresso após sucesso
+        if (typeof window !== 'undefined') {
+            delete window.__MODAL_ANALYSIS_IN_PROGRESS__;
+        }
+        __dbg('✅ Análise concluída com sucesso - flag removida');
+    }, 800);
+}
+
+// 🎯 NOVO: Atualizar upload area para step de referência
+function updateUploadAreaForReferenceStep() {
+    const uploadArea = document.getElementById('audioUploadArea');
+    if (!uploadArea) return;
+    
+    const uploadContent = uploadArea.querySelector('.upload-content');
+    if (!uploadContent) return;
+    
+    // Limpar input de arquivo
+    const fileInput = document.getElementById('modalAudioFileInput');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    
+    // Atualizar conteúdo baseado no step
+    if (referenceStepState.currentStep === 'referenceAudio') {
+        const icon = uploadContent.querySelector('.upload-icon');
+        const title = uploadContent.querySelector('h4');
+        const description = uploadContent.querySelector('p:not(.supported-formats):not(.format-recommendation)');
+        
+        if (icon) icon.textContent = '🎯';
+        if (title) title.textContent = 'Música de Referência';
+        if (description) description.textContent = 'Agora selecione a música que servirá como referência para comparação';
+    }
+    
+    // Mostrar upload area novamente
+    uploadArea.style.display = 'block';
+    
+    // Esconder loading
+    const loading = document.getElementById('audioAnalysisLoading');
+    if (loading) loading.style.display = 'none';
+    
+    window.logReferenceEvent('upload_area_updated', { 
+        step: referenceStepState.currentStep 
+    });
+}
+
+// 🎯 NOVO: Executar comparação entre as duas músicas
+async function performReferenceComparison() {
+    window.logReferenceEvent('reference_comparison_started');
+    
+    try {
+        updateModalProgress(70, '🔄 Comparando as duas músicas...');
+        
+        const userAnalysis = referenceStepState.userAnalysis;
+        const refAnalysis = referenceStepState.referenceAnalysis;
+        
+        if (!userAnalysis || !refAnalysis) {
+            throw new Error('Análises não encontradas para comparação');
+        }
+        
+        // Gerar comparação
+        const comparison = generateComparison(userAnalysis, refAnalysis);
+        
+        // Gerar sugestões baseadas na comparação
+        const suggestions = generateReferenceSuggestions(comparison);
+        
+        // Criar análise combinada para exibição
+        const combinedAnalysis = {
+            ...userAnalysis,
+            comparison,
+            suggestions: [...(userAnalysis.suggestions || []), ...suggestions],
+            analysisMode: 'reference',
+            referenceFile: referenceStepState.referenceAudioFile.name,
+            userFile: referenceStepState.userAudioFile.name
+        };
+        
+        currentModalAnalysis = combinedAnalysis;
+        
+        updateModalProgress(100, '✨ Comparação Completa!');
+        
+        // Mostrar resultados
+        setTimeout(() => {
+            displayModalResults(combinedAnalysis);
+            window.logReferenceEvent('reference_comparison_completed');
+        }, 800);
+        
+    } catch (error) {
+        console.error('❌ Erro na comparação:', error);
+        window.logReferenceEvent('reference_comparison_error', { error: error.message });
+        showModalError(`Erro na comparação: ${error.message}`);
+    }
+}
+
+// 🎯 NOVO: Gerar comparação entre duas análises
+function generateComparison(userAnalysis, refAnalysis) {
+    const userTech = userAnalysis.technicalData || {};
+    const refTech = refAnalysis.technicalData || {};
+    
+    return {
+        loudness: {
+            user: userTech.lufsIntegrated || null,
+            reference: refTech.lufsIntegrated || null,
+            difference: (userTech.lufsIntegrated && refTech.lufsIntegrated) 
+                ? userTech.lufsIntegrated - refTech.lufsIntegrated 
+                : null
+        },
+        dynamics: {
+            user: userTech.lra || userTech.crestFactor || null,
+            reference: refTech.lra || refTech.crestFactor || null,
+            difference: (userTech.lra && refTech.lra) 
+                ? userTech.lra - refTech.lra 
+                : null
+        },
+        stereo: {
+            user: userTech.stereoCorrelation || null,
+            reference: refTech.stereoCorrelation || null,
+            difference: (userTech.stereoCorrelation && refTech.stereoCorrelation) 
+                ? userTech.stereoCorrelation - refTech.stereoCorrelation 
+                : null
+        },
+        spectral: compareSpectralData(userTech, refTech)
+    };
+}
+
+// 🎯 NOVO: Comparar dados espectrais
+function compareSpectralData(userTech, refTech) {
+    const bandNames = ['subBass', 'bass', 'lowMid', 'mid', 'upperMid', 'presence', 'brilliance', 'air'];
+    const comparisons = {};
+    
+    bandNames.forEach(band => {
+        const userValue = userTech[`${band}Energy`] || userTech[`energy_${band}`] || null;
+        const refValue = refTech[`${band}Energy`] || refTech[`energy_${band}`] || null;
+        
+        if (userValue !== null && refValue !== null) {
+            comparisons[band] = {
+                user: userValue,
+                reference: refValue,
+                difference: userValue - refValue
+            };
+        }
+    });
+    
+    return comparisons;
+}
+
+// 🎯 NOVO: Gerar sugestões baseadas na comparação
+function generateReferenceSuggestions(comparison) {
+    const suggestions = [];
+    
+    // Sugestões de loudness
+    if (comparison.loudness.difference !== null) {
+        const diff = comparison.loudness.difference;
+        if (Math.abs(diff) > 1) {
+            suggestions.push({
+                type: 'reference_loudness',
+                message: diff > 0 ? 'Sua música está mais alta que a referência' : 'Sua música está mais baixa que a referência',
+                action: diff > 0 ? `Diminuir volume em ${Math.abs(diff).toFixed(1)}dB` : `Aumentar volume em ${Math.abs(diff).toFixed(1)}dB`,
+                explanation: 'Para match de loudness com a referência',
+                frequency_range: 'N/A',
+                adjustment_db: Math.abs(diff),
+                direction: diff > 0 ? 'decrease' : 'increase'
+            });
+        }
+    }
+    
+    // Sugestões espectrais
+    Object.entries(comparison.spectral).forEach(([band, data]) => {
+        if (Math.abs(data.difference) > 2) {
+            const freqRanges = {
+                subBass: '20-60 Hz',
+                bass: '60-250 Hz',
+                lowMid: '250-500 Hz',
+                mid: '500-2k Hz',
+                upperMid: '2k-4k Hz',
+                presence: '4k-6k Hz',
+                brilliance: '6k-12k Hz',
+                air: '12k-20k Hz'
+            };
+            
+            suggestions.push({
+                type: 'reference_spectral',
+                message: data.difference > 0 ? `Muito ${band} comparado à referência` : `Pouco ${band} comparado à referência`,
+                action: data.difference > 0 ? `Cortar ${band}` : `Realçar ${band}`,
+                explanation: `Para match espectral com a referência`,
+                frequency_range: freqRanges[band] || 'N/A',
+                adjustment_db: Math.abs(data.difference),
+                direction: data.difference > 0 ? 'cut' : 'boost',
+                q_factor: 1.0
+            });
+        }
+    });
+    
+    return suggestions;
+}
+
+// 🎯 NOVO: Adicionar seção de comparação com referência
+function addReferenceComparisonSection(analysis) {
+    const results = document.getElementById('audioAnalysisResults');
+    if (!results) return;
+    
+    const comparison = analysis.comparison;
+    const userFile = analysis.userFile || 'Sua música';
+    const referenceFile = analysis.referenceFile || 'Música de referência';
+    
+    // Criar seção de comparação
+    const comparisonSection = document.createElement('div');
+    comparisonSection.className = 'reference-comparison-section';
+    comparisonSection.innerHTML = `
+        <div class="comparison-header">
+            <h4>🎯 Comparação com Referência</h4>
+            <div class="comparison-files">
+                <span class="file-indicator user">📄 ${userFile}</span>
+                <span class="vs-indicator">vs</span>
+                <span class="file-indicator reference">🎯 ${referenceFile}</span>
+            </div>
+        </div>
+        
+        <div class="comparison-content">
+            <div class="comparison-grid">
+                ${generateComparisonRow('Loudness', comparison.loudness, 'LUFS')}
+                ${generateComparisonRow('Dinâmica', comparison.dynamics, 'dB')}
+                ${generateComparisonRow('Correlação Estéreo', comparison.stereo, '')}
+            </div>
+            
+            ${comparison.spectral && Object.keys(comparison.spectral).length > 0 ? `
+                <div class="spectral-comparison">
+                    <h5>📊 Análise Espectral</h5>
+                    <div class="spectral-grid">
+                        ${Object.entries(comparison.spectral).map(([band, data]) => 
+                            generateSpectralComparisonCard(band, data)
+                        ).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+    
+    // Inserir no início da seção de resultados
+    const resultsHeader = results.querySelector('.results-header');
+    if (resultsHeader) {
+        resultsHeader.insertAdjacentElement('afterend', comparisonSection);
+    } else {
+        results.insertBefore(comparisonSection, results.firstChild);
+    }
+    
+    window.logReferenceEvent('comparison_section_displayed');
+}
+
+// 🎯 NOVO: Gerar linha de comparação
+function generateComparisonRow(label, comparisonData, unit) {
+    if (!comparisonData || comparisonData.difference === null) {
+        return `
+            <div class="comparison-row unavailable">
+                <div class="comparison-label">${label}</div>
+                <div class="comparison-values">
+                    <span class="comparison-unavailable">Dados insuficientes</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    const userValue = comparisonData.user?.toFixed?.(1) || comparisonData.user || '—';
+    const refValue = comparisonData.reference?.toFixed?.(1) || comparisonData.reference || '—';
+    const diff = comparisonData.difference?.toFixed?.(1) || '—';
+    const diffClass = comparisonData.difference > 0 ? 'positive' : comparisonData.difference < 0 ? 'negative' : 'neutral';
+    
+    return `
+        <div class="comparison-row">
+            <div class="comparison-label">${label}</div>
+            <div class="comparison-values">
+                <div class="value-pair">
+                    <span class="user-value">${userValue}${unit}</span>
+                    <span class="ref-value">${refValue}${unit}</span>
+                </div>
+                <div class="difference-indicator ${diffClass}">
+                    ${diff > 0 ? '+' : ''}${diff}${unit}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 🎯 NOVO: Gerar card de comparação espectral
+function generateSpectralComparisonCard(band, data) {
+    const bandNames = {
+        subBass: 'Sub Bass',
+        bass: 'Bass',
+        lowMid: 'Low Mid',
+        mid: 'Mid',
+        upperMid: 'Upper Mid',
+        presence: 'Presence',
+        brilliance: 'Brilliance',
+        air: 'Air'
+    };
+    
+    const friendlyName = bandNames[band] || band;
+    const diff = data.difference?.toFixed?.(1) || '—';
+    const diffClass = data.difference > 2 ? 'high-positive' : 
+                      data.difference > 0.5 ? 'positive' : 
+                      data.difference < -2 ? 'high-negative' : 
+                      data.difference < -0.5 ? 'negative' : 'neutral';
+    
+    return `
+        <div class="spectral-card ${diffClass}">
+            <div class="spectral-band-name">${friendlyName}</div>
+            <div class="spectral-difference">${diff > 0 ? '+' : ''}${diff}dB</div>
+        </div>
+    `;
 }
 
 // ⏳ Aguardar Audio Analyzer carregar
@@ -1013,6 +2003,7 @@ function showModalLoading() {
 // (função de simulação de progresso removida — não utilizada)
 
 // 📊 Mostrar resultados no modal
+// 📊 Mostrar resultados no modal
 function displayModalResults(analysis) {
     const uploadArea = document.getElementById('audioUploadArea');
     const loading = document.getElementById('audioAnalysisLoading');
@@ -1030,6 +2021,11 @@ function displayModalResults(analysis) {
     
     // Mostrar resultados
     results.style.display = 'block';
+    
+    // 🎯 NOVO: Verificar se é modo referência e adicionar seção de comparação
+    if (analysis.analysisMode === 'reference' && analysis.comparison) {
+        addReferenceComparisonSection(analysis);
+    }
     
     // Marcar se pacote avançado chegou (LUFS integrado + True Peak + LRA)
     const advancedReady = (

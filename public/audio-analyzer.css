@@ -2027,3 +2027,607 @@ details[open] summary {
         padding: 8px;
     }
 }
+
+/* ======================================================================
+   🎯 MODAL DE SELEÇÃO DE MODO - ANÁLISE POR REFERÊNCIA
+   ====================================================================== */
+
+/* Modal de seleção de modo */
+.mode-selection-modal {
+    max-width: 620px !important;
+    min-height: auto !important;
+    max-height: 70vh !important;
+}
+
+.mode-selection-container {
+    padding: 8px 0;
+}
+
+.mode-selection-description {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.mode-selection-description p {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.mode-selection-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Botões de opção de modo */
+.mode-option-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 20px;
+    background: linear-gradient(135deg, 
+        rgba(124, 77, 255, 0.08) 0%, 
+        rgba(156, 39, 176, 0.05) 50%, 
+        rgba(124, 77, 255, 0.08) 100%);
+    border: 2px solid rgba(124, 77, 255, 0.3);
+    border-radius: 16px;
+    color: white;
+    cursor: pointer;
+    transition: all 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    backdrop-filter: blur(8px);
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+}
+
+.mode-option-btn:hover {
+    border-color: rgba(124, 77, 255, 0.6);
+    background: linear-gradient(135deg, 
+        rgba(124, 77, 255, 0.15) 0%, 
+        rgba(156, 39, 176, 0.08) 50%, 
+        rgba(124, 77, 255, 0.15) 100%);
+    transform: translateY(-2px);
+    box-shadow: 
+        0 8px 32px rgba(124, 77, 255, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.mode-option-btn:active {
+    transform: translateY(0);
+    transition: transform 120ms ease;
+}
+
+.mode-option-icon {
+    font-size: 32px;
+    margin-right: 16px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 8px rgba(124, 77, 255, 0.3));
+}
+
+.mode-option-content {
+    flex: 1;
+}
+
+.mode-option-content h4 {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    font-family: 'Orbitron', monospace;
+}
+
+.mode-option-content p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.4;
+}
+
+.mode-option-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mode-option-badge:not(.new) {
+    background: rgba(76, 175, 80, 0.2);
+    color: #81C784;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.mode-option-badge.new {
+    background: rgba(255, 193, 7, 0.2);
+    color: #FFD54F;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    animation: new-badge-glow 2s infinite alternate;
+}
+
+@keyframes new-badge-glow {
+    0% {
+        box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
+    }
+    100% {
+        box-shadow: 0 0 16px rgba(255, 193, 7, 0.5);
+    }
+}
+
+.mode-option-arrow {
+    font-size: 24px;
+    color: rgba(124, 77, 255, 0.7);
+    margin-left: 16px;
+    transition: all 280ms ease;
+    transform: translateX(0);
+}
+
+.mode-option-btn:hover .mode-option-arrow {
+    color: rgba(124, 77, 255, 1);
+    transform: translateX(4px);
+}
+
+/* Estado quando modo referência está desabilitado */
+.mode-option-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Responsividade para mobile */
+@media (max-width: 768px) {
+    .mode-selection-modal {
+        max-width: 95vw !important;
+        margin: 20px auto !important;
+    }
+    
+    .mode-option-btn {
+        padding: 16px;
+    }
+    
+    .mode-option-icon {
+        font-size: 28px;
+        margin-right: 12px;
+    }
+    
+    .mode-option-content h4 {
+        font-size: 16px;
+    }
+    
+    .mode-option-content p {
+        font-size: 13px;
+    }
+    
+    .mode-option-arrow {
+        font-size: 20px;
+        margin-left: 12px;
+    }
+}
+
+/* Acessibilidade - foco via teclado */
+.mode-option-btn:focus {
+    outline: none;
+    border-color: rgba(124, 77, 255, 0.8);
+    box-shadow: 
+        0 0 0 3px rgba(124, 77, 255, 0.3),
+        0 8px 32px rgba(124, 77, 255, 0.25);
+}
+
+/* ======================================================================
+   📝 PROGRESS STEPS - MODO REFERÊNCIA
+   ====================================================================== */
+
+.audio-modal-subtitle {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 4px;
+    text-align: center;
+}
+
+.reference-progress-steps {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+    padding: 0 20px;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    flex: 1;
+    max-width: 120px;
+}
+
+.progress-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    right: -50%;
+    width: 100%;
+    height: 2px;
+    background: rgba(124, 77, 255, 0.3);
+    z-index: 1;
+}
+
+.step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(124, 77, 255, 0.2);
+    border: 2px solid rgba(124, 77, 255, 0.4);
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Orbitron', monospace;
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 2;
+    transition: all 280ms ease;
+}
+
+.step-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    text-align: center;
+    line-height: 1.3;
+    font-weight: 500;
+}
+
+/* Estados dos steps */
+.progress-step.active .step-number {
+    background: rgba(124, 77, 255, 0.8);
+    border-color: rgba(124, 77, 255, 1);
+    color: white;
+    box-shadow: 0 0 16px rgba(124, 77, 255, 0.4);
+}
+
+.progress-step.active .step-label {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.progress-step.completed .step-number {
+    background: rgba(76, 175, 80, 0.8);
+    border-color: rgba(76, 175, 80, 1);
+    color: white;
+}
+
+.progress-step.completed .step-label {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.progress-step.completed::after {
+    background: rgba(76, 175, 80, 0.6);
+}
+
+/* Responsividade mobile */
+@media (max-width: 768px) {
+    .reference-progress-steps {
+        margin: 16px 0;
+        padding: 0 10px;
+    }
+    
+    .progress-step {
+        max-width: 80px;
+    }
+    
+    .step-number {
+        width: 24px;
+        height: 24px;
+        font-size: 12px;
+    }
+    
+    .step-label {
+        font-size: 11px;
+    }
+    
+    .progress-step:not(:last-child)::after {
+        right: -60%;
+    }
+}
+
+/* ======================================================================
+   🎯 SEÇÃO DE COMPARAÇÃO COM REFERÊNCIA
+   ====================================================================== */
+
+.reference-comparison-section {
+    background: linear-gradient(135deg, 
+        rgba(156, 39, 176, 0.08) 0%, 
+        rgba(124, 77, 255, 0.05) 50%, 
+        rgba(156, 39, 176, 0.08) 100%);
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 20px 0;
+    backdrop-filter: blur(8px);
+}
+
+.comparison-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.comparison-header h4 {
+    color: white;
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    text-shadow: 0 2px 8px rgba(156, 39, 176, 0.3);
+}
+
+.comparison-files {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.file-indicator {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.file-indicator.user {
+    background: rgba(33, 150, 243, 0.2);
+    border: 1px solid rgba(33, 150, 243, 0.4);
+    color: #64B5F6;
+}
+
+.file-indicator.reference {
+    background: rgba(156, 39, 176, 0.2);
+    border: 1px solid rgba(156, 39, 176, 0.4);
+    color: #CE93D8;
+}
+
+.vs-indicator {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.comparison-content {
+    margin-top: 20px;
+}
+
+.comparison-grid {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.comparison-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    transition: all 280ms ease;
+}
+
+.comparison-row:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(156, 39, 176, 0.3);
+}
+
+.comparison-row.unavailable {
+    opacity: 0.6;
+}
+
+.comparison-label {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.comparison-values {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.value-pair {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.user-value {
+    color: #64B5F6;
+    padding: 4px 8px;
+    background: rgba(33, 150, 243, 0.1);
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.ref-value {
+    color: #CE93D8;
+    padding: 4px 8px;
+    background: rgba(156, 39, 176, 0.1);
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.difference-indicator {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 12px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.difference-indicator.positive {
+    background: rgba(255, 193, 7, 0.2);
+    color: #FFD54F;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.difference-indicator.negative {
+    background: rgba(33, 150, 243, 0.2);
+    color: #64B5F6;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.difference-indicator.neutral {
+    background: rgba(76, 175, 80, 0.2);
+    color: #81C784;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.comparison-unavailable {
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+    font-size: 13px;
+}
+
+/* Seção espectral */
+.spectral-comparison {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.spectral-comparison h5 {
+    color: white;
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    text-align: center;
+}
+
+.spectral-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+}
+
+.spectral-card {
+    padding: 12px 8px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid;
+    transition: all 280ms ease;
+}
+
+.spectral-card.high-positive {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.4);
+    color: #EF5350;
+}
+
+.spectral-card.positive {
+    background: rgba(255, 193, 7, 0.15);
+    border-color: rgba(255, 193, 7, 0.4);
+    color: #FFD54F;
+}
+
+.spectral-card.neutral {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: rgba(76, 175, 80, 0.4);
+    color: #81C784;
+}
+
+.spectral-card.negative {
+    background: rgba(33, 150, 243, 0.15);
+    border-color: rgba(33, 150, 243, 0.4);
+    color: #64B5F6;
+}
+
+.spectral-card.high-negative {
+    background: rgba(63, 81, 181, 0.15);
+    border-color: rgba(63, 81, 181, 0.4);
+    color: #7986CB;
+}
+
+.spectral-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.spectral-band-name {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    opacity: 0.9;
+}
+
+.spectral-difference {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Orbitron', monospace;
+}
+
+/* Responsividade mobile para comparação */
+@media (max-width: 768px) {
+    .reference-comparison-section {
+        margin: 16px -8px;
+        padding: 16px;
+        border-radius: 12px;
+    }
+    
+    .comparison-files {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .file-indicator {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    
+    .comparison-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+    }
+    
+    .comparison-values {
+        width: 100%;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    
+    .value-pair {
+        gap: 6px;
+    }
+    
+    .spectral-grid {
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+        gap: 6px;
+    }
+    
+    .spectral-card {
+        padding: 8px 4px;
+    }
+    
+    .spectral-band-name {
+        font-size: 10px;
+    }
+    
+    .spectral-difference {
+        font-size: 12px;
+    }
+}
+
