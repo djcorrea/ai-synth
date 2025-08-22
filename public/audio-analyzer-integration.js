@@ -1079,18 +1079,21 @@ function displayModalResults(analysis) {
         const safePct = (v) => (Number.isFinite(v) ? `${(v*100).toFixed(0)}%` : '—');
         const monoCompat = (s) => s ? s : '—';
 
+        // Função para obter o valor LUFS integrado usando a prioridade correta
+        const getLufsIntegratedValue = () => {
+            const data = analysis.technicalData;
+            return data.lufs?.integrated ?? data.metrics?.lufs ?? data.lufsIntegrated;
+        };
+
         const col1 = [
             row('Peak', `${safeFixed(analysis.technicalData.peak)} dB`, 'peak'),
             row('RMS', `${safeFixed(analysis.technicalData.rms)} dB`, 'rms'),
             row('DR', `${safeFixed(analysis.technicalData.dynamicRange)} dB`, 'dynamicRange'),
             row('Crest Factor', `${safeFixed(analysis.technicalData.crestFactor)}`, 'crestFactor'),
             row('True Peak', (advancedReady && Number.isFinite(analysis.technicalData.truePeakDbtp)) ? `${safeFixed(analysis.technicalData.truePeakDbtp)} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
-            row('LUFS Int.', (advancedReady && Number.isFinite(analysis.technicalData.lufsIntegrated)) ? `${safeFixed(analysis.technicalData.lufsIntegrated)} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
+            row('Volume Integrado (padrão streaming)', (advancedReady && Number.isFinite(getLufsIntegratedValue())) ? `${safeFixed(getLufsIntegratedValue())} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
             row('LRA', (advancedReady && Number.isFinite(analysis.technicalData.lra)) ? `${safeFixed(analysis.technicalData.lra)} dB` : (advancedReady? '—':'⏳'), 'lra')
-            ].join('') + (
-                Number.isFinite(analysis.technicalData.loudnessOffsetDb) ?
-                row('Offset -23LUFS', `${safeFixed(analysis.technicalData.loudnessOffsetDb,1)} dB`, 'loudnessOffsetDb') : ''
-            );
+            ].join('');
 
         const col2 = [
             row('Correlação', Number.isFinite(analysis.technicalData.stereoCorrelation) ? safeFixed(analysis.technicalData.stereoCorrelation, 2) : '—', 'stereoCorrelation'),
@@ -1131,13 +1134,9 @@ function displayModalResults(analysis) {
             // Card extra: Métricas Avançadas (novo card)
             const advancedMetricsCard = () => {
                 const rows = [];
-                // LUFS ST/M e Headroom
-                if (advancedReady && Number.isFinite(analysis.technicalData?.lufsShortTerm)) {
-                    rows.push(row('LUFS (Short‑Term)', `${safeFixed(analysis.technicalData.lufsShortTerm, 1)} LUFS`, 'lufsShortTerm'));
-                }
-                if (advancedReady && Number.isFinite(analysis.technicalData?.lufsMomentary)) {
-                    rows.push(row('LUFS (Momentary)', `${safeFixed(analysis.technicalData.lufsMomentary, 1)} LUFS`, 'lufsMomentary'));
-                }
+                // Removido LUFS ST/M conforme solicitado - manter apenas integrado
+                
+                // Headroom
                 if (Number.isFinite(analysis.technicalData?.headroomDb)) {
                     // Mostrar headroom real se calculado a partir do pico, senão offset de loudness
                     const hrReal = Number.isFinite(analysis.technicalData.headroomTruePeakDb) ? analysis.technicalData.headroomTruePeakDb : null;
@@ -2124,7 +2123,12 @@ function renderReferenceComparisons(analysis) {
         </tr>`);
     };
     // Usar somente métricas reais (sem fallback para RMS/Peak, que têm unidades e conceitos distintos)
-    pushRow('LUFS Int.', tech.lufsIntegrated, ref.lufs_target, ref.tol_lufs, '');
+    // Função para obter o valor LUFS integrado usando a prioridade correta
+    const getLufsIntegratedValue = () => {
+        return tech.lufs?.integrated ?? tech.metrics?.lufs ?? tech.lufsIntegrated;
+    };
+    
+    pushRow('Volume Integrado (padrão streaming)', getLufsIntegratedValue(), ref.lufs_target, ref.tol_lufs, ' LUFS');
     pushRow('True Peak', tech.truePeakDbtp, ref.true_peak_target, ref.tol_true_peak, ' dBTP');
     pushRow('DR', tech.dynamicRange, ref.dr_target, ref.tol_dr, '');
     pushRow('LRA', tech.lra, ref.lra_target, ref.tol_lra, '');
