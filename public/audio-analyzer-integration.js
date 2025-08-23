@@ -560,9 +560,9 @@ const __INLINE_EMBEDDED_REFS__ = {
     ]},
     byGenre: {
         trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:2.5}, low_bass:{target_db:-14.6,tol_db:4.3}, upper_bass:{target_db:-14.8,tol_db:2.5}, low_mid:{target_db:-12.6,tol_db:3.7}, mid:{target_db:-12,tol_db:4.0}, high_mid:{target_db:-20.2,tol_db:3.6}, brilho:{target_db:-24.7,tol_db:2.5}, presenca:{target_db:-32.1,tol_db:3.6} } },
-    // Perfil atualizado Funk Mandela 2025-08-fixed-flex - Padrões Fixos + Flexíveis estruturados
+    // Perfil atualizado Funk Mandela 2025-08-fixed-flex.1 - REPROCESSADO 23/08/2025
     funk_mandela:   { 
-        version: "2025-08-fixed-flex", 
+        version: "2025-08-fixed-flex.1", 
         lufs_target: -8, tol_lufs: 1, tol_lufs_min: 1, tol_lufs_max: 1, 
         true_peak_target: -0.3, tol_true_peak: 0.3, true_peak_streaming_max: -0.3, true_peak_baile_max: 0.0, 
         dr_target: 8, tol_dr: 1, 
