@@ -1509,19 +1509,30 @@ async function handleReferenceFileSelection(file) {
         showModalLoading();
         updateModalProgress(10, '🎵 Analisando sua música...');
         
-        // 🎯 PRIMEIRO: Analisar arquivo do usuário sem targets (extração de métricas apenas)
+        // 🎯 CORREÇÃO TOTAL: Analisar arquivo do usuário SEM aplicar targets
         const userAnalysisOptions = { 
-          mode: 'extract_metrics', 
-          debugModeReference: true 
+          mode: 'pure_analysis', // Modo puro, sem comparações
+          debugModeReference: true,
+          // Garantir mesmas configurações para ambos os arquivos
+          normalizeLoudness: true,
+          windowDuration: 30,
+          fftSize: 4096
         };
         const analysis = await window.audioAnalyzer.analyzeAudioFile(file, userAnalysisOptions);
         
-        // 🐛 DIAGNÓSTICO: Verificar se analysis contém métricas extraídas apenas
-        console.log('🔍 [DIAGNÓSTICO] User analysis concluída (extração de métricas)');
-        console.log('🔍 [DIAGNÓSTICO] User LUFS:', analysis.technicalData?.lufsIntegrated);
-        console.log('🔍 [DIAGNÓSTICO] User stereoCorrelation:', analysis.technicalData?.stereoCorrelation);
-        console.log('🔍 [DIAGNÓSTICO] User dynamicRange:', analysis.technicalData?.dynamicRange);
-        console.log('🔍 [DIAGNÓSTICO] User analysis mode inicial (deve ser extract_metrics)');
+        // 🐛 VALIDAÇÃO: Verificar que não há comparação com gênero
+        if (analysis.comparison || analysis.mixScore) {
+          console.warn('⚠️ [AVISO] Análise do usuário contaminada com comparação/score');
+        }
+        
+        console.log('🔍 [DIAGNÓSTICO] User analysis (pura):', {
+          lufs: analysis.technicalData?.lufsIntegrated,
+          stereoCorrelation: analysis.technicalData?.stereoCorrelation,
+          dynamicRange: analysis.technicalData?.dynamicRange,
+          truePeak: analysis.technicalData?.truePeakDbtp,
+          hasComparison: !!analysis.comparison,
+          hasScore: !!analysis.mixScore
+        });
         
         referenceStepState.userAnalysis = analysis;
         
@@ -1543,76 +1554,75 @@ async function handleReferenceFileSelection(file) {
         console.log('🔍 [DIAGNÓSTICO] Current mode:', window.currentAnalysisMode);
         console.log('🔍 [DIAGNÓSTICO] Genre ativo antes da análise:', window.PROD_AI_REF_GENRE);
         
-        // Analisar arquivo de referência (extração de métricas apenas)
+        // Analisar arquivo de referência (extração de métricas com MESMAS configurações)
         showModalLoading();
         updateModalProgress(50, '🎯 Analisando música de referência...');
         
-        // 🎯 CORREÇÃO: Analisar arquivo de referência para extrair métricas baseline
+        // 🎯 CORREÇÃO TOTAL: Usar EXATAMENTE as mesmas configurações do usuário
         const refAnalysisOptions = { 
-          mode: 'extract_metrics', // Novo modo para extrair métricas apenas
-          debugModeReference: true 
+          mode: 'pure_analysis', // Modo puro, sem comparações
+          debugModeReference: true,
+          // 🎯 GARANTIR parâmetros idênticos
+          normalizeLoudness: true,
+          windowDuration: 30,
+          fftSize: 4096
         };
         const analysis = await window.audioAnalyzer.analyzeAudioFile(file, refAnalysisOptions);
         
-        // 🐛 DIAGNÓSTICO: Verificar se analysis de referência contém métricas extraídas
-        console.log('🔍 [DIAGNÓSTICO] Reference analysis concluída');
-        console.log('🔍 [DIAGNÓSTICO] Reference LUFS:', analysis.technicalData?.lufsIntegrated);
-        console.log('🔍 [DIAGNÓSTICO] Reference stereoCorrelation:', analysis.technicalData?.stereoCorrelation);
-        console.log('🔍 [DIAGNÓSTICO] Reference dynamicRange:', analysis.technicalData?.dynamicRange);
-        console.log('🔍 [DIAGNÓSTICO] Reference truePeak:', analysis.technicalData?.truePeakDbtp);
-        
-        // 🎯 CRIAR targets baseados na referência para usar na análise do usuário
-        const referenceTargets = {
-          lufs: analysis.technicalData?.lufsIntegrated || -14.0,
-          stereoCorrelation: analysis.technicalData?.stereoCorrelation || 0.8,
-          dynamicRange: analysis.technicalData?.dynamicRange || 10.0,
-          truePeak: analysis.technicalData?.truePeakDbtp || -1.0,
-          
-          // 🎯 NOVO: Incluir targets para bandas espectrais baseados na referência
-          lufs_target: analysis.technicalData?.lufsIntegrated || -14.0,
-          stereo_target: analysis.technicalData?.stereoCorrelation || 0.8,
-          dr_target: analysis.technicalData?.dynamicRange || 10.0,
-          true_peak_target: analysis.technicalData?.truePeakDbtp || -1.0,
-          lra_target: analysis.technicalData?.lra || 7.0,
-          
-          // Tolerâncias padrão (podem ser ajustadas)
-          tol_lufs: 1.0,
-          tol_stereo: 0.1,
-          tol_dr: 2.0,
-          tol_true_peak: 0.5,
-          tol_lra: 2.0
-        };
-        
-        // 🎯 CRUCIAL: Incluir bandas espectrais da referência se disponíveis
-        if (analysis.technicalData?.bandEnergies) {
-          referenceTargets.bands = {};
-          
-          // Converter bandEnergies da referência em targets para comparação
-          for (const [bandName, bandData] of Object.entries(analysis.technicalData.bandEnergies)) {
-            if (bandData && Number.isFinite(bandData.rms_db)) {
-              referenceTargets.bands[bandName] = {
-                target_db: bandData.rms_db,  // Usar o valor da referência como target
-                tol_db: 1.0,  // Tolerância padrão para bandas
-                tol_min: 0.5, // Tolerância mínima
-                tol_max: 1.5  // Tolerância máxima
-              };
-            }
-          }
-          
-          console.log('🔍 [DIAGNÓSTICO] Reference bands extraídas:', Object.keys(referenceTargets.bands));
-          console.log('🔍 [DIAGNÓSTICO] Exemplo de band target:', referenceTargets.bands[Object.keys(referenceTargets.bands)[0]]);
-        } else {
-          console.log('🔍 [DIAGNÓSTICO] Reference não possui bandEnergies - usando targets padrão para bandas');
+        // 🐛 VALIDAÇÃO: Verificar que não há comparação com gênero
+        if (analysis.comparison || analysis.mixScore) {
+          console.warn('⚠️ [AVISO] Análise da referência contaminada com comparação/score');
         }
         
-        console.log('🔍 [DIAGNÓSTICO] Reference targets extraídos:', referenceTargets);
+        console.log('🔍 [DIAGNÓSTICO] Reference analysis (pura):', {
+          lufs: analysis.technicalData?.lufsIntegrated,
+          stereoCorrelation: analysis.technicalData?.stereoCorrelation,
+          dynamicRange: analysis.technicalData?.dynamicRange,
+          truePeak: analysis.technicalData?.truePeakDbtp,
+          hasComparison: !!analysis.comparison,
+          hasScore: !!analysis.mixScore
+        });
+        
+        // 🎯 VALIDAÇÃO: Verificar se conseguimos extrair métricas válidas
+        const referenceMetrics = {
+          lufs: analysis.technicalData?.lufsIntegrated,
+          stereoCorrelation: analysis.technicalData?.stereoCorrelation,
+          dynamicRange: analysis.technicalData?.dynamicRange,
+          truePeak: analysis.technicalData?.truePeakDbtp
+        };
+        
+        // 🚨 ERRO CLARO: Falhar se não conseguir extrair métricas
+        if (!Number.isFinite(referenceMetrics.lufs)) {
+          throw new Error('REFERENCE_METRICS_FAILED: Não foi possível extrair métricas LUFS da música de referência. Verifique se o arquivo é válido.');
+        }
+        
+        if (!Number.isFinite(referenceMetrics.stereoCorrelation)) {
+          throw new Error('REFERENCE_METRICS_FAILED: Não foi possível extrair correlação estéreo da música de referência.');
+        }
+        
+        console.log('✅ [SUCESSO] Métricas da referência extraídas:', referenceMetrics);
         
         referenceStepState.referenceAnalysis = analysis;
-        referenceStepState.referenceTargets = referenceTargets;
+        referenceStepState.referenceMetrics = referenceMetrics;
         
         // Executar comparação
         updateReferenceStep('analysis');
         await performReferenceComparison();
+        
+        // 🎯 EXIBIR resultados da análise por referência
+        const finalAnalysis = referenceStepState.finalAnalysis;
+        
+        updateModalProgress(100, '✅ Análise por referência concluída!');
+        
+        // 🎯 LOGS finais de validação
+        console.log('🎉 [ANÁLISE POR REFERÊNCIA] Concluída com sucesso:');
+        console.log('  - Baseline source:', finalAnalysis.comparison?.baseline_source);
+        console.log('  - LUFS difference:', finalAnalysis.comparison?.loudness?.difference?.toFixed(2));
+        console.log('  - Sugestões:', finalAnalysis.suggestions?.length || 0);
+        console.log('  - Sem gênero:', !finalAnalysis.genre);
+        
+        // Exibir modal de resultados
+        displayReferenceResults(finalAnalysis);
         
         window.logReferenceEvent('reference_audio_analyzed', { 
             fileName: file.name,
@@ -1734,7 +1744,7 @@ function updateUploadAreaForReferenceStep() {
     });
 }
 
-// 🎯 NOVO: Executar comparação entre as duas músicas
+// 🎯 REESCRITA COMPLETA: Comparação baseada exclusivamente na referência
 async function performReferenceComparison() {
     window.logReferenceEvent('reference_comparison_started');
     
@@ -1743,76 +1753,144 @@ async function performReferenceComparison() {
         
         const userAnalysis = referenceStepState.userAnalysis;
         const refAnalysis = referenceStepState.referenceAnalysis;
-        const referenceTargets = referenceStepState.referenceTargets;
+        const referenceMetrics = referenceStepState.referenceMetrics;
         
-        if (!userAnalysis || !refAnalysis || !referenceTargets) {
-            throw new Error('Análises ou targets de referência não encontrados para comparação');
+        if (!userAnalysis || !refAnalysis || !referenceMetrics) {
+            throw new Error('COMPARISON_DATA_MISSING: Análises ou métricas de referência não encontradas');
         }
         
-        console.log('🔍 [DIAGNÓSTICO] Iniciando comparação - modo referência');
-        console.log('🔍 [DIAGNÓSTICO] Targets da referência:', referenceTargets);
-        console.log('🔍 [DIAGNÓSTICO] userAudioFile existe:', !!referenceStepState.userAudioFile);
-        console.log('🔍 [DIAGNÓSTICO] userAudioFile nome:', referenceStepState.userAudioFile?.name);
-        
-        // 🎯 CORREÇÃO: Re-analisar arquivo do usuário usando targets da referência
-        console.log('🔍 [DIAGNÓSTICO] Re-analisando usuário com targets da referência...');
-        
-        // Aplicar targets da referência globalmente (temporariamente)
-        const originalRefData = window.PROD_AI_REF_DATA;
-        const originalRefGenre = window.PROD_AI_REF_GENRE; // 🎯 SALVAR gênero original
-        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_DATA original:', originalRefData);
-        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_GENRE original:', originalRefGenre);
-        
-        window.PROD_AI_REF_DATA = {
-            reference_music: referenceTargets // Criar um "gênero" temporário com os targets da referência
-        };
-        window.PROD_AI_REF_GENRE = 'reference_music'; // 🎯 DEFINIR gênero ativo
-        
-        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_DATA após aplicação:', window.PROD_AI_REF_DATA);
-        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_GENRE após aplicação:', window.PROD_AI_REF_GENRE);
-        
-        // Re-analisar arquivo do usuário com targets da referência
-        const userFileFromState = referenceStepState.userAudioFile; // Arquivo original já guardado
-        if (!userFileFromState) {
-            console.error('🚨 [ERRO] Arquivo do usuário não encontrado no estado');
-            console.error('🚨 referenceStepState:', referenceStepState);
-            throw new Error('Arquivo do usuário não encontrado no estado');
-        }
-        
-        console.log('🔍 [DIAGNÓSTICO] Arquivo do usuário para re-análise:', userFileFromState.name);
-        
-        const finalUserAnalysisOptions = { 
-            mode: 'genre', // 🎯 USAR modo gênero para aplicar os targets
-            genre: 'reference_music', // 🎯 USAR o "gênero" temporário criado
-            debugModeReference: true 
+        // 🎯 EXTRAIR métricas do usuário (análise pura, sem comparações)
+        const userMetrics = {
+            lufs: userAnalysis.technicalData?.lufsIntegrated,
+            stereoCorrelation: userAnalysis.technicalData?.stereoCorrelation,
+            dynamicRange: userAnalysis.technicalData?.dynamicRange,
+            truePeak: userAnalysis.technicalData?.truePeakDbtp
         };
         
-        console.log('🔍 [DIAGNÓSTICO] Opções para análise final:', finalUserAnalysisOptions);
-        
-        // 🎯 CRUCIAL: Re-analisar arquivo do usuário com targets da referência
-        const finalUserAnalysis = await window.audioAnalyzer.analyzeAudioFile(userFileFromState, finalUserAnalysisOptions);
-        
-        // Restaurar dados originais
-        window.PROD_AI_REF_DATA = originalRefData;
-        window.PROD_AI_REF_GENRE = originalRefGenre; // 🎯 RESTAURAR gênero original
-        
-        console.log('🔍 [DIAGNÓSTICO] Dados originais restaurados');
-        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_GENRE restaurado para:', window.PROD_AI_REF_GENRE);
-        
-        console.log('🔍 [DIAGNÓSTICO] Análise final do usuário concluída');
-        console.log('🔍 [DIAGNÓSTICO] Final user LUFS:', finalUserAnalysis.technicalData?.lufsIntegrated);
-        console.log('🔍 [DIAGNÓSTICO] Final user tem comparison:', !!finalUserAnalysis.comparison);
-        console.log('🔍 [DIAGNÓSTICO] Final user suggestions count:', finalUserAnalysis.suggestions?.length || 0);
-        
-        // 🎯 VERIFICAR se a comparação está correta
-        if (finalUserAnalysis.comparison) {
-            console.log('🔍 [DIAGNÓSTICO] Comparison LUFS baseline:', finalUserAnalysis.comparison.loudness?.baseline);
-            console.log('🔍 [DIAGNÓSTICO] Comparison LUFS actual:', finalUserAnalysis.comparison.loudness?.actual);
-            console.log('🔍 [DIAGNÓSTICO] Comparison LUFS difference:', finalUserAnalysis.comparison.loudness?.difference);
+        // 🚨 VALIDAÇÃO: Verificar métricas do usuário
+        if (!Number.isFinite(userMetrics.lufs)) {
+            throw new Error('USER_METRICS_FAILED: Não foi possível extrair métricas LUFS da sua música');
         }
         
-        // Atualizar estado com análise final
-        referenceStepState.finalUserAnalysis = finalUserAnalysis;
+        console.log('🔍 [COMPARAÇÃO] Métricas extraídas:');
+        console.log('  - Usuário:', userMetrics);
+        console.log('  - Referência:', referenceMetrics);
+        
+        // 🎯 CALCULAR diferenças PURAS (referência como baseline)
+        const differences = {
+            lufs: userMetrics.lufs - referenceMetrics.lufs,
+            stereoCorrelation: userMetrics.stereoCorrelation - referenceMetrics.stereoCorrelation,
+            dynamicRange: userMetrics.dynamicRange - referenceMetrics.dynamicRange,
+            truePeak: userMetrics.truePeak - referenceMetrics.truePeak
+        };
+        
+        console.log('🔍 [COMPARAÇÃO] Diferenças calculadas:', differences);
+        
+        // 🎯 GERAR sugestões baseadas APENAS na referência
+        const referenceSuggestions = [];
+        const THRESHOLD = 0.2; // Ignorar diferenças menores que 0.2dB
+        
+        // Loudness (LUFS)
+        if (Math.abs(differences.lufs) > THRESHOLD) {
+            const action = differences.lufs > 0 ? 'Diminuir' : 'Aumentar';
+            const direction = differences.lufs > 0 ? 'decrease' : 'increase';
+            referenceSuggestions.push({
+                type: 'reference_loudness',
+                message: `${action} volume em ${Math.abs(differences.lufs).toFixed(1)}dB para igualar à música de referência`,
+                action: `${action} volume em ${Math.abs(differences.lufs).toFixed(1)}dB`,
+                frequency_range: 'N/A',
+                adjustment_db: Math.abs(differences.lufs),
+                direction: direction,
+                baseline_source: 'reference_audio'
+            });
+        }
+        
+        // Dynamic Range
+        if (Math.abs(differences.dynamicRange) > THRESHOLD) {
+            const action = differences.dynamicRange > 0 ? 'Reduzir' : 'Aumentar';
+            referenceSuggestions.push({
+                type: 'reference_dynamics',
+                message: `${action} range dinâmico em ${Math.abs(differences.dynamicRange).toFixed(1)}dB para igualar à referência`,
+                action: `${action} range dinâmico em ${Math.abs(differences.dynamicRange).toFixed(1)}dB`,
+                frequency_range: 'N/A',
+                adjustment_db: Math.abs(differences.dynamicRange),
+                baseline_source: 'reference_audio'
+            });
+        }
+        
+        // Stereo Correlation
+        if (Math.abs(differences.stereoCorrelation) > 0.05) { // 5% threshold para correlação
+            const action = differences.stereoCorrelation > 0 ? 'Reduzir' : 'Aumentar';
+            referenceSuggestions.push({
+                type: 'reference_stereo',
+                message: `${action} correlação estéreo para igualar à referência (diferença: ${(differences.stereoCorrelation * 100).toFixed(1)}%)`,
+                action: `Ajustar correlação estéreo`,
+                frequency_range: 'N/A',
+                baseline_source: 'reference_audio'
+            });
+        }
+        
+        // True Peak
+        if (Math.abs(differences.truePeak) > THRESHOLD) {
+            const action = differences.truePeak > 0 ? 'Reduzir' : 'Aumentar';
+            referenceSuggestions.push({
+                type: 'reference_peak',
+                message: `${action} pico em ${Math.abs(differences.truePeak).toFixed(1)}dB para igualar à referência`,
+                action: `${action} pico em ${Math.abs(differences.truePeak).toFixed(1)}dB`,
+                frequency_range: 'N/A',
+                adjustment_db: Math.abs(differences.truePeak),
+                baseline_source: 'reference_audio'
+            });
+        }
+        
+        console.log(`🔍 [COMPARAÇÃO] Sugestões geradas: ${referenceSuggestions.length}`);
+        
+        // 🎯 CRIAR análise final com comparação pura
+        const finalAnalysis = {
+            ...userAnalysis,
+            comparison: {
+                mode: 'reference',
+                baseline_source: 'reference_audio',
+                loudness: {
+                    user: userMetrics.lufs,
+                    reference: referenceMetrics.lufs,
+                    difference: differences.lufs,
+                    baseline: referenceMetrics.lufs
+                },
+                dynamics: {
+                    user: userMetrics.dynamicRange,
+                    reference: referenceMetrics.dynamicRange,
+                    difference: differences.dynamicRange,
+                    baseline: referenceMetrics.dynamicRange
+                },
+                stereo: {
+                    user: userMetrics.stereoCorrelation,
+                    reference: referenceMetrics.stereoCorrelation,
+                    difference: differences.stereoCorrelation,
+                    baseline: referenceMetrics.stereoCorrelation
+                },
+                peak: {
+                    user: userMetrics.truePeak,
+                    reference: referenceMetrics.truePeak,
+                    difference: differences.truePeak,
+                    baseline: referenceMetrics.truePeak
+                }
+            },
+            suggestions: referenceSuggestions,
+            // 🚫 NUNCA usar gênero em modo referência
+            genre: null,
+            mixScore: null, // Não gerar score baseado em gênero
+            mixClassification: null
+        };
+        
+        // 🎯 LOGS de validação final
+        console.log('🎉 [SUCESSO] Comparação por referência concluída:');
+        console.log('  - Modo:', finalAnalysis.comparison.mode);
+        console.log('  - Baseline source:', finalAnalysis.comparison.baseline_source);
+        console.log('  - Sugestões:', referenceSuggestions.length);
+        console.log('  - Sem contaminação de gênero:', !finalAnalysis.genre);
+        
+        referenceStepState.finalAnalysis = finalAnalysis;
         console.log('🔍 [DIAGNÓSTICO] Reference analysis tem comparação com gênero:', !!refAnalysis.comparison);
         
         // 🎯 NOVO: Verificar se análises estão "limpas" (sem contaminar com gênero)
@@ -3789,3 +3867,79 @@ if (typeof window !== 'undefined' && !window.__testConsistency) {
         return out;
     };
 }
+
+// 🎯 FINAL: Display Reference Results
+window.displayReferenceResults = function(referenceResults) {
+    window.logReferenceEvent('displaying_reference_results', {
+        baseline_source: referenceResults.baseline_source,
+        has_suggestions: referenceResults.referenceSuggestions?.length > 0
+    });
+    
+    try {
+        const { comparisonData, referenceSuggestions, baseline_source } = referenceResults;
+        
+        if (baseline_source !== 'reference') {
+            throw new Error(`Invalid baseline source: ${baseline_source}. Expected 'reference'`);
+        }
+        
+        if (!comparisonData) {
+            throw new Error('Missing comparison data in reference results');
+        }
+
+        const results = document.getElementById('results');
+        if (!results) {
+            throw new Error('Results container not found');
+        }
+
+        // Exibir seção de comparação
+        displayComparisonSection(comparisonData, referenceSuggestions || []);
+        
+        // Se há sugestões, exibir
+        if (referenceSuggestions && referenceSuggestions.length > 0) {
+            const suggestionsList = document.getElementById('suggestions-list');
+            if (suggestionsList) {
+                suggestionsList.innerHTML = referenceSuggestions.map(suggestion => 
+                    `<div class="suggestion-item">
+                        <h4>${suggestion.category}</h4>
+                        <p>${suggestion.text}</p>
+                        <div class="suggestion-details">
+                            <small>Diferença: ${suggestion.difference} | Threshold: ${suggestion.threshold}</small>
+                        </div>
+                    </div>`
+                ).join('');
+            }
+        } else {
+            // Audio idêntico - mostrar mensagem de sucesso
+            const suggestionsList = document.getElementById('suggestions-list');
+            if (suggestionsList) {
+                suggestionsList.innerHTML = `
+                    <div class="no-suggestions">
+                        <h3>✅ Análise de Referência Concluída</h3>
+                        <p>Os áudios são altamente similares. Diferenças dentro da tolerância aceitável.</p>
+                    </div>
+                `;
+            }
+        }
+        
+        window.logReferenceEvent('reference_results_displayed_successfully');
+        
+    } catch (error) {
+        console.error('Error displaying reference results:', error);
+        window.logReferenceEvent('reference_display_error', { 
+            error: error.message,
+            baseline_source: referenceResults.baseline_source 
+        });
+        
+        // Fallback display
+        const results = document.getElementById('results');
+        if (results) {
+            results.innerHTML = `
+                <div class="error-display">
+                    <h3>❌ Erro na Exibição dos Resultados</h3>
+                    <p>Erro: ${error.message}</p>
+                    <p>Baseline Source: ${referenceResults.baseline_source}</p>
+                </div>
+            `;
+        }
+    }
+};

@@ -77,7 +77,7 @@ class AudioAnalyzer {
 
   // 📁 Analisar arquivo de áudio
   async analyzeAudioFile(file, options = {}) {
-    // 🎯 CORREÇÃO: Propagar contexto de modo
+    // 🎯 CORREÇÃO TOTAL: Propagar contexto de modo
     const mode = options.mode || 'genre'; // Default para compatibilidade
     const DEBUG_MODE_REFERENCE = options.debugModeReference || false;
     
@@ -85,9 +85,9 @@ class AudioAnalyzer {
       console.log('🔍 [MODE_DEBUG] analyzeAudioFile called with mode:', mode);
       console.log('🔍 [MODE_DEBUG] options:', options);
       
-      // 🎯 NOVO: Log específico para modo extract_metrics
-      if (mode === 'extract_metrics') {
-        console.log('🔍 [MODE_DEBUG] extract_metrics mode: apenas extrair métricas, sem comparação');
+      // 🎯 MODO PURO: Apenas extrair métricas, sem comparações
+      if (mode === 'pure_analysis') {
+        console.log('🔍 [MODE_DEBUG] pure_analysis mode: extrair métricas sem comparações ou scores');
       }
     }
     
@@ -461,16 +461,16 @@ class AudioAnalyzer {
               let activeRef = null;
               try {
                 if (typeof window !== 'undefined') {
-                  // 🎯 CORREÇÃO: Apenas usar PROD_AI_REF_DATA no modo gênero
+                  // 🎯 CORREÇÃO TOTAL: Apenas usar PROD_AI_REF_DATA no modo gênero
                   if (mode === 'genre') {
                     activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null;
                     if (DEBUG_MODE_REFERENCE) {
                       console.log('🔍 [MODE_DEBUG] Using genre targets for scoring, mode:', mode);
                     }
                   } else {
-                    activeRef = null; // Modo referência não usa targets de gênero
+                    activeRef = null; // Modos reference, extract_metrics, pure_analysis não usam targets de gênero
                     if (DEBUG_MODE_REFERENCE) {
-                      console.log('🔍 [MODE_DEBUG] Skipping genre targets, mode:', mode);
+                      console.log('🔍 [MODE_DEBUG] Skipping genre targets, mode:', mode, '(pure analysis)');
                     }
                   }
                 }
@@ -799,7 +799,7 @@ class AudioAnalyzer {
     // ===== Quality Breakdown (preencher se ausente) =====
     try {
       if (!baseAnalysis.qualityBreakdown) {
-        // 🎯 CORREÇÃO: Apenas usar PROD_AI_REF_DATA no modo gênero
+        // 🎯 CORREÇÃO TOTAL: Apenas usar PROD_AI_REF_DATA no modo gênero
         let ref = null;
         if (mode === 'genre' && typeof window !== 'undefined') {
           ref = window.PROD_AI_REF_DATA;
@@ -807,7 +807,7 @@ class AudioAnalyzer {
             console.log('🔍 [MODE_DEBUG] Using genre ref for quality breakdown, mode:', mode);
           }
         } else if (DEBUG_MODE_REFERENCE) {
-          console.log('🔍 [MODE_DEBUG] Skipping genre ref for quality breakdown, mode:', mode);
+          console.log('🔍 [MODE_DEBUG] Skipping genre ref for quality breakdown, mode:', mode, '(pure analysis)');
         }
         
         const safe = (v,def=0)=> Number.isFinite(v)?v:def;
@@ -893,7 +893,7 @@ class AudioAnalyzer {
         console.log('[COLOR_RATIO_V2_DEBUG] tdFinal input:', tdFinal);
         console.log('[COLOR_RATIO_V2_DEBUG] tdFinal keys:', Object.keys(tdFinal || {}));
         let activeRef = null;
-        // 🎯 CORREÇÃO: Apenas usar PROD_AI_REF_DATA no modo gênero
+        // 🎯 CORREÇÃO TOTAL: Apenas usar PROD_AI_REF_DATA no modo gênero
         try { 
           if (mode === 'genre') {
             activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null;
@@ -901,7 +901,7 @@ class AudioAnalyzer {
               console.log('🔍 [MODE_DEBUG] Using genre ref for scoring, mode:', mode);
             }
           } else if (DEBUG_MODE_REFERENCE) {
-            console.log('🔍 [MODE_DEBUG] Skipping genre ref for scoring, mode:', mode);
+            console.log('🔍 [MODE_DEBUG] Skipping genre ref for scoring, mode:', mode, '(pure analysis)');
           }
         } catch {}
         try {
@@ -2097,29 +2097,7 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
   // ===== FASE 2 (INÍCIO): Bandas espectrais alinhadas às referências =====
     try {
       const t0Spec = performance.now();
-      // 🎯 CORREÇÃO: Buscar referência correta conforme o modo
-      let ref = null;
-      if (typeof window !== 'undefined') {
-        if (mode === 'reference') {
-          // Modo referência: usar dados específicos da música de referência
-          ref = window.PROD_AI_REF_DATA?.reference_music || null;
-          if (DEBUG_MODE_REFERENCE) {
-            console.log('🔍 [MODE_DEBUG] Using reference music data for bands:', ref);
-          }
-        } else {
-          // Modo gênero: usar dados do gênero ativo
-          const activeGenre = window.PROD_AI_REF_GENRE || 'default';
-          const fullRefData = window.PROD_AI_REF_DATA;
-          ref = fullRefData ? fullRefData[activeGenre] : null;
-          if (DEBUG_MODE_REFERENCE) {
-            console.log('🔍 [MODE_DEBUG] Using genre-specific ref for bands:', activeGenre);
-            console.log('🔍 [MODE_DEBUG] Band ref data:', ref);
-          }
-        }
-      } else if (DEBUG_MODE_REFERENCE) {
-        console.log('🔍 [MODE_DEBUG] Window not available for refs (mode=' + mode + ')');
-      }
-      
+      const ref = (typeof window !== 'undefined') ? window.PROD_AI_REF_DATA : null;
       const doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
       if (doBands) {
         // Evitar reprocessar se já existe (idempotente)
