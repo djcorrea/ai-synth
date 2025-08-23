@@ -469,6 +469,39 @@ window.openModeSelectionModal = openModeSelectionModal;
 window.closeModeSelectionModal = closeModeSelectionModal;
 window.selectAnalysisMode = selectAnalysisMode;
 
+//! DEBUG: Função de debug global para forçar recarga
+window.forceReloadRefs = async function(genre = 'funk_bruxaria') {
+    console.log('🔄 FORÇA RECARGA DE REFERÊNCIAS:', genre);
+    
+    // Limpar tudo
+    delete window.__refDataCache;
+    window.__refDataCache = {};
+    window.REFS_BYPASS_CACHE = true;
+    window.__activeRefData = null;
+    window.__activeRefGenre = null;
+    delete window.PROD_AI_REF_DATA;
+    
+    console.log('💥 Cache limpo, forçando reload...');
+    
+    try {
+        const result = await loadReferenceData(genre);
+        console.log('✅ Recarga forçada concluída:', {
+            version: result.version,
+            lufs_target: result.lufs_target,
+            true_peak_target: result.true_peak_target,
+            presenca_band: result.bands?.presenca?.target_db
+        });
+        
+        // Resetar flag
+        window.REFS_BYPASS_CACHE = false;
+        return result;
+    } catch (error) {
+        console.error('💥 Erro na recarga forçada:', error);
+        window.REFS_BYPASS_CACHE = false;
+        throw error;
+    }
+};
+
 // 🔍 Função de Diagnóstico de Referências (somente dev)
 window.diagnosRefSources = function(genre = null) {
     const targetGenre = genre || __activeRefGenre || 'funk_bruxaria';
@@ -841,8 +874,11 @@ async function loadReferenceData(genre) {
         }
         updateRefStatus('⏳ carregando...', '#996600');
         
+        console.log('🔍 DEBUG loadReferenceData início:', { genre, bypassCache });
+        
         // PRIORIDADE CORRIGIDA: external > embedded > fallback
         // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
+        console.log('🌐 Tentando carregar JSON externo primeiro...');
         try {
             const version = __refDataCache[genre]?.version || 'force';
             const json = await fetchRefJsonWithFallback([
@@ -877,7 +913,8 @@ async function loadReferenceData(genre) {
                 return enrichedNet;
             }
         } catch (netError) {
-            console.log('⚠️ External refs failed, trying embedded:', netError.message);
+            console.log('❌ External refs failed:', netError.message);
+            console.log('🔄 Fallback para embedded refs...');
         }
         
         // 2) Fallback para referências embutidas (embedded)
