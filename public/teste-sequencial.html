@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Scoring V2 - Sequencial</title>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            background: #0a0a0a; 
+            color: #00ff00; 
+            padding: 20px; 
+            line-height: 1.4;
+            margin: 0;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: rgba(0,255,0,0.05);
+        }
+        .section {
+            border: 1px solid #00ff00;
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(0,255,0,0.02);
+        }
+        .log { 
+            background: rgba(0,255,0,0.1); 
+            border: 1px solid #00ff00; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            white-space: pre-wrap;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .error { 
+            background: rgba(255,0,0,0.1); 
+            border-color: #ff0000; 
+            color: #ff6666; 
+        }
+        .success { 
+            background: rgba(0,255,0,0.2); 
+            border-color: #00ff00; 
+        }
+        .warning {
+            background: rgba(255,255,0,0.1);
+            border-color: #ffff00;
+            color: #ffff88;
+        }
+        .button {
+            background: #002200;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 12px 25px;
+            margin: 10px 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            display: inline-block;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .button:hover { 
+            background: #004400; 
+            box-shadow: 0 0 10px rgba(0,255,0,0.3);
+        }
+        .button:active { background: #001100; }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .status-item {
+            background: rgba(0,255,0,0.05);
+            border: 1px solid #00ff00;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .status-value {
+            color: #88ff88;
+            font-weight: bold;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #00ff00;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #88ff88);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 SISTEMA DE TESTE SCORING V2</h1>
+            <p>Teste completo com carregamento sequencial e validação</p>
+        </div>
+
+        <div class="section">
+            <h2>🚀 1. Carregamento dos Módulos</h2>
+            <div class="progress">
+                <div class="progress-bar" id="loadProgress"></div>
+            </div>
+            <div class="button" onclick="loadModules()">Carregar Módulos de Scoring</div>
+            <div class="button" onclick="checkStatus()">Verificar Status</div>
+            <div id="loadStatus" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 2. Teste de Funcionalidade</h2>
+            <div class="button" onclick="runQuickTest()">Teste Rápido</div>
+            <div class="button" onclick="runComparisonTest()">Teste de Comparação V1 vs V2</div>
+            <div class="button" onclick="runStressTest()">Teste de Stress</div>
+            <div id="testResults" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h2>🎛️ 3. Controles de Teste</h2>
+            <div class="button" onclick="enableV2Test()">Habilitar Modo V2</div>
+            <div class="button" onclick="disableV2Test()">Desabilitar Modo V2</div>
+            <div class="button" onclick="resetAll()">Reset Completo</div>
+            <div id="controlStatus" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 4. Status do Sistema</h2>
+            <div class="status-grid" id="statusGrid">
+                <!-- Preenchido dinamicamente -->
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 5. Logs Detalhados</h2>
+            <div class="button" onclick="clearLogs()">Limpar Logs</div>
+            <div class="button" onclick="exportLogs()">Exportar Logs</div>
+            <div id="detailedLogs" class="log"></div>
+        </div>
+    </div>
+
+    <!-- Carregador de módulos -->
+    <script src="/scoring-loader.js"></script>
+
+    <script>
+        let allLogs = [];
+        
+        function log(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            
+            allLogs.push({ timestamp, message, type });
+            
+            // Log detalhado
+            const detailedDiv = document.getElementById('detailedLogs');
+            if (detailedDiv) {
+                const div = document.createElement('div');
+                div.className = `log ${type}`;
+                div.textContent = logEntry;
+                detailedDiv.appendChild(div);
+                detailedDiv.scrollTop = detailedDiv.scrollHeight;
+            }
+            
+            console.log(message);
+        }
+        
+        function updateProgress(percent) {
+            const bar = document.getElementById('loadProgress');
+            if (bar) {
+                bar.style.width = percent + '%';
+            }
+        }
+        
+        function updateStatus(containerId, message, type = 'log') {
+            const container = document.getElementById(containerId);
+            if (container) {
+                const div = document.createElement('div');
+                div.className = `log ${type}`;
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+        
+        function updateStatusGrid() {
+            const grid = document.getElementById('statusGrid');
+            if (!grid) return;
+            
+            const status = window.ScoringLoader ? window.ScoringLoader.getStatus() : {};
+            
+            grid.innerHTML = `
+                <div class="status-item">
+                    <div>Carregador:</div>
+                    <div class="status-value">${window.ScoringLoader ? '✅ Disponível' : '❌ Indisponível'}</div>
+                </div>
+                <div class="status-item">
+                    <div>Scoring V1:</div>
+                    <div class="status-value">${status.v1Available ? '✅ Carregado' : '❌ Não carregado'}</div>
+                </div>
+                <div class="status-item">
+                    <div>Scoring V2:</div>
+                    <div class="status-value">${status.v2Available ? '✅ Carregado' : '❌ Não carregado'}</div>
+                </div>
+                <div class="status-item">
+                    <div>Integração:</div>
+                    <div class="status-value">${status.integrationAvailable ? '✅ Carregado' : '❌ Não carregado'}</div>
+                </div>
+                <div class="status-item">
+                    <div>Função Global:</div>
+                    <div class="status-value">${status.globalFunctionAvailable ? '✅ Disponível' : '❌ Indisponível'}</div>
+                </div>
+                <div class="status-item">
+                    <div>Modo Teste V2:</div>
+                    <div class="status-value">${window.SCORING_V2_TEST ? '🧪 Habilitado' : '🛡️ Desabilitado'}</div>
+                </div>
+            `;
+        }
+        
+        async function loadModules() {
+            try {
+                updateProgress(0);
+                updateStatus('loadStatus', '🚀 Iniciando carregamento dos módulos...', 'log');
+                log('🚀 Iniciando carregamento sequencial dos módulos');
+                
+                if (!window.ScoringLoader) {
+                    throw new Error('ScoringLoader não disponível');
+                }
+                
+                updateProgress(25);
+                const result = await window.ScoringLoader.loadAllModules();
+                
+                if (result.success) {
+                    updateProgress(100);
+                    updateStatus('loadStatus', '✅ Todos os módulos carregados com sucesso!', 'success');
+                    log('✅ Carregamento completo bem-sucedido');
+                    
+                    updateStatusGrid();
+                } else {
+                    updateProgress(0);
+                    updateStatus('loadStatus', `❌ Erro no carregamento: ${result.error}`, 'error');
+                    log(`❌ Falha no carregamento: ${result.error}`);
+                }
+                
+            } catch (error) {
+                updateProgress(0);
+                updateStatus('loadStatus', `❌ Erro crítico: ${error.message}`, 'error');
+                log(`❌ Erro crítico no carregamento: ${error.message}`);
+            }
+        }
+        
+        function checkStatus() {
+            try {
+                const status = window.ScoringLoader ? window.ScoringLoader.getStatus() : {};
+                updateStatus('loadStatus', `📊 Status: ${JSON.stringify(status, null, 2)}`, 'log');
+                updateStatusGrid();
+                log('📊 Status verificado');
+            } catch (error) {
+                updateStatus('loadStatus', `❌ Erro ao verificar status: ${error.message}`, 'error');
+            }
+        }
+        
+        async function runQuickTest() {
+            try {
+                updateStatus('testResults', '🧪 Executando teste rápido...', 'log');
+                
+                if (!window.ScoringLoader) {
+                    throw new Error('ScoringLoader não disponível');
+                }
+                
+                const success = await window.ScoringLoader.quickTest();
+                
+                if (success) {
+                    updateStatus('testResults', '✅ Teste rápido bem-sucedido!', 'success');
+                    log('✅ Teste rápido passou com sucesso');
+                } else {
+                    updateStatus('testResults', '⚠️ Teste rápido falhou - verifique logs', 'warning');
+                    log('⚠️ Teste rápido não passou como esperado');
+                }
+                
+            } catch (error) {
+                updateStatus('testResults', `❌ Erro no teste: ${error.message}`, 'error');
+                log(`❌ Erro no teste rápido: ${error.message}`);
+            }
+        }
+        
+        async function runComparisonTest() {
+            try {
+                updateStatus('testResults', '🔄 Executando teste de comparação V1 vs V2...', 'log');
+                
+                if (!window.ScoringIntegration) {
+                    throw new Error('ScoringIntegration não disponível');
+                }
+                
+                const testData = {
+                    lufsIntegrated: -12.5,
+                    truePeakDbtp: -0.8,
+                    dynamicRange: 6.2,
+                    lra: 4.5,
+                    stereoCorrelation: 0.75,
+                    dcOffset: 0.0001,
+                    clippingPercent: 0,
+                    bandEnergies: {
+                        sub_bass: { rms_db: -8.2 },
+                        bass: { rms_db: -6.8 },
+                        low_mid: { rms_db: -7.5 },
+                        mid: { rms_db: -9.1 },
+                        high_mid: { rms_db: -12.3 },
+                        treble: { rms_db: -15.6 }
+                    }
+                };
+                
+                const reference = { genre: 'funk_mandela' };
+                
+                // Teste V1
+                window.SCORING_V2_TEST = false;
+                const v1Result = await window.ScoringIntegration.computeMixScore(testData, reference);
+                
+                // Teste V2
+                window.SCORING_V2_TEST = true;
+                const v2Result = await window.ScoringIntegration.computeMixScore(testData, reference);
+                
+                const improvement = v2Result.scorePct - v1Result.scorePct;
+                const improvementPct = v1Result.scorePct > 0 ? (improvement / v1Result.scorePct * 100) : 0;
+                
+                const report = `
+🎯 RESULTADO DO TESTE DE COMPARAÇÃO:
+   V1 Score: ${v1Result.scorePct}% (${v1Result.method})
+   V2 Score: ${v2Result.scorePct}% (${v2Result.method})
+   Melhoria: ${improvement > 0 ? '+' : ''}${improvement.toFixed(1)} pontos
+   Melhoria %: ${improvementPct > 0 ? '+' : ''}${improvementPct.toFixed(1)}%
+   
+   V2 Funcionando: ${v2Result.method.includes('v2') ? '✅ SIM' : '❌ NÃO'}
+   Tempo V1: ${v1Result.processingTime}ms
+   Tempo V2: ${v2Result.processingTime}ms`;
+                
+                updateStatus('testResults', report, v2Result.method.includes('v2') ? 'success' : 'warning');
+                log(`📊 Teste de comparação concluído - V2 ${v2Result.method.includes('v2') ? 'funcionando' : 'não funcionando'}`);
+                
+            } catch (error) {
+                updateStatus('testResults', `❌ Erro no teste de comparação: ${error.message}`, 'error');
+                log(`❌ Erro no teste de comparação: ${error.message}`);
+            }
+        }
+        
+        async function runStressTest() {
+            try {
+                updateStatus('testResults', '💪 Executando teste de stress (5 execuções)...', 'log');
+                
+                if (!window.ScoringIntegration) {
+                    throw new Error('ScoringIntegration não disponível');
+                }
+                
+                const testData = {
+                    lufsIntegrated: -12.0,
+                    truePeakDbtp: -1.0,
+                    dynamicRange: 6.0,
+                    bandEnergies: {
+                        bass: { rms_db: -8.0 },
+                        mid: { rms_db: -10.0 },
+                        treble: { rms_db: -15.0 }
+                    }
+                };
+                
+                const reference = { genre: 'funk_mandela' };
+                
+                window.SCORING_V2_TEST = true;
+                const results = [];
+                
+                for (let i = 0; i < 5; i++) {
+                    const start = performance.now();
+                    const result = await window.ScoringIntegration.computeMixScore(testData, reference);
+                    const time = performance.now() - start;
+                    
+                    results.push({
+                        iteration: i + 1,
+                        score: result.scorePct,
+                        method: result.method,
+                        time: time
+                    });
+                }
+                
+                const avgScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
+                const avgTime = results.reduce((sum, r) => sum + r.time, 0) / results.length;
+                const allV2 = results.every(r => r.method.includes('v2'));
+                
+                const report = `
+💪 RESULTADO DO TESTE DE STRESS:
+   Execuções: 5
+   Score Médio: ${avgScore.toFixed(1)}%
+   Tempo Médio: ${avgTime.toFixed(1)}ms
+   Consistência V2: ${allV2 ? '✅ 100%' : '⚠️ Inconsistente'}
+   
+   Detalhes:
+${results.map(r => `   #${r.iteration}: ${r.score}% (${r.time.toFixed(1)}ms) - ${r.method}`).join('\n')}`;
+                
+                updateStatus('testResults', report, allV2 ? 'success' : 'warning');
+                log(`💪 Teste de stress concluído - Consistência: ${allV2 ? '100%' : 'Problemas detectados'}`);
+                
+            } catch (error) {
+                updateStatus('testResults', `❌ Erro no teste de stress: ${error.message}`, 'error');
+                log(`❌ Erro no teste de stress: ${error.message}`);
+            }
+        }
+        
+        function enableV2Test() {
+            window.SCORING_V2_TEST = true;
+            updateStatus('controlStatus', '🧪 Modo V2 habilitado para testes', 'success');
+            updateStatusGrid();
+            log('🧪 Modo de teste V2 habilitado');
+        }
+        
+        function disableV2Test() {
+            window.SCORING_V2_TEST = false;
+            updateStatus('controlStatus', '🛡️ Modo V2 desabilitado (voltando para V1)', 'log');
+            updateStatusGrid();
+            log('🛡️ Modo de teste V2 desabilitado');
+        }
+        
+        function resetAll() {
+            // Reset flags
+            window.SCORING_V2_TEST = false;
+            
+            // Limpar logs visuais
+            const logContainers = ['loadStatus', 'testResults', 'controlStatus'];
+            logContainers.forEach(id => {
+                const container = document.getElementById(id);
+                if (container) container.innerHTML = '';
+            });
+            
+            // Reset progress
+            updateProgress(0);
+            
+            // Reset status
+            updateStatusGrid();
+            
+            updateStatus('controlStatus', '🔄 Sistema resetado completamente', 'log');
+            log('🔄 Reset completo do sistema executado');
+        }
+        
+        function clearLogs() {
+            document.getElementById('detailedLogs').innerHTML = '';
+            allLogs = [];
+            log('🧹 Logs limpos');
+        }
+        
+        function exportLogs() {
+            const logData = {
+                timestamp: new Date().toISOString(),
+                logs: allLogs,
+                systemStatus: window.ScoringLoader ? window.ScoringLoader.getStatus() : {},
+                lastResult: window.__LAST_SCORING_RESULT || null
+            };
+            
+            const blob = new Blob([JSON.stringify(logData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `scoring-test-logs-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('📥 Logs exportados com sucesso');
+        }
+        
+        // Auto-setup
+        window.addEventListener('load', () => {
+            log('🌟 Sistema de teste carregado! Clique em "Carregar Módulos" para começar.');
+            updateStatusGrid();
+        });
+        
+        // Update status periodicamente
+        setInterval(updateStatusGrid, 2000);
+    </script>
+</body>
+</html>

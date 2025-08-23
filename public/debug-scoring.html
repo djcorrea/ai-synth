@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Scoring V2</title>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            background: #1a1a1a; 
+            color: #00ff00; 
+            padding: 20px; 
+            line-height: 1.4;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .log { 
+            background: rgba(0,255,0,0.1); 
+            border: 1px solid #00ff00; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            white-space: pre-wrap;
+        }
+        .error { 
+            background: rgba(255,0,0,0.1); 
+            border-color: #ff0000; 
+            color: #ff6666; 
+        }
+        .success { 
+            background: rgba(0,255,0,0.2); 
+            border-color: #00ff00; 
+        }
+        .button {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px 20px;
+            margin: 10px 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            display: inline-block;
+        }
+        .button:hover { background: #444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 DEBUG SCORING V2 SYSTEM</h1>
+        
+        <div class="button" onclick="testBasicImports()">1. Testar Imports Básicos</div>
+        <div class="button" onclick="testScoringV1()">2. Testar Scoring V1</div>
+        <div class="button" onclick="testScoringV2()">3. Testar Scoring V2</div>
+        <div class="button" onclick="testIntegration()">4. Testar Integração</div>
+        <div class="button" onclick="runFullTest()">5. Teste Completo</div>
+        <div class="button" onclick="clearLogs()">Limpar Logs</div>
+        
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        let logContainer = document.getElementById('logs');
+        
+        function log(message, type = 'log') {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            logContainer.innerHTML = '';
+        }
+        
+        async function testBasicImports() {
+            log('🧪 TESTE 1: Verificando imports básicos...', 'log');
+            
+            try {
+                // Testar scoring original
+                log('   Testando scoring.js...', 'log');
+                const scoringOriginal = await import('/lib/audio/features/scoring.js?v=' + Date.now());
+                if (scoringOriginal && scoringOriginal.computeMixScore) {
+                    log('   ✅ scoring.js carregado com sucesso', 'success');
+                } else {
+                    log('   ❌ scoring.js sem função computeMixScore', 'error');
+                }
+                
+                // Testar scoring V2
+                log('   Testando scoring-v2-browser.js...', 'log');
+                const scoringV2 = await import('/lib/audio/features/scoring-v2-browser.js?v=' + Date.now());
+                if (scoringV2 && scoringV2.calculateScoringV2) {
+                    log('   ✅ scoring-v2-browser.js carregado com sucesso', 'success');
+                } else {
+                    log('   ❌ scoring-v2-browser.js sem função calculateScoringV2', 'error');
+                }
+                
+                // Testar integração
+                log('   Testando scoring-integration-browser.js...', 'log');
+                const integration = await import('/lib/audio/features/scoring-integration-browser.js?v=' + Date.now());
+                if (integration && integration.computeMixScore) {
+                    log('   ✅ scoring-integration-browser.js carregado com sucesso', 'success');
+                } else {
+                    log('   ❌ scoring-integration-browser.js sem função computeMixScore', 'error');
+                }
+                
+                log('✅ TESTE 1 CONCLUÍDO', 'success');
+                
+            } catch (error) {
+                log(`❌ ERRO NO TESTE 1: ${error.message}`, 'error');
+                log(`   Stack: ${error.stack}`, 'error');
+            }
+        }
+        
+        async function testScoringV1() {
+            log('🧪 TESTE 2: Testando Scoring V1...', 'log');
+            
+            try {
+                const scoringModule = await import('/lib/audio/features/scoring.js?v=' + Date.now());
+                
+                const testData = {
+                    lufsIntegrated: -12.5,
+                    truePeakDbtp: -0.8,
+                    dynamicRange: 6.2,
+                    lra: 4.5,
+                    stereoCorrelation: 0.75,
+                    dcOffset: 0.0001,
+                    clippingPercent: 0,
+                    bandEnergies: {
+                        sub_bass: { rms_db: -8.2 },
+                        bass: { rms_db: -6.8 },
+                        low_mid: { rms_db: -7.5 },
+                        mid: { rms_db: -9.1 },
+                        high_mid: { rms_db: -12.3 },
+                        treble: { rms_db: -15.6 }
+                    }
+                };
+                
+                const testReference = {
+                    genre: 'funk_mandela'
+                };
+                
+                const result = await scoringModule.computeMixScore(testData, testReference);
+                
+                log(`   📊 Resultado V1: ${result.scorePct}% (${result.classification})`, 'success');
+                log(`   📝 Método: ${result.method}`, 'log');
+                
+                log('✅ TESTE 2 CONCLUÍDO', 'success');
+                return result;
+                
+            } catch (error) {
+                log(`❌ ERRO NO TESTE 2: ${error.message}`, 'error');
+                return null;
+            }
+        }
+        
+        async function testScoringV2() {
+            log('🧪 TESTE 3: Testando Scoring V2 Direto...', 'log');
+            
+            try {
+                const scoringV2Module = await import('/lib/audio/features/scoring-v2-browser.js?v=' + Date.now());
+                
+                const testData = {
+                    lufsIntegrated: -12.5,
+                    truePeakDbtp: -0.8,
+                    dynamicRange: 6.2,
+                    lra: 4.5,
+                    stereoCorrelation: 0.75,
+                    dcOffset: 0.0001,
+                    clippingPercent: 0,
+                    bandEnergies: {
+                        sub_bass: { rms_db: -8.2 },
+                        bass: { rms_db: -6.8 },
+                        low_mid: { rms_db: -7.5 },
+                        mid: { rms_db: -9.1 },
+                        high_mid: { rms_db: -12.3 },
+                        treble: { rms_db: -15.6 }
+                    }
+                };
+                
+                const testReference = {
+                    genre: 'funk_mandela'
+                };
+                
+                const result = await scoringV2Module.calculateScoringV2(testData, testReference);
+                
+                log(`   📊 Resultado V2: ${result.scorePct}% (${result.classification})`, 'success');
+                log(`   📝 Versão: ${result.scoringVersion}`, 'log');
+                log(`   📝 Gênero: ${result.genre}`, 'log');
+                
+                log('✅ TESTE 3 CONCLUÍDO', 'success');
+                return result;
+                
+            } catch (error) {
+                log(`❌ ERRO NO TESTE 3: ${error.message}`, 'error');
+                return null;
+            }
+        }
+        
+        async function testIntegration() {
+            log('🧪 TESTE 4: Testando Integração...', 'log');
+            
+            try {
+                const integrationModule = await import('/lib/audio/features/scoring-integration-browser.js?v=' + Date.now());
+                
+                const testData = {
+                    lufsIntegrated: -12.5,
+                    truePeakDbtp: -0.8,
+                    dynamicRange: 6.2,
+                    lra: 4.5,
+                    stereoCorrelation: 0.75,
+                    dcOffset: 0.0001,
+                    clippingPercent: 0,
+                    bandEnergies: {
+                        sub_bass: { rms_db: -8.2 },
+                        bass: { rms_db: -6.8 },
+                        low_mid: { rms_db: -7.5 },
+                        mid: { rms_db: -9.1 },
+                        high_mid: { rms_db: -12.3 },
+                        treble: { rms_db: -15.6 }
+                    }
+                };
+                
+                const testReference = {
+                    genre: 'funk_mandela'
+                };
+                
+                // Testar com V1 (modo normal)
+                window.SCORING_V2_TEST = false;
+                const resultV1 = await integrationModule.computeMixScore(testData, testReference);
+                
+                log(`   📊 Integração V1: ${resultV1.scorePct}% (${resultV1.classification})`, 'log');
+                log(`   📝 Método V1: ${resultV1.method}`, 'log');
+                
+                // Testar com V2 (modo teste)
+                window.SCORING_V2_TEST = true;
+                const resultV2 = await integrationModule.computeMixScore(testData, testReference);
+                
+                log(`   📊 Integração V2: ${resultV2.scorePct}% (${resultV2.classification})`, 'log');
+                log(`   📝 Método V2: ${resultV2.method}`, 'log');
+                
+                // Comparar
+                const diff = resultV2.scorePct - resultV1.scorePct;
+                log(`   📈 Diferença: ${diff > 0 ? '+' : ''}${diff.toFixed(1)} pontos`, diff > 0 ? 'success' : 'log');
+                
+                // Verificar se V2 realmente foi usado
+                if (resultV2.method && resultV2.method.includes('v2')) {
+                    log('   ✅ V2 está sendo usado corretamente!', 'success');
+                } else {
+                    log('   ⚠️ V2 não está sendo usado (fallback para V1)', 'error');
+                }
+                
+                log('✅ TESTE 4 CONCLUÍDO', 'success');
+                return { resultV1, resultV2 };
+                
+            } catch (error) {
+                log(`❌ ERRO NO TESTE 4: ${error.message}`, 'error');
+                return null;
+            }
+        }
+        
+        async function runFullTest() {
+            log('🚀 INICIANDO TESTE COMPLETO...', 'log');
+            
+            await testBasicImports();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const v1Result = await testScoringV1();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const v2Result = await testScoringV2();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const integrationResult = await testIntegration();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            log('🎊 TESTE COMPLETO FINALIZADO!', 'success');
+            
+            if (v1Result && v2Result && integrationResult) {
+                log('📈 RESUMO FINAL:', 'success');
+                log(`   V1 Original: ${v1Result.scorePct}%`, 'log');
+                log(`   V2 Direto: ${v2Result.scorePct}%`, 'log');
+                log(`   V2 Integração: ${integrationResult.resultV2.scorePct}%`, 'log');
+                
+                const improvement = v2Result.scorePct - v1Result.scorePct;
+                log(`   Melhoria: ${improvement > 0 ? '+' : ''}${improvement.toFixed(1)} pontos`, improvement > 0 ? 'success' : 'log');
+                
+                if (integrationResult.resultV2.method && integrationResult.resultV2.method.includes('v2')) {
+                    log('🎉 SUCESSO: Sistema V2 funcionando!', 'success');
+                } else {
+                    log('❌ PROBLEMA: V2 não está ativo na integração', 'error');
+                }
+            } else {
+                log('❌ FALHAS DETECTADAS: Verifique os logs acima', 'error');
+            }
+        }
+        
+        // Auto-executar teste básico ao carregar
+        window.addEventListener('load', () => {
+            log('🌟 Sistema de Debug Carregado! Clique nos botões para testar.', 'success');
+        });
+    </script>
+</body>
+</html>

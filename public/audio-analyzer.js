@@ -476,14 +476,26 @@ class AudioAnalyzer {
                 }
               } catch {}
               let scorerMod = null;
-              // 🚀 SCORING V2 INTEGRATION - Versão compatível com browser
-              try { 
-                scorerMod = await import('/lib/audio/features/scoring-integration-browser.js?v=' + Date.now()).catch(()=>null); 
-                if (!scorerMod) {
-                  // Fallback para scoring original se integration falhar
+              // 🚀 SCORING V2 INTEGRATION - Usar sistema global carregado
+              try {
+                // Verificar se sistema global está carregado
+                if (window.ScoringIntegration && window.ScoringIntegration.computeMixScore) {
+                  scorerMod = window.ScoringIntegration;
+                  console.log('✅ [ANALYZER] Usando ScoringIntegration global');
+                } else if (window.computeMixScore) {
+                  scorerMod = { computeMixScore: window.computeMixScore };
+                  console.log('✅ [ANALYZER] Usando função global computeMixScore');
+                } else if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
+                  scorerMod = window.ScoringV1;
+                  console.log('⚠️ [ANALYZER] Fallback para ScoringV1 global');
+                } else {
+                  console.warn('⚠️ [ANALYZER] Nenhum módulo de scoring global encontrado, tentando import dinâmico...');
+                  // Último recurso: tentar import dinâmico
                   scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
                 }
-              } catch {}
+              } catch (error) {
+                console.error('❌ [ANALYZER] Erro ao carregar scoring:', error);
+              }
               if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
                 // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo
                 let genreSpecificRef = null;
@@ -912,11 +924,24 @@ class AudioAnalyzer {
           }
         } catch {}
         try {
-          // 🚀 SCORING V2 INTEGRATION - Versão compatível com browser
-          const scorerMod = await import('/lib/audio/features/scoring-integration-browser.js?v=' + Date.now()).catch(async ()=> {
-            // Fallback para scoring original se integration falhar
-            return await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
-          });
+          // 🚀 SCORING V2 INTEGRATION - Usar sistema global carregado
+          let scorerMod = null;
+          
+          // Verificar se sistema global está carregado
+          if (window.ScoringIntegration && window.ScoringIntegration.computeMixScore) {
+            scorerMod = window.ScoringIntegration;
+            console.log('✅ [ANALYZER_2] Usando ScoringIntegration global');
+          } else if (window.computeMixScore) {
+            scorerMod = { computeMixScore: window.computeMixScore };
+            console.log('✅ [ANALYZER_2] Usando função global computeMixScore');
+          } else if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
+            scorerMod = window.ScoringV1;
+            console.log('⚠️ [ANALYZER_2] Fallback para ScoringV1 global');
+          } else {
+            console.warn('⚠️ [ANALYZER_2] Nenhum módulo de scoring global encontrado, tentando import dinâmico...');
+            // Último recurso: tentar import dinâmico
+            scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+          }
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
             // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
             let genreSpecificRef = null;
