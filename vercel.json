@@ -4,16 +4,6 @@
     "FORCE_REBUILD": "1724254320",
     "NODE_ENV": "production"
   },
-  "functions": {
-    "api/chat.js": {
-      "maxDuration": 60,
-      "memory": 1024
-    },
-    "api/upload-audio.js": {
-      "maxDuration": 30,
-      "memory": 512
-    }
-  },
   "builds": [
     { "src": "api/**/*.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" },
