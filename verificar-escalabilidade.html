@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificação de Escalabilidade - AI.SYNTH</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.success { background: #28a745; }
+        .status.error { background: #dc3545; }
+        .status.warning { background: #ffc107; color: #333; }
+        .log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        button {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4);
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Verificação de Escalabilidade AI.SYNTH</h1>
+        
+        <div class="test-section">
+            <h3>📊 Status das Melhorias Implementadas</h3>
+            <div id="status-checks"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔬 Testes de Funcionalidade</h3>
+            <button onclick="testRateLimit()">Testar Rate Limiting</button>
+            <button onclick="testResponseCache()">Testar Cache de Respostas</button>
+            <button onclick="testConcurrency()">Testar Concorrência</button>
+            <button onclick="runFullTest()">Teste Completo</button>
+        </div>
+
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="requests-sent">0</div>
+                <div class="metric-label">Requisições Enviadas</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="responses-received">0</div>
+                <div class="metric-label">Respostas Recebidas</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="cache-hits">0</div>
+                <div class="metric-label">Cache Hits</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="rate-limited">0</div>
+                <div class="metric-label">Rate Limited</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Log de Resultados</h3>
+            <div class="log" id="test-log"></div>
+        </div>
+    </div>
+
+    <script>
+        let requestCount = 0;
+        let responseCount = 0;
+        let cacheHits = 0;
+        let rateLimited = 0;
+
+        function log(message) {
+            const logElement = document.getElementById('test-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateMetrics() {
+            document.getElementById('requests-sent').textContent = requestCount;
+            document.getElementById('responses-received').textContent = responseCount;
+            document.getElementById('cache-hits').textContent = cacheHits;
+            document.getElementById('rate-limited').textContent = rateLimited;
+        }
+
+        function checkImplementations() {
+            const statusDiv = document.getElementById('status-checks');
+            let html = '';
+
+            // Verificar status do backend
+            const backendStatus = window.__BACKEND_SCALING_STATUS__;
+            if (backendStatus) {
+                html += `<p>✅ Backend Scaling Status: <span class="status success">ATIVO</span></p>`;
+                html += `<p>📊 Rate Limiting: <span class="status ${backendStatus.rateLimiting ? 'success' : 'error'}">${backendStatus.rateLimiting ? 'ATIVO' : 'INATIVO'}</span></p>`;
+                html += `<p>💾 Response Cache: <span class="status ${backendStatus.responseCache ? 'success' : 'error'}">${backendStatus.responseCache ? 'ATIVO' : 'INATIVO'}</span></p>`;
+                html += `<p>🧹 Auto Cleanup: <span class="status ${backendStatus.autoCleanup ? 'success' : 'error'}">${backendStatus.autoCleanup ? 'ATIVO' : 'INATIVO'}</span></p>`;
+                html += `<p>🔧 Versão: <span class="status warning">${backendStatus.version}</span></p>`;
+            } else {
+                html += `<p>⚠️ Backend Status: <span class="status warning">NÃO DETECTADO</span></p>`;
+            }
+
+            statusDiv.innerHTML = html;
+        }
+
+        async function testRateLimit() {
+            log('🔄 Iniciando teste de Rate Limiting...');
+            
+            // Fazer várias requisições rapidamente para testar o rate limit
+            for (let i = 0; i < 15; i++) {
+                try {
+                    requestCount++;
+                    updateMetrics();
+                    
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: `Teste rate limit ${i + 1}`,
+                            uid: 'test-user-rate-limit'
+                        })
+                    });
+
+                    if (response.status === 429) {
+                        rateLimited++;
+                        log(`⛔ Requisição ${i + 1}: Rate Limited (429)`);
+                    } else if (response.ok) {
+                        responseCount++;
+                        log(`✅ Requisição ${i + 1}: Sucesso (${response.status})`);
+                    } else {
+                        log(`❌ Requisição ${i + 1}: Erro (${response.status})`);
+                    }
+                } catch (error) {
+                    log(`❌ Requisição ${i + 1}: Erro de rede - ${error.message}`);
+                }
+                
+                updateMetrics();
+                await new Promise(resolve => setTimeout(resolve, 100)); // 100ms entre requisições
+            }
+            
+            log(`📊 Teste Rate Limiting concluído. ${rateLimited > 0 ? 'Rate limiting FUNCIONANDO!' : 'Rate limiting pode não estar ativo.'}`);
+        }
+
+        async function testResponseCache() {
+            log('🔄 Iniciando teste de Cache de Respostas...');
+            
+            const testMessage = 'Teste de cache de resposta';
+            const startTime = Date.now();
+            
+            // Primeira requisição (deve ser processada normalmente)
+            try {
+                requestCount++;
+                updateMetrics();
+                
+                const response1 = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: testMessage,
+                        uid: 'test-user-cache'
+                    })
+                });
+
+                const time1 = Date.now() - startTime;
+                
+                if (response1.ok) {
+                    responseCount++;
+                    log(`✅ Primeira requisição: ${time1}ms`);
+                    
+                    // Segunda requisição idêntica (deve vir do cache)
+                    const startTime2 = Date.now();
+                    requestCount++;
+                    updateMetrics();
+                    
+                    const response2 = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: testMessage,
+                            uid: 'test-user-cache'
+                        })
+                    });
+
+                    const time2 = Date.now() - startTime2;
+                    
+                    if (response2.ok) {
+                        responseCount++;
+                        if (time2 < time1 / 2) {
+                            cacheHits++;
+                            log(`💾 Segunda requisição (CACHE): ${time2}ms - Cache FUNCIONANDO!`);
+                        } else {
+                            log(`🤔 Segunda requisição: ${time2}ms - Cache pode não estar ativo`);
+                        }
+                    }
+                }
+            } catch (error) {
+                log(`❌ Erro no teste de cache: ${error.message}`);
+            }
+            
+            updateMetrics();
+        }
+
+        async function testConcurrency() {
+            log('🔄 Iniciando teste de Concorrência...');
+            
+            const promises = [];
+            const startTime = Date.now();
+            
+            // Fazer 10 requisições simultâneas
+            for (let i = 0; i < 10; i++) {
+                promises.push(
+                    fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: `Teste concorrência ${i + 1}`,
+                            uid: `test-user-concurrent-${i}`
+                        })
+                    }).then(response => ({
+                        index: i + 1,
+                        status: response.status,
+                        ok: response.ok
+                    }))
+                );
+                requestCount++;
+            }
+            
+            try {
+                const results = await Promise.all(promises);
+                const totalTime = Date.now() - startTime;
+                
+                let successCount = 0;
+                let errorCount = 0;
+                
+                results.forEach(result => {
+                    if (result.ok) {
+                        successCount++;
+                        responseCount++;
+                    } else {
+                        errorCount++;
+                        if (result.status === 429) rateLimited++;
+                    }
+                });
+                
+                log(`📊 Teste Concorrência concluído em ${totalTime}ms`);
+                log(`✅ Sucessos: ${successCount}, ❌ Erros: ${errorCount}`);
+                log(`🚀 Sistema suportou ${successCount} requisições simultâneas!`);
+                
+            } catch (error) {
+                log(`❌ Erro no teste de concorrência: ${error.message}`);
+            }
+            
+            updateMetrics();
+        }
+
+        async function runFullTest() {
+            log('🚀 Iniciando TESTE COMPLETO de escalabilidade...');
+            log('=' .repeat(50));
+            
+            await testRateLimit();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            await testResponseCache();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            await testConcurrency();
+            
+            log('=' .repeat(50));
+            log('🎯 TESTE COMPLETO FINALIZADO!');
+            log(`📊 Resumo: ${requestCount} requisições, ${responseCount} respostas, ${cacheHits} cache hits, ${rateLimited} rate limited`);
+            
+            // Calcular melhoria estimada
+            const cacheEfficiency = requestCount > 0 ? (cacheHits / requestCount * 100).toFixed(1) : 0;
+            const rateLimitEfficiency = requestCount > 0 ? (rateLimited / requestCount * 100).toFixed(1) : 0;
+            
+            log(`💾 Eficiência do Cache: ${cacheEfficiency}%`);
+            log(`⛔ Taxa de Rate Limiting: ${rateLimitEfficiency}%`);
+            
+            if (rateLimited > 0 || cacheHits > 0) {
+                log('✅ MELHORIAS DE ESCALABILIDADE CONFIRMADAS!');
+            } else {
+                log('⚠️ Melhorias podem estar inativas ou precisam de mais testes');
+            }
+        }
+
+        // Executar verificações iniciais
+        window.addEventListener('load', () => {
+            log('🚀 Sistema de verificação iniciado');
+            checkImplementations();
+        });
+    </script>
+</body>
+</html>

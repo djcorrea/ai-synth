@@ -1,6 +1,6 @@
 # 🎯 TESTE FINAL - Verificar se o erro foi corrigido
 
-Write-Host "🎯 TESTE FINAL DO AI.SYNTH" -ForegroundColor Green
+Write-Host "🎯 TESTE FINAL DO Soundy.AI" -ForegroundColor Green
 Write-Host "=========================" -ForegroundColor Yellow
 
 Write-Host ""

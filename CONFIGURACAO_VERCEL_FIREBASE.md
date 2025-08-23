@@ -9,7 +9,7 @@
 ### 1. Acessar Configurações
 ```
 1. Acesse: https://vercel.com/dashboard
-2. Clique no seu projeto AI.SYNTH
+2. Clique no seu projeto Soundy.AI
 3. Vá em "Settings" → "Environment Variables"
 ```
 

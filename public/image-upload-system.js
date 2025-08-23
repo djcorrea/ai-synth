@@ -1,6 +1,6 @@
 /**
  * Sistema de Upload e Pré-visualização de Imagens
- * Compatível com o chat existente do AI.SYNTH
+ * Compatível com o chat existente do Soundy.AI
  * Implementação: Dezembro 2024
  */
 
