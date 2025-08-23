@@ -469,6 +469,47 @@ window.openModeSelectionModal = openModeSelectionModal;
 window.closeModeSelectionModal = closeModeSelectionModal;
 window.selectAnalysisMode = selectAnalysisMode;
 
+// 🔍 Função de Diagnóstico de Referências (somente dev)
+window.diagnosRefSources = function(genre = null) {
+    const targetGenre = genre || __activeRefGenre || 'funk_bruxaria';
+    const currentData = __activeRefData;
+    const cached = __refDataCache[targetGenre];
+    
+    console.log('🎯 REFERÊNCIAS DIAGNÓSTICO COMPLETO:', {
+        requestedGenre: targetGenre,
+        activeGenre: __activeRefGenre,
+        currentSource: currentData ? 'loaded' : 'none',
+        cacheExists: !!cached,
+        REFS_ALLOW_NETWORK: typeof window !== 'undefined' ? window.REFS_ALLOW_NETWORK : 'undefined',
+        currentData: currentData ? {
+            version: currentData.version,
+            num_tracks: currentData.num_tracks,
+            lufs_target: currentData.lufs_target,
+            true_peak_target: currentData.true_peak_target,
+            stereo_target: currentData.stereo_target,
+            sub_band: currentData.bands?.sub?.target_db,
+            presenca_band: currentData.bands?.presenca?.target_db
+        } : null
+    });
+    
+    // Test fetch do JSON externo
+    const testUrl = `/refs/out/${targetGenre}.json?v=diagnostic`;
+    fetch(testUrl).then(r => r.json()).then(j => {
+        const data = j[targetGenre];
+        console.log('🌐 EXTERNAL JSON TEST:', {
+            url: testUrl,
+            success: true,
+            version: data?.version,
+            num_tracks: data?.num_tracks,
+            lufs_target: data?.lufs_target,
+            true_peak_target: data?.true_peak_target,
+            stereo_target: data?.stereo_target
+        });
+    }).catch(e => console.log('❌ EXTERNAL JSON FAILED:', testUrl, e.message));
+    
+    return { targetGenre, currentData, cached };
+};
+
 // =============== ETAPA 2: Robustez & Completeness Helpers ===============
 // Central logging para métricas ausentes / NaN (evita console spam e facilita auditoria)
 function __logMetricAnomaly(kind, key, context={}) {
@@ -799,7 +840,47 @@ async function loadReferenceData(genre) {
             delete __refDataCache[genre];
         }
         updateRefStatus('⏳ carregando...', '#996600');
-        // 1) Preferir embutido (window), depois inline, antes de rede
+        
+        // PRIORIDADE CORRIGIDA: external > embedded > fallback
+        // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
+        try {
+            const version = __refDataCache[genre]?.version || 'force';
+            const json = await fetchRefJsonWithFallback([
+                `/refs/out/${genre}.json?v=${version}`,
+                `/public/refs/out/${genre}.json?v=${version}`,
+                `refs/out/${genre}.json?v=${version}`,
+                `../refs/out/${genre}.json?v=${version}`
+            ]);
+            const rootKey = Object.keys(json)[0];
+            const data = json[rootKey];
+            if (data && typeof data === 'object' && data.version) {
+                const enrichedNet = enrichReferenceObject(data, genre);
+                __refDataCache[genre] = enrichedNet;
+                __activeRefData = enrichedNet;
+                __activeRefGenre = genre;
+                window.PROD_AI_REF_DATA = enrichedNet;
+                
+                // Log de diagnóstico
+                console.log('🎯 REFS DIAGNOSTIC:', {
+                    genre,
+                    source: 'external',
+                    path: `/refs/out/${genre}.json`,
+                    version: data.version,
+                    num_tracks: data.num_tracks,
+                    lufs_target: data.lufs_target,
+                    true_peak_target: data.true_peak_target,
+                    stereo_target: data.stereo_target
+                });
+                
+                updateRefStatus('✔ referências aplicadas', '#0d6efd');
+                try { buildAggregatedRefStats(); } catch {}
+                return enrichedNet;
+            }
+        } catch (netError) {
+            console.log('⚠️ External refs failed, trying embedded:', netError.message);
+        }
+        
+        // 2) Fallback para referências embutidas (embedded)
         const embWin = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre && window.__EMBEDDED_REFS__.byGenre[genre]) || null;
         const embInline = __INLINE_EMBEDDED_REFS__?.byGenre?.[genre] || null;
         const useData = embWin || embInline;
@@ -809,31 +890,30 @@ async function loadReferenceData(genre) {
             __activeRefData = enriched;
             __activeRefGenre = genre;
             window.PROD_AI_REF_DATA = enriched;
+            
+            // Log de diagnóstico
+            console.log('🎯 REFS DIAGNOSTIC:', {
+                genre,
+                source: 'embedded',
+                path: embWin ? 'window.__EMBEDDED_REFS__' : '__INLINE_EMBEDDED_REFS__',
+                version: 'embedded',
+                num_tracks: useData.num_tracks || 'unknown',
+                lufs_target: useData.lufs_target,
+                true_peak_target: useData.true_peak_target,
+                stereo_target: useData.stereo_target
+            });
+            
             updateRefStatus('✔ referências embutidas', '#0d6efd');
             try { buildAggregatedRefStats(); } catch {}
             return enriched;
         }
-        // 2) Se permitido, tentar rede
+        
+        // 3) Se ainda nada funcionou e REFS_ALLOW_NETWORK está ativo (legacy path)
         if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
-            const json = await fetchRefJsonWithFallback([
-                `/refs/out/${genre}.json`,
-                `/public/refs/out/${genre}.json`,
-                `refs/out/${genre}.json`,
-                `../refs/out/${genre}.json`
-            ]);
-            const rootKey = Object.keys(json)[0];
-            const data = json[rootKey];
-            if (!data || typeof data !== 'object') throw new Error('JSON de referência inválido para ' + genre);
-            const enrichedNet = enrichReferenceObject(data, genre);
-            __refDataCache[genre] = enrichedNet;
-            __activeRefData = enrichedNet;
-            __activeRefGenre = genre;
-            window.PROD_AI_REF_DATA = enrichedNet;
-            updateRefStatus('✔ referências aplicadas', '#0d6efd');
-            try { buildAggregatedRefStats(); } catch {}
-            return enrichedNet;
+            console.log('⚠️ Using legacy REFS_ALLOW_NETWORK path - should not happen with new logic');
         }
-        // 3) Último recurso: trance inline
+        
+        // 4) Último recurso: trance inline (fallback)
         const fallback = __INLINE_EMBEDDED_REFS__?.byGenre?.trance;
         if (fallback) {
             const enrichedFb = enrichReferenceObject(structuredClone(fallback), 'trance');
@@ -841,6 +921,19 @@ async function loadReferenceData(genre) {
             __activeRefData = enrichedFb;
             __activeRefGenre = 'trance';
             window.PROD_AI_REF_DATA = enrichedFb;
+            
+            // Log de diagnóstico
+            console.log('🎯 REFS DIAGNOSTIC:', {
+                genre,
+                source: 'fallback',
+                path: '__INLINE_EMBEDDED_REFS__.trance',
+                version: 'fallback',
+                num_tracks: fallback.num_tracks || 'unknown',
+                lufs_target: fallback.lufs_target,
+                true_peak_target: fallback.true_peak_target,
+                stereo_target: fallback.stereo_target
+            });
+            
             updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
             try { buildAggregatedRefStats(); } catch {}
             return enrichedFb;
