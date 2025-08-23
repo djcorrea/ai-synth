@@ -850,6 +850,7 @@ function detectarEstiloNaMensagem(mensagem) {
     { keywords: ['funk mandela', 'mandelão', 'mandela'], nome: 'funk mandela' },
     { keywords: ['funk bh', 'funk de bh', 'mtg', 'funkbh'], nome: 'funk bh' },
     { keywords: ['funk bruxaria', 'bruxaria', 'bruxo', 'dark funk'], nome: 'funk bruxaria' },
+    { keywords: ['funk automotivo', 'automotivo', 'funk auto', 'auto funk'], nome: 'funk automotivo' },
     { keywords: ['funk sp', 'funk de sp', 'funk zn', 'batida sp', 'batidão paulista', 'funk paulistano', 'beat zn', 'zn'], nome: 'funk sp' },
     { keywords: ['brazilian phonk', 'phonk', 'phonk brasileiro', 'phonk br'], nome: 'phonk' },
     { keywords: ['funk automotivo', 'beat automotivo', 'automotivo', 'automotivo melódico'], nome: 'funk automotivo' },

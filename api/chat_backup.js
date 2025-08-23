@@ -514,6 +514,7 @@ function detectarEstiloNaMensagem(mensagem) {
     { keywords: ['funk mandela', 'mandelão', 'mandela'], nome: 'funk mandela' },
     { keywords: ['funk bh', 'funk de bh', 'mtg', 'funkbh'], nome: 'funk bh' },
     { keywords: ['funk bruxaria', 'bruxaria', 'bruxo', 'dark funk'], nome: 'funk bruxaria' },
+    { keywords: ['funk automotivo', 'automotivo', 'funk auto', 'auto funk'], nome: 'funk automotivo' },
     { keywords: ['funk sp', 'funk de sp', 'funk zn', 'batida sp', 'batidão paulista', 'funk paulistano', 'beat zn', 'zn'], nome: 'funk sp' },
     { keywords: ['brazilian phonk', 'phonk', 'phonk brasileiro', 'phonk br'], nome: 'phonk' },
     { keywords: ['trap', 'trap nacional'], nome: 'trap' },
@@ -726,6 +727,46 @@ SIGA ESSA SEQUÊNCIA NAS RESPOSTAS:
 - Escalas menores, notas dissonantes, vibe assustadora.
 - Reverb e delay com automação, pitch + distorção nos vocais.
 - Estrutura repetitiva e hipnótica, equalização para "espaço sombrio".
+`,
+
+  funkAutomotivo: `
+📌 DIRETRIZES:
+- Responda com altíssimo nível técnico, explicando cada conceito com profundidade e clareza, como se estivesse ensinando um aluno que deseja se tornar profissional.
+- Use os conteúdos abaixo apenas como **base técnica de referência**.
+- Ao responder, **analise o contexto exato da pergunta do usuário** e entregue a melhor resposta possível, totalmente personalizada para o caso dele.
+- **Explique como aplicar cada técnica na prática**: forneça parâmetros exatos (Hz, dB, ms), nome de plugins, valores sugeridos, variações avançadas, ordem de processamento e dicas profissionais.
+- Sempre que for mencionado compressão, saturação, sidechain, equalização, automação, timbres, sound design ou mixagem, **detalhe como fazer no DAW (ex: FL Studio), com instruções de onde clicar e como configurar**.
+- Seja extremamente técnico, mas sem perder a clareza: ensine com estrutura, passo a passo e com exemplos reais.
+- Use estrutura com emojis para facilitar a leitura.
+
+SIGA ESSA SEQUÊNCIA NAS RESPOSTAS:
+
+📚 CONTEXTO TÉCNICO ATIVO — FUNK AUTOMOTIVO
+
+O Funk Automotivo é um subgênero do funk em constante ascensão, conhecido por sua pegada dançante e batidas sequenciadas. Carrega uma identidade sonora única, podendo seguir linhas mais melódicas, com synths envolventes e harmonias, ou versões mais sujas, com graves distorcidos e agressividade na mixagem.
+
+🎤 Acapellas:
+- Pode-se usar vozes ritmadas, com frases repetitivas, ou se quiser produzir um funk automotivo melódico use alguma voz mais cantada, marcante e harmônica.
+- Faça uma mixagem limpa na voz, corte os graves entre 20 Hz a 80 Hz.
+- Utilize efeitos de reverb e delay conforme o necessário.
+- Faça automações ou ajustes no volume para encaixar com dinâmica.
+
+🥁 BPM e Estrutura:
+- BPM entre 130-150, estrutura simples mas envolvente.
+- Kicks punchados com presença na região de 60-100Hz.
+- Hi-hats com patterns interessantes, claps ou snares no tempo 2 e 4.
+
+🎹 Elementos melódicos:
+- Synths podem ser tanto melódicos quanto percussivos.
+- Use arpejos, plucks, pads atmosféricos.
+- Trabalhe com reverb espacial e delay para criar profundidade.
+
+🎛️ Mixagem:
+- LUFS target: -8 LUFS (mais alto que outros funks para impacto automotivo).
+- True Peak: máximo -1 dBTP para preservar headroom.
+- Sub-bass forte entre 40-80Hz com sidechain no kick.
+- Médios bem definidos para vocais (500Hz-2kHz).
+- Agudos brilhantes mas controlados (8kHz+).
 `
 };
 
@@ -779,6 +820,8 @@ function generatePersonalizedSystemPrompt(perfil) {
 `,
 
     'funk bh': instrucoesBase.funkBH,
+
+    'funk automotivo': instrucoesBase.funkAutomotivo,
 
     'phonk': instrucoesBase.phonk,
 

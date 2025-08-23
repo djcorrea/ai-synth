@@ -5,6 +5,7 @@
     {"key":"trance","label":"Trance"},
     {"key":"funk_mandela","label":"Funk Mandela"},
     {"key":"funk_bruxaria","label":"Funk Bruxaria"},
+    {"key":"funk_automotivo","label":"Funk Automotivo"},
     {"key":"eletronico","label":"Eletrônico"},
     {"key":"eletrofunk","label":"Eletrofunk"},
     {"key":"funk_consciente","label":"Funk Consciente"},
@@ -49,6 +50,21 @@
     }
   };
   window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  = window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  || minimal({ lufs_target: -10 });
+  window.__EMBEDDED_REFS__.byGenre['funk_automotivo'] = window.__EMBEDDED_REFS__.byGenre['funk_automotivo'] || minimal({ 
+    lufs_target: -8, 
+    true_peak_target: -9.58,
+    stereo_target: 0.3,
+    bands: {
+      sub: { target_db: -7.6, tol_db: 6.0 },
+      low_bass: { target_db: -6.6, tol_db: 4.5 },
+      upper_bass: { target_db: -11.4, tol_db: 3.5 },
+      low_mid: { target_db: -8.2, tol_db: 3.5 },
+      mid: { target_db: -6.7, tol_db: 3.0 },
+      high_mid: { target_db: -12.8, tol_db: 4.5 },
+      brilho: { target_db: -16.6, tol_db: 4.5 },
+      presenca: { target_db: -22.7, tol_db: 5.0 }
+    }
+  });
   window.__EMBEDDED_REFS__.byGenre['eletronico']     = window.__EMBEDDED_REFS__.byGenre['eletronico']     || minimal({ lra_target: 8 });
   window.__EMBEDDED_REFS__.byGenre['eletrofunk']     = window.__EMBEDDED_REFS__.byGenre['eletrofunk']     || {
     lufs_target: -8.3, tol_lufs: 1.22,
