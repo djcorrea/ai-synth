@@ -476,9 +476,9 @@ class AudioAnalyzer {
                 }
               } catch {}
               let scorerMod = null;
-              // 🚀 SCORING V2 INTEGRATION - Fallback automático para V1 se V2 falhar
+              // 🚀 SCORING V2 INTEGRATION - Versão compatível com browser
               try { 
-                scorerMod = await import('/lib/audio/features/scoring-integration.js?v=' + Date.now()).catch(()=>null); 
+                scorerMod = await import('/lib/audio/features/scoring-integration-browser.js?v=' + Date.now()).catch(()=>null); 
                 if (!scorerMod) {
                   // Fallback para scoring original se integration falhar
                   scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
@@ -912,8 +912,8 @@ class AudioAnalyzer {
           }
         } catch {}
         try {
-          // 🚀 SCORING V2 INTEGRATION - Fallback automático para V1 se V2 falhar
-          const scorerMod = await import('/lib/audio/features/scoring-integration.js?v=' + Date.now()).catch(async ()=> {
+          // 🚀 SCORING V2 INTEGRATION - Versão compatível com browser
+          const scorerMod = await import('/lib/audio/features/scoring-integration-browser.js?v=' + Date.now()).catch(async ()=> {
             // Fallback para scoring original se integration falhar
             return await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
           });
