@@ -9,7 +9,7 @@ Write-Host "📋 PASSOS OBRIGATÓRIOS:" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "1️⃣  OBTER SERVICE ACCOUNT:" -ForegroundColor Green
 Write-Host "   - Acesse: https://console.firebase.google.com" -ForegroundColor White
-Write-Host "   - Selecione seu projeto Soundy.AI" -ForegroundColor White
+Write-Host "   - Selecione seu projeto SOUNDY.AI" -ForegroundColor White
 Write-Host "   - Project Settings → Service Accounts" -ForegroundColor White
 Write-Host "   - 'Generate new private key'" -ForegroundColor White
 Write-Host "   - Baixe o arquivo JSON" -ForegroundColor White
@@ -17,7 +17,7 @@ Write-Host ""
 
 Write-Host "2️⃣  CONFIGURAR NO VERCEL:" -ForegroundColor Green
 Write-Host "   - Acesse: https://vercel.com/dashboard" -ForegroundColor White
-Write-Host "   - Projeto Soundy.AI → Settings → Environment Variables" -ForegroundColor White
+Write-Host "   - Projeto SOUNDY.AI → Settings → Environment Variables" -ForegroundColor White
 Write-Host "   - Nome: FIREBASE_SERVICE_ACCOUNT" -ForegroundColor Yellow
 Write-Host "   - Valor: COLE TODO O CONTEÚDO DO JSON" -ForegroundColor Yellow
 Write-Host "   - Environment: Production, Preview, Development" -ForegroundColor White

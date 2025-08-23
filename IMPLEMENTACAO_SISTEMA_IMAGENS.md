@@ -1,8 +1,8 @@
-# 🖼️ Sistema de Upload de Imagens - Soundy.AI
+# 🖼️ Sistema de Upload de Imagens - SOUNDY.AI
 
 ## 📋 Resumo da Implementação
 
-Sistema completo de upload e análise de imagens integrado ao chat do Soundy.AI, com suporte a GPT-4 Vision, cotas mensais por plano e interface de pré-visualização.
+Sistema completo de upload e análise de imagens integrado ao chat do SOUNDY.AI, com suporte a GPT-4 Vision, cotas mensais por plano e interface de pré-visualização.
 
 ## ✅ Funcionalidades Implementadas
 
@@ -11,7 +11,7 @@ Sistema completo de upload e análise de imagens integrado ao chat do Soundy.AI,
 - ✅ **Validação de Upload**: Máximo 3 imagens, 10MB cada, formatos JPG/PNG/WebP
 - ✅ **Integração com Chat**: Compatível com botão "+" existente 
 - ✅ **Bloqueio de Envio**: Impede envio apenas de imagens (requer texto)
-- ✅ **Interface Responsiva**: Adaptada ao design existente do Soundy.AI
+- ✅ **Interface Responsiva**: Adaptada ao design existente do SOUNDY.AI
 
 ### Backend  
 - ✅ **API de Upload**: `/api/upload-image.js` para processamento de imagens
@@ -45,7 +45,7 @@ Sistema completo de upload e análise de imagens integrado ao chat do Soundy.AI,
 ## 🔧 Como Usar
 
 ### Para Usuários
-1. **Acessar Chat**: Ir para a página principal do Soundy.AI
+1. **Acessar Chat**: Ir para a página principal do SOUNDY.AI
 2. **Clicar em "+"**: Botão ao lado do input de mensagem
 3. **Selecionar "Enviar imagem"**: Opção no menu dropdown
 4. **Escolher Imagens**: Máximo 3 arquivos (JPG/PNG/WebP, 10MB cada)

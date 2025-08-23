@@ -1,5 +1,5 @@
 // Deploy trigger file - DO NOT REMOVE
-// Last update: 2025-08-21 (Soundy.AI System Updates)
+// Last update: 2025-08-21 (SOUNDY.AI System Updates)
 // This file forces Vercel to rebuild when changes are made
 
 export const DEPLOY_INFO = {
@@ -9,4 +9,4 @@ export const DEPLOY_INFO = {
   description: "Sistema de imagens implementado com validações robustas"
 };
 
-console.log("🚀 Soundy.AI Deploy Info:", DEPLOY_INFO);
+console.log("🚀 SOUNDY.AI Deploy Info:", DEPLOY_INFO);
