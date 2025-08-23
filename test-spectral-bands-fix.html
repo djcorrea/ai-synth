@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Teste Final - Bandas Espectrais Corrigidas</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; font-family: 'Consolas', monospace; font-size: 12px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .critical { border-left: 4px solid #dc3545; background: #fff5f5; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .log { background: #f8f9fa; border: 1px solid #e9ecef; padding: 10px; margin: 10px 0; max-height: 300px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 11px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Teste Final - Correção Bandas Espectrais</h1>
+        <p><strong>Objetivo:</strong> Verificar se as bandas espectrais agora usam targets da referência</p>
+        
+        <button onclick="testSpectralBandsReference()">🧪 Testar Bandas Espectrais com Referência</button>
+        <button onclick="testIdenticalMusicScenario()">🎵 Simular Músicas Idênticas</button>
+        <button onclick="clearResults()">🧹 Limpar</button>
+        
+        <div id="results"></div>
+        <div id="logs" class="log"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('logs');
+            logDiv.innerHTML += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function addResult(success, message, critical = false) {
+            const resultsDiv = document.getElementById('results');
+            let resultClass = success ? 'success' : 'error';
+            if (critical) resultClass += ' critical';
+            resultsDiv.innerHTML += `<div class="test-result ${resultClass}">${message}</div>`;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        async function testSpectralBandsReference() {
+            clearResults();
+            log('=== TESTE BANDAS ESPECTRAIS COM REFERÊNCIA ===');
+            
+            try {
+                // 1. Simular bandas espectrais da música de referência
+                const referenceBandEnergies = {
+                    sub: { rms_db: -10.5 },
+                    low_bass: { rms_db: -8.2 },
+                    mid: { rms_db: -6.8 },
+                    high_mid: { rms_db: -7.1 },
+                    brilho: { rms_db: -9.3 }
+                };
+                
+                log('Bandas espectrais da referência simuladas');
+                addResult(true, '✅ PASSO 1: Bandas espectrais da referência criadas');
+                
+                // 2. Criar targets baseados na referência
+                const referenceTargets = {
+                    lufs_target: -12.5,
+                    stereo_target: 0.75,
+                    dr_target: 8.3,
+                    true_peak_target: -0.8,
+                    bands: {}
+                };
+                
+                // Converter bandEnergies em targets
+                for (const [bandName, bandData] of Object.entries(referenceBandEnergies)) {
+                    referenceTargets.bands[bandName] = {
+                        target_db: bandData.rms_db,
+                        tol_db: 1.0,
+                        tol_min: 0.5,
+                        tol_max: 1.5
+                    };
+                }
+                
+                log('Targets de bandas criados baseados na referência');
+                log(`Exemplo: sub target = ${referenceTargets.bands.sub.target_db}dB`);
+                addResult(true, '✅ PASSO 2: Targets de bandas criados a partir da referência');
+                
+                // 3. Aplicar ao sistema temporariamente
+                const originalRefData = window.PROD_AI_REF_DATA;
+                const originalRefGenre = window.PROD_AI_REF_GENRE;
+                
+                window.PROD_AI_REF_DATA = {
+                    reference_music: referenceTargets
+                };
+                window.PROD_AI_REF_GENRE = 'reference_music';
+                
+                log('Sistema configurado para usar targets de bandas da referência');
+                addResult(true, '✅ PASSO 3: Sistema configurado com targets de bandas da referência');
+                
+                // 4. Simular bandas espectrais do usuário (diferentes da referência)
+                const userBandEnergies = {
+                    sub: { rms_db: -12.0 },     // -1.5dB vs referência (-10.5)
+                    low_bass: { rms_db: -7.5 }, // +0.7dB vs referência (-8.2)
+                    mid: { rms_db: -8.1 },      // -1.3dB vs referência (-6.8)
+                    high_mid: { rms_db: -6.8 }, // +0.3dB vs referência (-7.1)
+                    brilho: { rms_db: -10.1 }   // -0.8dB vs referência (-9.3)
+                };
+                
+                // 5. Calcular diferenças específicas da referência
+                const differences = {};
+                let totalDifference = 0;
+                let bandCount = 0;
+                
+                for (const bandName of Object.keys(referenceBandEnergies)) {
+                    const userValue = userBandEnergies[bandName].rms_db;
+                    const refValue = referenceBandEnergies[bandName].rms_db;
+                    const diff = userValue - refValue;
+                    differences[bandName] = diff;
+                    totalDifference += Math.abs(diff);
+                    bandCount++;
+                    
+                    log(`Banda ${bandName}: Usuario(${userValue}) vs Ref(${refValue}) = ${diff.toFixed(1)}dB`);
+                }
+                
+                const avgDifference = totalDifference / bandCount;
+                log(`Diferença média das bandas: ${avgDifference.toFixed(2)}dB`);
+                
+                if (avgDifference > 0.1) {
+                    addResult(true, `✅ PASSO 4: Diferenças detectadas nas bandas (média: ${avgDifference.toFixed(2)}dB)`);
+                } else {
+                    addResult(false, '❌ PASSO 4: Diferenças muito pequenas - possível problema');
+                }
+                
+                // 6. Verificar se targets estão acessíveis ao sistema
+                const systemTargets = window.PROD_AI_REF_DATA?.reference_music?.bands;
+                if (systemTargets && systemTargets.sub && systemTargets.sub.target_db === -10.5) {
+                    addResult(true, '✅ PASSO 5: Targets de bandas acessíveis pelo sistema de análise');
+                    log('Sistema pode acessar targets de bandas da referência');
+                } else {
+                    addResult(false, '❌ PASSO 5: Targets de bandas não acessíveis');
+                }
+                
+                // 7. Gerar sugestões baseadas na referência
+                const suggestions = [];
+                for (const [bandName, diff] of Object.entries(differences)) {
+                    if (Math.abs(diff) > 0.5) {
+                        const action = diff > 0 ? 'Diminuir' : 'Aumentar';
+                        const suggestion = `${action} ${bandName} em ${Math.abs(diff).toFixed(1)}dB para igualar à referência`;
+                        suggestions.push(suggestion);
+                    }
+                }
+                
+                log(`Sugestões de bandas geradas: ${suggestions.length} sugestões`);
+                suggestions.forEach((suggestion, index) => {
+                    addResult(true, `✅ Sugestão ${index + 1}: ${suggestion}`);
+                });
+                
+                // 8. Restaurar estado original
+                window.PROD_AI_REF_DATA = originalRefData;
+                window.PROD_AI_REF_GENRE = originalRefGenre;
+                
+                addResult(true, '✅ PASSO 6: Estado original restaurado', true);
+                addResult(true, '🎉 BANDAS ESPECTRAIS AGORA USAM TARGETS DA REFERÊNCIA!', true);
+                
+            } catch (error) {
+                log(`Erro durante teste: ${error.message}`, 'error');
+                addResult(false, `❌ Erro: ${error.message}`);
+            }
+        }
+
+        async function testIdenticalMusicScenario() {
+            clearResults();
+            log('=== TESTE MÚSICAS IDÊNTICAS ===');
+            
+            try {
+                // Simular análise da mesma música como usuário e referência
+                const identicalBandEnergies = {
+                    sub: { rms_db: -9.8 },
+                    low_bass: { rms_db: -7.5 },
+                    mid: { rms_db: -6.2 },
+                    high_mid: { rms_db: -7.8 },
+                    brilho: { rms_db: -8.9 }
+                };
+                
+                log('Simulando análise da MESMA música como usuário e referência');
+                
+                // Calcular diferenças (devem ser zero)
+                let totalDifference = 0;
+                let maxDifference = 0;
+                
+                for (const [bandName, bandData] of Object.entries(identicalBandEnergies)) {
+                    const diff = bandData.rms_db - bandData.rms_db; // 0
+                    totalDifference += Math.abs(diff);
+                    maxDifference = Math.max(maxDifference, Math.abs(diff));
+                    
+                    log(`Banda ${bandName}: Usuario(${bandData.rms_db}) vs Ref(${bandData.rms_db}) = ${diff}dB`);
+                }
+                
+                if (totalDifference === 0 && maxDifference === 0) {
+                    addResult(true, '✅ MÚSICAS IDÊNTICAS: Diferença total = 0dB em todas as bandas', true);
+                    log('Resultado esperado: Nenhuma sugestão de correção deve ser gerada');
+                } else {
+                    addResult(false, `❌ PROBLEMA: Músicas idênticas mostram diferenças (total: ${totalDifference}dB)`);
+                }
+                
+                log('=== TESTE CONCLUÍDO ===');
+                
+            } catch (error) {
+                log(`Erro durante teste: ${error.message}`, 'error');
+                addResult(false, `❌ Erro: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

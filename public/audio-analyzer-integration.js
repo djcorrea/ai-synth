@@ -1566,8 +1566,44 @@ async function handleReferenceFileSelection(file) {
           lufs: analysis.technicalData?.lufsIntegrated || -14.0,
           stereoCorrelation: analysis.technicalData?.stereoCorrelation || 0.8,
           dynamicRange: analysis.technicalData?.dynamicRange || 10.0,
-          truePeak: analysis.technicalData?.truePeakDbtp || -1.0
+          truePeak: analysis.technicalData?.truePeakDbtp || -1.0,
+          
+          // 🎯 NOVO: Incluir targets para bandas espectrais baseados na referência
+          lufs_target: analysis.technicalData?.lufsIntegrated || -14.0,
+          stereo_target: analysis.technicalData?.stereoCorrelation || 0.8,
+          dr_target: analysis.technicalData?.dynamicRange || 10.0,
+          true_peak_target: analysis.technicalData?.truePeakDbtp || -1.0,
+          lra_target: analysis.technicalData?.lra || 7.0,
+          
+          // Tolerâncias padrão (podem ser ajustadas)
+          tol_lufs: 1.0,
+          tol_stereo: 0.1,
+          tol_dr: 2.0,
+          tol_true_peak: 0.5,
+          tol_lra: 2.0
         };
+        
+        // 🎯 CRUCIAL: Incluir bandas espectrais da referência se disponíveis
+        if (analysis.technicalData?.bandEnergies) {
+          referenceTargets.bands = {};
+          
+          // Converter bandEnergies da referência em targets para comparação
+          for (const [bandName, bandData] of Object.entries(analysis.technicalData.bandEnergies)) {
+            if (bandData && Number.isFinite(bandData.rms_db)) {
+              referenceTargets.bands[bandName] = {
+                target_db: bandData.rms_db,  // Usar o valor da referência como target
+                tol_db: 1.0,  // Tolerância padrão para bandas
+                tol_min: 0.5, // Tolerância mínima
+                tol_max: 1.5  // Tolerância máxima
+              };
+            }
+          }
+          
+          console.log('🔍 [DIAGNÓSTICO] Reference bands extraídas:', Object.keys(referenceTargets.bands));
+          console.log('🔍 [DIAGNÓSTICO] Exemplo de band target:', referenceTargets.bands[Object.keys(referenceTargets.bands)[0]]);
+        } else {
+          console.log('🔍 [DIAGNÓSTICO] Reference não possui bandEnergies - usando targets padrão para bandas');
+        }
         
         console.log('🔍 [DIAGNÓSTICO] Reference targets extraídos:', referenceTargets);
         

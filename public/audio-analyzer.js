@@ -2097,7 +2097,20 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
   // ===== FASE 2 (INÍCIO): Bandas espectrais alinhadas às referências =====
     try {
       const t0Spec = performance.now();
-      const ref = (typeof window !== 'undefined') ? window.PROD_AI_REF_DATA : null;
+      // 🎯 CORREÇÃO: Buscar gênero específico para bandas espectrais
+      let ref = null;
+      if (mode === 'genre' && typeof window !== 'undefined') {
+        const activeGenre = window.PROD_AI_REF_GENRE || 'default';
+        const fullRefData = window.PROD_AI_REF_DATA;
+        ref = fullRefData ? fullRefData[activeGenre] : null;
+        if (DEBUG_MODE_REFERENCE) {
+          console.log('🔍 [MODE_DEBUG] Using genre-specific ref for bands:', activeGenre);
+          console.log('🔍 [MODE_DEBUG] Band ref data:', ref);
+        }
+      } else if (DEBUG_MODE_REFERENCE) {
+        console.log('🔍 [MODE_DEBUG] Skipping genre ref for bands (mode=' + mode + ')');
+      }
+      
       const doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
       if (doBands) {
         // Evitar reprocessar se já existe (idempotente)
