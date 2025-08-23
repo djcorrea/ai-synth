@@ -2097,18 +2097,27 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
   // ===== FASE 2 (INÍCIO): Bandas espectrais alinhadas às referências =====
     try {
       const t0Spec = performance.now();
-      // 🎯 CORREÇÃO: Buscar gênero específico para bandas espectrais
+      // 🎯 CORREÇÃO: Buscar referência correta conforme o modo
       let ref = null;
-      if (mode === 'genre' && typeof window !== 'undefined') {
-        const activeGenre = window.PROD_AI_REF_GENRE || 'default';
-        const fullRefData = window.PROD_AI_REF_DATA;
-        ref = fullRefData ? fullRefData[activeGenre] : null;
-        if (DEBUG_MODE_REFERENCE) {
-          console.log('🔍 [MODE_DEBUG] Using genre-specific ref for bands:', activeGenre);
-          console.log('🔍 [MODE_DEBUG] Band ref data:', ref);
+      if (typeof window !== 'undefined') {
+        if (mode === 'reference') {
+          // Modo referência: usar dados específicos da música de referência
+          ref = window.PROD_AI_REF_DATA?.reference_music || null;
+          if (DEBUG_MODE_REFERENCE) {
+            console.log('🔍 [MODE_DEBUG] Using reference music data for bands:', ref);
+          }
+        } else {
+          // Modo gênero: usar dados do gênero ativo
+          const activeGenre = window.PROD_AI_REF_GENRE || 'default';
+          const fullRefData = window.PROD_AI_REF_DATA;
+          ref = fullRefData ? fullRefData[activeGenre] : null;
+          if (DEBUG_MODE_REFERENCE) {
+            console.log('🔍 [MODE_DEBUG] Using genre-specific ref for bands:', activeGenre);
+            console.log('🔍 [MODE_DEBUG] Band ref data:', ref);
+          }
         }
       } else if (DEBUG_MODE_REFERENCE) {
-        console.log('🔍 [MODE_DEBUG] Skipping genre ref for bands (mode=' + mode + ')');
+        console.log('🔍 [MODE_DEBUG] Window not available for refs (mode=' + mode + ')');
       }
       
       const doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
