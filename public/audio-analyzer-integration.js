@@ -671,7 +671,34 @@ const __INLINE_EMBEDDED_REFS__ = {
             presenca:{target_db:-19.2,tol_db:3.5,severity:"hard",vocal_presence_range:true} 
         } 
     },
-        funk_bruxaria:  { lufs_target: -10, tol_lufs: 1,  true_peak_target: -1, tol_true_peak: 1, dr_target: 8, tol_dr: 2, lra_target: 6, tol_lra: 3, stereo_target: 0.1,  tol_stereo: 0.1, bands: { sub:{target_db:-18,tol_db:4.5}, low_bass:{target_db:-16,tol_db:4.5}, upper_bass:{target_db:-15,tol_db:4.5}, low_mid:{target_db:-14,tol_db:4.5}, mid:{target_db:-13,tol_db:4.5}, high_mid:{target_db:-20,tol_db:4.5}, brilho:{target_db:-25,tol_db:4.5}, presenca:{target_db:-32,tol_db:4.5} } },
+        funk_bruxaria: { 
+            version: "1.0.1",
+            generated_at: "2025-08-23T18:03:37.143Z",
+            num_tracks: 29,
+            lufs_target: -14,
+            tol_lufs: 0.5,
+            true_peak_target: -10.6,
+            tol_true_peak: 1.27,
+            dr_target: 7.4,
+            tol_dr: 1.3,
+            lra_target: 8.4,
+            tol_lra: 2.8,
+            stereo_target: 0.3,
+            tol_stereo: 0.1,
+            calor_target: -11.95,
+            brilho_target: -17.69,
+            clareza_target: -1.21,
+            bands: {
+                sub: { target_db: -12.5, tol_db: 3 },
+                low_bass: { target_db: -15.2, tol_db: 3 },
+                upper_bass: { target_db: -15.2, tol_db: 2.3 },
+                low_mid: { target_db: -12, tol_db: 1.7 },
+                mid: { target_db: -8.7, tol_db: 1.7 },
+                high_mid: { target_db: -14.5, tol_db: 2.8 },
+                brilho: { target_db: -17.7, tol_db: 2.2 },
+                presenca: { target_db: -26.7, tol_db: 2.8 }
+            }
+        },
         funk_automotivo:{ lufs_target: -8,  tol_lufs: 1.2, true_peak_target: -9.58, tol_true_peak: 2.5, dr_target: 8.1, tol_dr: 2.0, lra_target: 6.6, tol_lra: 4.0, stereo_target: 0.3, tol_stereo: 0.15, bands: { sub:{target_db:-7.6,tol_db:6.0}, low_bass:{target_db:-6.6,tol_db:4.5}, upper_bass:{target_db:-11.4,tol_db:3.5}, low_mid:{target_db:-8.2,tol_db:3.5}, mid:{target_db:-6.7,tol_db:3.0}, high_mid:{target_db:-12.8,tol_db:4.5}, brilho:{target_db:-16.6,tol_db:4.5}, presenca:{target_db:-22.7,tol_db:5.0} } },
         eletronico:     { 
             version: "1.0.1",
