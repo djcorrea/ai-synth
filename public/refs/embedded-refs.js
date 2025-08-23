@@ -49,7 +49,7 @@
       presenca: { target_db: -19.2, tol_db: 4.5 }
     }
   };
-  window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  = window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  || minimal({ lufs_target: -10 });
+  window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  = window.__EMBEDDED_REFS__.byGenre['funk_bruxaria']  || minimal({ lufs_target: -14 });
   window.__EMBEDDED_REFS__.byGenre['funk_automotivo'] = window.__EMBEDDED_REFS__.byGenre['funk_automotivo'] || minimal({ 
     lufs_target: -8, 
     true_peak_target: -9.58,
