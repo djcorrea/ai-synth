@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Alinhamento de Targets V2 vs Embedded Refs</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .system {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .system h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        .metric {
+            margin: 8px 0;
+            font-family: monospace;
+        }
+        .aligned {
+            background: #0d4f0d;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .misaligned {
+            background: #4f0d0d;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #45a049;
+        }
+        #results {
+            white-space: pre-wrap;
+            font-family: monospace;
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Teste de Alinhamento de Targets</h1>
+        <p>Verificando se os targets do V2 Scoring estão alinhados com o Embedded Refs (sistema de sugestões)</p>
+        
+        <button class="test-button" onclick="testTargetAlignment()">🔍 Verificar Alinhamento</button>
+        <button class="test-button" onclick="testSuggestionFlow()">🔄 Testar Fluxo de Sugestões</button>
+        <button class="test-button" onclick="clearResults()">🧹 Limpar</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <!-- Scripts necessários -->
+    <script src="scoring-v2-complete.js"></script>
+    <script src="refs/embedded-refs-new.js"></script>
+
+    <script>
+        const log = (msg) => {
+            const results = document.getElementById('results');
+            results.textContent += msg + '\n';
+        };
+
+        const clearResults = () => {
+            document.getElementById('results').textContent = '';
+        };
+
+        const testTargetAlignment = () => {
+            clearResults();
+            log('🎯 TESTE DE ALINHAMENTO DE TARGETS');
+            log('=====================================\n');
+
+            const genres = ['funk_mandela', 'eletronico'];
+            
+            genres.forEach(genre => {
+                log(`📊 GÊNERO: ${genre.toUpperCase()}`);
+                log('-'.repeat(40));
+                
+                // Targets do V2
+                const v2Targets = window.GENRE_TARGETS_V2?.[genre] || {};
+                log(`V2 Scoring Targets:`);
+                log(`  LUFS: ${v2Targets.lufsIntegrated || 'N/A'}`);
+                log(`  True Peak: ${v2Targets.truePeakDbtp || 'N/A'}`);
+                log(`  DR: ${v2Targets.dynamicRange || 'N/A'}`);
+                log(`  LRA: ${v2Targets.lra || 'N/A'}`);
+                
+                // Targets do Embedded Refs
+                const refTargets = window.__EMBEDDED_REFS__?.byGenre?.[genre] || {};
+                log(`\nEmbedded Refs Targets:`);
+                log(`  LUFS: ${refTargets.lufs_target || 'N/A'}`);
+                log(`  True Peak: ${refTargets.true_peak_target || 'N/A'}`);
+                log(`  DR: ${refTargets.dr_target || 'N/A'}`);
+                log(`  LRA: ${refTargets.lra_target || 'N/A'}`);
+                
+                // Verificação de alinhamento
+                log(`\n✅ Verificação de Alinhamento:`);
+                const lufsAligned = Math.abs((v2Targets.lufsIntegrated || 0) - (refTargets.lufs_target || 0)) < 0.1;
+                const peakAligned = Math.abs((v2Targets.truePeakDbtp || 0) - (refTargets.true_peak_target || 0)) < 0.1;
+                const drAligned = Math.abs((v2Targets.dynamicRange || 0) - (refTargets.dr_target || 0)) < 0.1;
+                const lraAligned = Math.abs((v2Targets.lra || 0) - (refTargets.lra_target || 0)) < 0.1;
+                
+                log(`  LUFS: ${lufsAligned ? '✅ ALINHADO' : '❌ DESALINHADO'}`);
+                log(`  True Peak: ${peakAligned ? '✅ ALINHADO' : '❌ DESALINHADO'}`);
+                log(`  DR: ${drAligned ? '✅ ALINHADO' : '❌ DESALINHADO'}`);
+                log(`  LRA: ${lraAligned ? '✅ ALINHADO' : '❌ DESALINHADO'}`);
+                
+                log('\n' + '='.repeat(50) + '\n');
+            });
+        };
+
+        const testSuggestionFlow = () => {
+            log('\n🔄 TESTE DE FLUXO DE SUGESTÕES');
+            log('===============================\n');
+            
+            // Simular áudio com valores que precisam de melhoria
+            const mockAudio = {
+                lufs_integrated: -12.0,  // Muito baixo para funk
+                true_peak_dbtp: -2.0,    // Conservador demais
+                dynamic_range: 8.0,      // Alto demais para funk
+                lra: 4.0                 // Alto demais
+            };
+            
+            const genre = 'funk_mandela';
+            log(`📊 Testando com ${genre}`);
+            log(`Audio simulado: LUFS ${mockAudio.lufs_integrated}, Peak ${mockAudio.true_peak_dbtp}`);
+            
+            // Score V1 (simular)
+            const scoreV1 = 75; // Exemplo
+            log(`\n📈 Score V1 (simulado): ${scoreV1}%`);
+            
+            // Score V2
+            if (typeof calculateScoreV2 === 'function') {
+                const scoreV2 = calculateScoreV2(mockAudio, genre);
+                log(`📈 Score V2 (real): ${scoreV2.toFixed(1)}%`);
+                
+                if (scoreV2 > scoreV1) {
+                    log(`✅ V2 dá score melhor que V1 (+${(scoreV2 - scoreV1).toFixed(1)}%)`);
+                } else {
+                    log(`❌ V2 dá score pior que V1 (${(scoreV2 - scoreV1).toFixed(1)}%)`);
+                }
+            }
+            
+            // Verificar se sugestões levariam a melhoria
+            const refTargets = window.__EMBEDDED_REFS__?.byGenre?.[genre] || {};
+            const targetLufs = refTargets.lufs_target;
+            const targetPeak = refTargets.true_peak_target;
+            
+            log(`\n🎯 Targets das Sugestões:`);
+            log(`  LUFS alvo: ${targetLufs}`);
+            log(`  Peak alvo: ${targetPeak}`);
+            
+            // Simular áudio "melhorado" seguindo sugestões
+            const improvedAudio = {
+                ...mockAudio,
+                lufs_integrated: targetLufs,
+                true_peak_dbtp: targetPeak,
+                dynamic_range: refTargets.dr_target,
+                lra: refTargets.lra_target
+            };
+            
+            if (typeof calculateScoreV2 === 'function') {
+                const improvedScore = calculateScoreV2(improvedAudio, genre);
+                log(`\n📊 Score após seguir sugestões: ${improvedScore.toFixed(1)}%`);
+                
+                if (improvedScore > scoreV2) {
+                    log(`✅ Seguir sugestões MELHORA o score (+${(improvedScore - scoreV2).toFixed(1)}%)`);
+                } else {
+                    log(`❌ Seguir sugestões NÃO melhora o score`);
+                }
+            }
+        };
+
+        // Auto-executar teste ao carregar
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🚀 Sistema carregado. Execute os testes usando os botões acima.\n');
+            }, 500);
+        });
+    </script>
+</body>
+</html>
