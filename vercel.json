@@ -11,31 +11,25 @@
     { "src": "lib/**", "use": "@vercel/static" }
   ],
   "routes": [
+    { 
+      "src": "/refs/embedded-refs.js", 
+      "dest": "/public/refs/embedded-refs.js",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
+    { 
+      "src": "/refs/embedded-refs-new.js", 
+      "dest": "/public/refs/embedded-refs-new.js",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
     { "src": "/refs/out/(.*)", "dest": "/public/refs/out/$1" },
     { "src": "/refs/(.*)", "dest": "/public/refs/$1" },
     { "src": "/lib/(.*)", "dest": "/lib/$1" },
     { "src": "/api/(.*)", "dest": "api/$1.js" },
     { "src": "/", "dest": "/public/landing.html" },
     { "src": "/(.*)", "dest": "/public/$1" }
-  ],
-  "headers": [
-    {
-      "source": "/refs/embedded-refs.js",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    },
-    {
-      "source": "/public/refs/embedded-refs.js",
-      "headers": [
-        {
-          "key": "Cache-Control", 
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    }
   ]
 }
