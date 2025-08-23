@@ -1,0 +1,1 @@
+Deploy trigger: 2025-08-23 18:45 - Force deploy for funk_bruxaria cache fix
