@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Teste REAL V1 vs V2</title>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            background: #000; 
+            color: #00ff00; 
+            padding: 20px; 
+        }
+        .button {
+            background: #002200;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-block;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .button:hover { background: #004400; }
+        .result {
+            background: rgba(0,255,0,0.1);
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success { border-color: #00ff00; background: rgba(0,255,0,0.2); }
+        .error { border-color: #ff0000; background: rgba(255,0,0,0.1); color: #ff6666; }
+        .warning { border-color: #ffff00; background: rgba(255,255,0,0.1); color: #ffff88; }
+        .header {
+            border-color: #00ffff;
+            background: rgba(0,255,255,0.1);
+            color: #00ffff;
+            font-weight: bold;
+        }
+        .comparison {
+            border-color: #ff00ff;
+            background: rgba(255,0,255,0.1);
+            color: #ff88ff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 TESTE REAL: V1 vs V2 SCORES</h1>
+    
+    <div class="button" onclick="testRealDifference()">🎯 Comparar V1 vs V2 Real</div>
+    <div class="button" onclick="testWithActualData()">📊 Usar Dados da Análise Atual</div>
+    <div class="button" onclick="testPerfectScore()">💯 Testar Score Perfeito</div>
+    <div class="button" onclick="clearResults()">🧹 Limpar</div>
+    
+    <div id="results"></div>
+
+    <!-- Carregar sistemas -->
+    <script src="scoring-v2-complete.js?v=20250823-balanceado"></script>
+    <script src="auto-enable-v2.js?v=20250823-balanceado"></script>
+
+    <script>
+        function addResult(message, type = 'result') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            document.getElementById('results').appendChild(div);
+            console.log(message);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Dados reais baseados na análise que você mostrou
+        const realAnalysisData = {
+            lufsIntegrated: -6.66, // Dinâmica da análise real
+            truePeakDbtp: -2.07,   // Pico Real da análise real
+            dynamicRange: 8.89,    // Dinâmica alto/baixo da análise real
+            lra: 2.56,             // Variação de Volume
+            stereoCorrelation: 0.11, // Correlação Estéreo
+            dcOffset: 0.0002,
+            clippingPercent: 0.174, // 0.174% da análise real
+            bandEnergies: {
+                sub_bass: { rms_db: -19.23 },    // Agudos da análise
+                bass: { rms_db: -13.52 },        // Médios Agudos
+                low_mid: { rms_db: -7.65 },      // Médios
+                mid: { rms_db: -8.00 },          // Médios Graves
+                high_mid: { rms_db: -9.32 },     // Graves Altos
+                treble: { rms_db: -28.56 }       // Presença
+            }
+        };
+
+        async function testRealDifference() {
+            addResult('🔍 TESTE REAL: V1 vs V2 com comparação forçada', 'header');
+            
+            if (!window.ScoringV2Complete) {
+                addResult('❌ Sistema V2 não carregado', 'error');
+                return;
+            }
+
+            const reference = { genre: 'funk_mandela' };
+
+            try {
+                // TESTE V1 - FORÇAR V1
+                addResult('🔧 Forçando V1...', 'result');
+                window.SCORING_V2_DISABLED = true;
+                window.SCORING_V2_TEST = false;
+                
+                const v1Result = await window.ScoringV2Complete.computeMixScore(realAnalysisData, reference);
+                
+                // TESTE V2 - FORÇAR V2  
+                addResult('🚀 Forçando V2...', 'result');
+                window.SCORING_V2_DISABLED = false;
+                window.SCORING_V2_TEST = true;
+                
+                const v2Result = await window.ScoringV2Complete.computeMixScore(realAnalysisData, reference);
+
+                // COMPARAÇÃO
+                const scoreDiff = v2Result.scorePct - v1Result.scorePct;
+                const percentImprovement = v1Result.scorePct > 0 ? (scoreDiff / v1Result.scorePct * 100) : 0;
+
+                addResult('🎯 RESULTADOS DA COMPARAÇÃO REAL:', 'comparison');
+                addResult(`   V1: ${v1Result.scorePct}% (${v1Result.method})`, 'result');
+                addResult(`   V2: ${v2Result.scorePct}% (${v2Result.method})`, 'result');
+                addResult(`   Diferença: ${scoreDiff > 0 ? '+' : ''}${scoreDiff.toFixed(1)} pontos`, 'result');
+                addResult(`   Melhoria: ${percentImprovement > 0 ? '+' : ''}${percentImprovement.toFixed(1)}%`, 'result');
+
+                if (v2Result.method.includes('v2')) {
+                    if (scoreDiff > 0) {
+                        addResult('✅ V2 ESTÁ MELHORANDO O SCORE!', 'success');
+                    } else if (scoreDiff === 0) {
+                        addResult('⚠️ V2 funcionando mas score igual (pode ser normal)', 'warning');
+                    } else {
+                        addResult('⚠️ V2 funcionando mas score menor (investigar)', 'warning');
+                    }
+                } else {
+                    addResult('❌ V2 NÃO está sendo usado!', 'error');
+                }
+
+                // Logs detalhados
+                addResult('🔍 Detalhes V1:', 'result');
+                addResult(`   Tempo: ${v1Result.processingTime}ms`, 'result');
+                addResult(`   Versão: ${v1Result.scoringVersion || 'v1'}`, 'result');
+                
+                addResult('🔍 Detalhes V2:', 'result');
+                addResult(`   Tempo: ${v2Result.processingTime}ms`, 'result');
+                addResult(`   Versão: ${v2Result.scoringVersion || 'v2'}`, 'result');
+
+            } catch (error) {
+                addResult(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+
+        async function testWithActualData() {
+            addResult('📊 TESTE COM DADOS DA SUA ANÁLISE ATUAL', 'header');
+            
+            // Tentar descobrir por que o score deu 54
+            if (!window.ScoringV2Complete) {
+                addResult('❌ Sistema V2 não carregado', 'error');
+                return;
+            }
+
+            const reference = { genre: 'funk_mandela' };
+
+            try {
+                // Resetar flags
+                window.SCORING_V2_DISABLED = undefined;
+                window.SCORING_V2_TEST = undefined;
+
+                // Teste com dados reais
+                const result = await window.ScoringV2Complete.computeMixScore(realAnalysisData, reference);
+
+                addResult('🎯 RESULTADO COM DADOS REAIS:', 'header');
+                addResult(`   Score: ${result.scorePct}%`, 'result');
+                addResult(`   Método: ${result.method}`, 'result');
+                addResult(`   Classificação: ${result.classification}`, 'result');
+                addResult(`   Versão: ${result.scoringVersion || 'não informado'}`, 'result');
+
+                // Verificar se bate com o que apareceu na interface (54)
+                if (Math.abs(result.scorePct - 54) < 1) {
+                    addResult('✅ Score bate com a interface (54)', 'success');
+                } else {
+                    addResult(`⚠️ Score diferente da interface (esperado ~54, got ${result.scorePct})`, 'warning');
+                }
+
+                // Verificar qual versão está sendo usada
+                if (result.method && result.method.includes('v2')) {
+                    addResult('✅ V2 está sendo usado na análise atual', 'success');
+                } else {
+                    addResult('❌ V1 está sendo usado (V2 não ativo)', 'error');
+                }
+
+                // Análise dos dados
+                addResult('🔍 ANÁLISE DOS DADOS:', 'header');
+                addResult(`   Clipping: ${realAnalysisData.clippingPercent}% (${realAnalysisData.clippingPercent > 0.1 ? 'Alto' : 'OK'})`, 'result');
+                addResult(`   Dinâmica: ${realAnalysisData.dynamicRange} (${realAnalysisData.dynamicRange < 6 ? 'Baixa' : 'OK'})`, 'result');
+                addResult(`   LUFS: ${realAnalysisData.lufsIntegrated} (${realAnalysisData.lufsIntegrated > -14 ? 'Alto' : 'OK'})`, 'result');
+
+            } catch (error) {
+                addResult(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPerfectScore() {
+            addResult('💯 TESTE DE SCORE PERFEITO (100%)', 'header');
+            
+            if (!window.ScoringV2Complete) {
+                addResult('❌ Sistema V2 não carregado', 'error');
+                return;
+            }
+
+            // Dados PERFEITOS baseados nos targets do funk_mandela
+            const perfectData = {
+                lufsIntegrated: -10.0,   // Exato do target
+                truePeakDbtp: -0.8,      // Exato do target
+                dynamicRange: 7.0,       // Exato do target
+                lra: 3.5,                // Exato do target
+                stereoCorrelation: 0.65, // Exato do target
+                dcOffset: 0.0001,        // Perfeito
+                clippingPercent: 0,      // Zero clipping
+                bandEnergies: {
+                    sub_bass: { rms_db: -9.0 },
+                    bass: { rms_db: -7.5 },
+                    low_mid: { rms_db: -8.5 },
+                    mid: { rms_db: -9.5 },
+                    high_mid: { rms_db: -11.5 },
+                    treble: { rms_db: -14.0 }
+                }
+            };
+
+            const reference = { genre: 'funk_mandela' };
+
+            try {
+                const result = await window.ScoringV2Complete.computeMixScore(perfectData, reference);
+
+                addResult('🎯 RESULTADO SCORE PERFEITO:', 'comparison');
+                addResult(`   Score: ${result.scorePct}%`, result.scorePct >= 98 ? 'success' : 'warning');
+                addResult(`   Método: ${result.method}`, 'result');
+                addResult(`   Classificação: ${result.classification}`, 'result');
+
+                if (result.scorePct >= 98) {
+                    addResult('✅ PERFEITO! Score 100% é alcançável!', 'success');
+                } else if (result.scorePct >= 90) {
+                    addResult('⚠️ Quase perfeito - tolerâncias OK', 'warning');
+                } else {
+                    addResult('❌ Score muito baixo - tolerâncias muito rigorosas', 'error');
+                }
+
+                // Teste com dados 95% perfeitos
+                addResult('📊 Testando dados 95% perfeitos...', 'result');
+                const almostPerfectData = {
+                    ...perfectData,
+                    lufsIntegrated: -11.5,   // +1.5 LUFS de diferença
+                    dynamicRange: 6.0,       // -1.0 dB diferença
+                    truePeakDbtp: -0.3       // +0.5 dB diferença
+                };
+
+                const result95 = await window.ScoringV2Complete.computeMixScore(almostPerfectData, reference);
+                addResult(`   Score 95%: ${result95.scorePct}%`, 'result');
+
+            } catch (error) {
+                addResult(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+
+        // Verificar carregamento
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                if (window.ScoringV2Complete) {
+                    addResult('✅ Sistema V2 carregado - pronto para testar', 'success');
+                    
+                    // Verificar status atual
+                    const status = window.ScoringV2Complete.getStatus();
+                    addResult(`📊 Status atual: ${status.currentMode}`, 'result');
+                } else {
+                    addResult('❌ Sistema V2 não carregado', 'error');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
