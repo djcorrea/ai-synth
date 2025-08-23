@@ -3357,6 +3357,19 @@ function renderSmartSummary(analysis){
 function renderReferenceComparisons(analysis) {
     const container = document.getElementById('referenceComparisons');
     if (!container) return;
+    
+    // 🎯 DETECÇÃO DE MODO REFERÊNCIA - Não exibir se já foi exibido via displayReferenceResults
+    const isReferenceMode = analysis.analysisMode === 'reference' || 
+                           analysis.baseline_source === 'reference' ||
+                           (analysis.comparison && analysis.comparison.baseline_source === 'reference');
+    
+    if (isReferenceMode) {
+        // Modo referência já tem sua própria exibição via displayReferenceResults
+        container.innerHTML = '<div style="font-size:12px;opacity:.6;color:#888;">✅ Análise por referência exibida acima</div>';
+        return;
+    }
+    
+    // Modo gênero normal
     const ref = __activeRefData;
     if (!ref) { container.innerHTML = '<div style="font-size:12px;opacity:.6">Referências não carregadas</div>'; return; }
     const tech = analysis.technicalData || {};
@@ -3454,7 +3467,7 @@ function renderReferenceComparisons(analysis) {
         });
     }
     container.innerHTML = `<div class="card" style="margin-top:12px;">
-        <div class="card-title">📌 Comparação de Referência (${window.PROD_AI_REF_GENRE})</div>
+        <div class="card-title">📌 Comparação com Targets de Gênero (${window.PROD_AI_REF_GENRE})</div>
         <table class="ref-compare-table">
             <thead><tr>
                 <th>Métrica</th><th>Valor</th><th>Alvo</th><th>Δ</th>
