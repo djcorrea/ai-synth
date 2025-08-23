@@ -948,13 +948,13 @@ class AudioAnalyzer {
           }
         } catch {}
         try {
-          // 🚀 SCORING V2 INTEGRATION - Usar sistema global carregado
+          // 🚀 SCORING V2 COMPLETE - Sistema simplificado (segunda ocorrência)
           let scorerMod = null;
           
-          // Verificar se sistema global está carregado
-          if (window.ScoringIntegration && window.ScoringIntegration.computeMixScore) {
-            scorerMod = window.ScoringIntegration;
-            console.log('✅ [ANALYZER_2] Usando ScoringIntegration global');
+          // Verificar se sistema V2 completo está carregado
+          if (window.ScoringV2Complete && window.ScoringV2Complete.computeMixScore) {
+            scorerMod = window.ScoringV2Complete;
+            console.log('✅ [ANALYZER_2] Usando ScoringV2Complete');
           } else if (window.computeMixScore) {
             scorerMod = { computeMixScore: window.computeMixScore };
             console.log('✅ [ANALYZER_2] Usando função global computeMixScore');
@@ -962,9 +962,17 @@ class AudioAnalyzer {
             scorerMod = window.ScoringV1;
             console.log('⚠️ [ANALYZER_2] Fallback para ScoringV1 global');
           } else {
-            console.warn('⚠️ [ANALYZER_2] Nenhum módulo de scoring global encontrado, tentando import dinâmico...');
-            // Último recurso: tentar import dinâmico
-            scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+            console.warn('⚠️ [ANALYZER_2] Carregando scoring como fallback...');
+            // Último recurso: usar scoring V1 se disponível ou carregar
+            if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
+              scorerMod = window.ScoringV1;
+            } else {
+              try {
+                scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+              } catch (e) {
+                console.error('❌ [ANALYZER_2] Falha ao carregar scoring:', e);
+              }
+            }
           }
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
             // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)

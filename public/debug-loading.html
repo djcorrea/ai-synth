@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Carregamento</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .status { margin: 10px 0; padding: 10px; border: 1px solid #0f0; }
+        .ok { background: rgba(0,255,0,0.1); }
+        .error { background: rgba(255,0,0,0.1); border-color: #f00; color: #f00; }
+        .button { 
+            background: #002; color: #0f0; border: 1px solid #0f0; 
+            padding: 10px; margin: 5px; cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 DEBUG CARREGAMENTO DA PÁGINA</h1>
+    
+    <div class="button" onclick="checkStatus()">Verificar Status Completo</div>
+    <div class="button" onclick="testScoring()">Testar Scoring</div>
+    <div class="button" onclick="checkReferences()">Verificar Referências</div>
+    
+    <div id="status"></div>
+
+    <script>
+        function addStatus(msg, isOk = true) {
+            const div = document.createElement('div');
+            div.className = `status ${isOk ? 'ok' : 'error'}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById('status').appendChild(div);
+            console.log(msg);
+        }
+
+        function checkStatus() {
+            document.getElementById('status').innerHTML = '';
+            
+            addStatus('=== VERIFICAÇÃO COMPLETA DO SISTEMA ===');
+            
+            // Scoring
+            addStatus(`ScoringV2Complete: ${!!window.ScoringV2Complete}`, !!window.ScoringV2Complete);
+            addStatus(`computeMixScore global: ${!!window.computeMixScore}`, !!window.computeMixScore);
+            addStatus(`enableScoringV2Test global: ${!!window.enableScoringV2Test}`, !!window.enableScoringV2Test);
+            
+            // Referencias
+            addStatus(`PROD_AI_REF_DATA: ${!!window.PROD_AI_REF_DATA}`, !!window.PROD_AI_REF_DATA);
+            addStatus(`PROD_AI_REF_DATA_ACTIVE: ${!!window.PROD_AI_REF_DATA_ACTIVE}`, !!window.PROD_AI_REF_DATA_ACTIVE);
+            addStatus(`PROD_AI_REF_GENRE: ${window.PROD_AI_REF_GENRE || 'não definido'}`, !!window.PROD_AI_REF_GENRE);
+            
+            // Audio Analyzer
+            addStatus(`startAudioAnalyzer: ${!!window.startAudioAnalyzer}`, !!window.startAudioAnalyzer);
+            addStatus(`loadReferenceData: ${!!window.loadReferenceData}`, !!window.loadReferenceData);
+            
+            // Estado do V2
+            addStatus(`SCORING_V2_TEST: ${window.SCORING_V2_TEST}`, true);
+            
+            if (window.ScoringV2Complete) {
+                const status = window.ScoringV2Complete.getStatus();
+                addStatus(`Status V2: ${JSON.stringify(status)}`, true);
+            }
+            
+            // Referencias detalhadas
+            if (window.PROD_AI_REF_DATA) {
+                const genres = Object.keys(window.PROD_AI_REF_DATA);
+                addStatus(`Gêneros disponíveis: ${genres.join(', ')}`, true);
+            }
+        }
+
+        async function testScoring() {
+            addStatus('=== TESTE DO SISTEMA DE SCORING ===');
+            
+            if (!window.ScoringV2Complete) {
+                addStatus('❌ ScoringV2Complete não disponível', false);
+                return;
+            }
+            
+            const testData = {
+                lufsIntegrated: -12.0,
+                truePeakDbtp: -1.0,
+                dynamicRange: 6.0,
+                bandEnergies: {
+                    bass: { rms_db: -8.0 },
+                    mid: { rms_db: -10.0 },
+                    treble: { rms_db: -15.0 }
+                }
+            };
+            
+            try {
+                // Teste V1
+                window.SCORING_V2_TEST = false;
+                const v1 = await window.ScoringV2Complete.computeMixScore(testData, {genre: 'funk_mandela'});
+                addStatus(`V1: ${v1.scorePct}% (${v1.method})`, true);
+                
+                // Teste V2
+                window.SCORING_V2_TEST = true;
+                const v2 = await window.ScoringV2Complete.computeMixScore(testData, {genre: 'funk_mandela'});
+                addStatus(`V2: ${v2.scorePct}% (${v2.method})`, true);
+                
+                const improvement = v2.scorePct - v1.scorePct;
+                addStatus(`Melhoria: ${improvement > 0 ? '+' : ''}${improvement.toFixed(1)} pontos`, improvement >= 0);
+                
+                if (v2.method.includes('v2')) {
+                    addStatus('✅ V2 funcionando!', true);
+                } else {
+                    addStatus('⚠️ V2 não ativo', false);
+                }
+                
+            } catch (error) {
+                addStatus(`❌ Erro no teste: ${error.message}`, false);
+            }
+        }
+
+        function checkReferences() {
+            addStatus('=== VERIFICAÇÃO DAS REFERÊNCIAS ===');
+            
+            if (window.PROD_AI_REF_DATA) {
+                const data = window.PROD_AI_REF_DATA;
+                addStatus(`Total de gêneros: ${Object.keys(data).length}`, true);
+                
+                for (const [genre, ref] of Object.entries(data)) {
+                    if (ref && ref.lufs_target !== undefined) {
+                        addStatus(`${genre}: LUFS ${ref.lufs_target}, DR ${ref.dr_target}`, true);
+                    } else {
+                        addStatus(`${genre}: dados incompletos`, false);
+                    }
+                }
+            } else {
+                addStatus('❌ PROD_AI_REF_DATA não carregado', false);
+            }
+            
+            if (window.PROD_AI_REF_GENRE) {
+                addStatus(`Gênero ativo: ${window.PROD_AI_REF_GENRE}`, true);
+            } else {
+                addStatus('⚠️ Nenhum gênero ativo', false);
+            }
+        }
+
+        // Auto-check ao carregar
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addStatus('🚀 Página carregada, verificando status...');
+                checkStatus();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

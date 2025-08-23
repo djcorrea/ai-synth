@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Status V2 Auto-Ativação</title>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            background: #000; 
+            color: #00ff00; 
+            padding: 20px; 
+        }
+        .button {
+            background: #002200;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-block;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .button:hover { background: #004400; }
+        .result {
+            background: rgba(0,255,0,0.1);
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success { border-color: #00ff00; background: rgba(0,255,0,0.2); }
+        .error { border-color: #ff0000; background: rgba(255,0,0,0.1); color: #ff6666; }
+        .warning { border-color: #ffff00; background: rgba(255,255,0,0.1); color: #ffff88; }
+        .header {
+            border-color: #00ffff;
+            background: rgba(0,255,255,0.1);
+            color: #00ffff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 TESTE STATUS V2 AUTO-ATIVAÇÃO</h1>
+    
+    <div class="button" onclick="checkCompleteStatus()">Status Completo</div>
+    <div class="button" onclick="testQuickScore()">Teste Rápido Score</div>
+    <div class="button" onclick="testAutoActivation()">Teste Auto-Ativação</div>
+    <div class="button" onclick="clearResults()">Limpar</div>
+    
+    <div id="results"></div>
+
+    <!-- Carregar os sistemas na ordem correta -->
+    <script src="scoring-v2-complete.js?v=20250823-final"></script>
+    <script src="auto-enable-v2.js?v=20250823-final"></script>
+
+    <script>
+        function addResult(message, type = 'result') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            document.getElementById('results').appendChild(div);
+            console.log(message);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function checkCompleteStatus() {
+            addResult('🔍 VERIFICAÇÃO COMPLETA DO SISTEMA', 'header');
+            
+            // 1. Verificar se V2 está carregado
+            if (window.ScoringV2Complete) {
+                addResult('✅ ScoringV2Complete carregado', 'success');
+                
+                // 2. Verificar status interno
+                if (typeof window.ScoringV2Complete.getStatus === 'function') {
+                    const status = window.ScoringV2Complete.getStatus();
+                    addResult('📊 Status Interno:', 'header');
+                    addResult(`   Modo atual: ${status.currentMode}`, 'result');
+                    addResult(`   V2 disponível: ${status.v2Available}`, 'result');
+                    addResult(`   Padrão é V2: ${status.defaultIsV2}`, 'result');
+                    addResult(`   Flag de teste: ${status.v2TestFlag}`, 'result');
+                    addResult(`   Flag desabilitado: ${status.v2DisabledFlag}`, 'result');
+                    
+                    if (status.currentMode === 'v2') {
+                        addResult('🎉 V2 está ATIVO por padrão!', 'success');
+                    } else {
+                        addResult('⚠️ V2 NÃO está ativo por padrão', 'warning');
+                    }
+                } else {
+                    addResult('❌ Função getStatus não encontrada', 'error');
+                }
+                
+                // 3. Verificar funções disponíveis
+                addResult('🔧 Funções Disponíveis:', 'header');
+                const functions = [
+                    'computeMixScore',
+                    'getStatus',
+                    'enableV2Default',
+                    'disableV2Default',
+                    'checkV2Status'
+                ];
+                
+                functions.forEach(func => {
+                    if (typeof window.ScoringV2Complete[func] === 'function') {
+                        addResult(`   ✅ ${func}`, 'success');
+                    } else {
+                        addResult(`   ❌ ${func}`, 'error');
+                    }
+                });
+                
+            } else {
+                addResult('❌ ScoringV2Complete NÃO carregado', 'error');
+            }
+            
+            // 4. Verificar auto-ativador
+            if (window.autoEnableV2) {
+                addResult('✅ Auto-ativador carregado', 'success');
+            } else {
+                addResult('❌ Auto-ativador NÃO carregado', 'error');
+            }
+            
+            // 5. Verificar flags globais
+            addResult('🌐 Flags Globais:', 'header');
+            addResult(`   window.SCORING_V2_TEST: ${window.SCORING_V2_TEST}`, 'result');
+            addResult(`   window.SCORING_V2_DISABLED: ${window.SCORING_V2_DISABLED}`, 'result');
+        }
+
+        async function testQuickScore() {
+            addResult('⚡ TESTE RÁPIDO DE SCORE', 'header');
+            
+            if (!window.ScoringV2Complete) {
+                addResult('❌ Sistema V2 não carregado', 'error');
+                return;
+            }
+            
+            const testData = {
+                lufsIntegrated: -12.5,
+                truePeakDbtp: -0.8,
+                dynamicRange: 6.2,
+                lra: 4.5,
+                stereoCorrelation: 0.75,
+                dcOffset: 0.0001,
+                clippingPercent: 0,
+                bandEnergies: {
+                    sub_bass: { rms_db: -8.2 },
+                    bass: { rms_db: -6.8 },
+                    low_mid: { rms_db: -7.5 },
+                    mid: { rms_db: -9.1 },
+                    high_mid: { rms_db: -12.3 },
+                    treble: { rms_db: -15.6 }
+                }
+            };
+            
+            const reference = { genre: 'funk_mandela' };
+            
+            try {
+                const result = await window.ScoringV2Complete.computeMixScore(testData, reference);
+                
+                addResult(`🎯 Score: ${result.scorePct}%`, 'success');
+                addResult(`🔧 Método: ${result.method}`, 'result');
+                addResult(`🏷️ Classificação: ${result.classification}`, 'result');
+                addResult(`⏱️ Tempo: ${result.processingTime}ms`, 'result');
+                
+                if (result.scoringVersion) {
+                    addResult(`📊 Versão: ${result.scoringVersion}`, 'result');
+                }
+                
+                if (result.method && result.method.includes('v2')) {
+                    addResult('🎉 V2 FUNCIONANDO AUTOMATICAMENTE!', 'success');
+                } else {
+                    addResult('⚠️ V2 não foi usado (ainda usando V1)', 'warning');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAutoActivation() {
+            addResult('🔄 TESTE DE AUTO-ATIVAÇÃO', 'header');
+            
+            // Simular carregamento da página
+            if (window.autoEnableV2) {
+                addResult('🚀 Executando auto-ativação...', 'result');
+                try {
+                    await window.autoEnableV2();
+                    addResult('✅ Auto-ativação executada', 'success');
+                    
+                    // Verificar se funcionou
+                    if (window.ScoringV2Complete) {
+                        const status = window.ScoringV2Complete.getStatus();
+                        if (status.currentMode === 'v2') {
+                            addResult('🎉 V2 ativado automaticamente!', 'success');
+                        } else {
+                            addResult('⚠️ Auto-ativação não funcionou', 'warning');
+                        }
+                    }
+                } catch (error) {
+                    addResult(`❌ Erro na auto-ativação: ${error.message}`, 'error');
+                }
+            } else {
+                addResult('❌ Função autoEnableV2 não encontrada', 'error');
+            }
+        }
+
+        // Verificar carregamento inicial
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                addResult('🌟 SISTEMA CARREGADO', 'header');
+                if (window.ScoringV2Complete) {
+                    addResult('✅ V2 System OK', 'success');
+                } else {
+                    addResult('❌ V2 System FALHOU', 'error');
+                }
+                
+                if (window.autoEnableV2) {
+                    addResult('✅ Auto-ativador OK', 'success');
+                } else {
+                    addResult('❌ Auto-ativador FALHOU', 'error');
+                }
+                
+                addResult('💡 Use "Status Completo" para diagnóstico detalhado', 'result');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

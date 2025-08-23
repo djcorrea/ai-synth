@@ -194,8 +194,25 @@
   async function computeMixScore(technicalData = {}, reference = null, options = {}) {
     const startTime = performance.now();
     
-    // Decidir se usa V2
-    const useV2 = window.SCORING_V2_TEST === true || options?.forceV2 === true;
+    // NOVA LÓGICA: V2 POR PADRÃO, EXCETO SE EXPLICITAMENTE DESABILITADO
+    let useV2 = true; // PADRÃO É V2
+    
+    // Desabilitar V2 apenas se explicitamente requisitado
+    if (window.SCORING_V2_DISABLED === true || options?.forceV1 === true) {
+      useV2 = false;
+    }
+    
+    // Ou se em modo de teste específico
+    if (window.SCORING_V2_TEST === false) {
+      useV2 = false;
+    }
+    
+    // Forçar V2 se requisitado
+    if (window.SCORING_V2_TEST === true || options?.forceV2 === true) {
+      useV2 = true;
+    }
+    
+    console.log(`🎯 [SMART_SCORING] Decisão: usar ${useV2 ? 'V2' : 'V1'}`);
     
     if (useV2) {
       console.log('🎯 [SMART_SCORING] Usando Scoring V2');
@@ -245,20 +262,48 @@
    */
   function enableV2Test() {
     window.SCORING_V2_TEST = true;
-    console.log('🧪 [SCORING_V2] Modo V2 habilitado!');
+    window.SCORING_V2_DISABLED = false;
+    console.log('🧪 [SCORING_V2] Modo V2 forçado habilitado!');
   }
   
   function disableV2Test() {
     window.SCORING_V2_TEST = false;
-    console.log('🛡️ [SCORING_V2] Modo V2 desabilitado!');
+    console.log('🛡️ [SCORING_V2] Modo V2 desabilitado (usando V1)!');
+  }
+  
+  function enableV2Default() {
+    window.SCORING_V2_DISABLED = false;
+    delete window.SCORING_V2_TEST; // Remove override
+    console.log('🚀 [SCORING_V2] V2 habilitado como padrão!');
+  }
+  
+  function disableV2Default() {
+    window.SCORING_V2_DISABLED = true;
+    delete window.SCORING_V2_TEST; // Remove override
+    console.log('🛡️ [SCORING_V2] V2 desabilitado, usando V1 como padrão!');
   }
   
   function getStatus() {
+    const v2Test = window.SCORING_V2_TEST;
+    const v2Disabled = window.SCORING_V2_DISABLED;
+    
+    // Determinar se V2 está sendo usado
+    let useV2 = true; // PADRÃO É V2
+    if (v2Disabled === true) useV2 = false;
+    if (v2Test === false) useV2 = false;
+    
     return {
       v2Available: true,
-      v2TestEnabled: window.SCORING_V2_TEST === true,
-      version: window.SCORING_V2_TEST ? 'v2.0.0-active' : 'v1.0.0-active'
+      currentMode: useV2 ? 'v2' : 'v1',
+      v2TestFlag: v2Test,
+      v2DisabledFlag: v2Disabled,
+      defaultIsV2: true // SEMPRE TRUE - V2 É PADRÃO AGORA
     };
+  }
+
+  // Função para verificar status (alias para getStatus)
+  function checkV2Status() {
+    return getStatus();
   }
 
   // 🎯 REGISTRAR NO WINDOW
@@ -267,18 +312,25 @@
     computeMixScore: computeMixScore,
     enableV2Test: enableV2Test,
     disableV2Test: disableV2Test,
-    getStatus: getStatus
+    enableV2Default: enableV2Default,
+    disableV2Default: disableV2Default,
+    getStatus: getStatus,
+    checkV2Status: checkV2Status
   };
   
   // Funções globais para facilidade
   window.enableScoringV2Test = enableV2Test;
   window.disableScoringV2Test = disableV2Test;
+  window.enableScoringV2Default = enableV2Default;
+  window.disableScoringV2Default = disableV2Default;
   window.getScoringV2Status = getStatus;
   
-  // Substituir função global se não existir
-  if (!window.computeMixScore) {
+  // Substituir função global apenas se não existir ou forçado
+  if (!window.computeMixScore || window.FORCE_SCORING_V2_OVERRIDE) {
     window.computeMixScore = computeMixScore;
     console.log('🔗 [SCORING_V2] Função global computeMixScore configurada');
+  } else {
+    console.log('🔗 [SCORING_V2] Função global já existe, mantendo original');
   }
   
   console.log('✅ [SCORING_V2_COMPLETE] Sistema V2 carregado e pronto!');
