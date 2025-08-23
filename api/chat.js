@@ -226,13 +226,26 @@ function validateImageMagicBytes(buffer) {
   return false;
 }
 
-// ✅ Rate limiting simples em memória (produção recomenda Redis)
+// ✅ Rate limiting melhorado - Fase 1 (compatível com Redis futuro)
 const userRequestCount = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minuto
 const MAX_REQUESTS_PER_MINUTE = 10;
 
+// Métricas de rate limiting
+const rateLimitMetrics = {
+  totalRequests: 0,
+  blockedRequests: 0,
+  lastCleanup: Date.now()
+};
+
+// Cache para respostas frequentes (Fase 2)
+const responseCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
 function checkRateLimit(uid) {
   const now = Date.now();
+  rateLimitMetrics.totalRequests++;
+  
   const userRequests = userRequestCount.get(uid) || [];
   
   // Remover requests antigos (fora da janela de tempo)
@@ -240,7 +253,8 @@ function checkRateLimit(uid) {
   
   // Verificar se excedeu o limite
   if (validRequests.length >= MAX_REQUESTS_PER_MINUTE) {
-    console.warn(`🚫 Rate limit excedido para usuário: ${uid}`);
+    rateLimitMetrics.blockedRequests++;
+    console.warn(`🚫 Rate limit excedido para usuário: ${uid} (${validRequests.length}/${MAX_REQUESTS_PER_MINUTE})`);
     return false;
   }
   
@@ -248,7 +262,89 @@ function checkRateLimit(uid) {
   validRequests.push(now);
   userRequestCount.set(uid, validRequests);
   
+  // Cleanup periódico (a cada 100 requests)
+  if (rateLimitMetrics.totalRequests % 100 === 0) {
+    cleanupRateLimit();
+    cleanupResponseCache();
+  }
+  
   return true;
+}
+
+// Função de limpeza de memória
+function cleanupRateLimit() {
+  const now = Date.now();
+  const cutoff = now - RATE_LIMIT_WINDOW;
+  const beforeSize = userRequestCount.size;
+  
+  for (const [uid, timestamps] of userRequestCount.entries()) {
+    const valid = timestamps.filter(t => t > cutoff);
+    if (valid.length === 0) {
+      userRequestCount.delete(uid);
+    } else if (valid.length !== timestamps.length) {
+      userRequestCount.set(uid, valid);
+    }
+  }
+  
+  const cleaned = beforeSize - userRequestCount.size;
+  if (cleaned > 0) {
+    console.log(`🧹 Rate limit cleanup: ${cleaned} usuários inativos removidos`);
+  }
+  rateLimitMetrics.lastCleanup = now;
+}
+
+// Cache inteligente para respostas (Fase 2)
+function getCachedResponse(messageHash) {
+  const cached = responseCache.get(messageHash);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`💾 Cache hit para mensagem: ${messageHash.substring(0, 8)}`);
+    return cached.response;
+  }
+  if (cached) {
+    responseCache.delete(messageHash);
+  }
+  return null;
+}
+
+function setCachedResponse(messageHash, response) {
+  // Limitar cache a 100 entradas
+  if (responseCache.size >= 100) {
+    const oldestKey = responseCache.keys().next().value;
+    responseCache.delete(oldestKey);
+  }
+  
+  responseCache.set(messageHash, {
+    response,
+    timestamp: Date.now()
+  });
+  console.log(`💾 Cache set para mensagem: ${messageHash.substring(0, 8)}`);
+}
+
+function cleanupResponseCache() {
+  const now = Date.now();
+  const beforeSize = responseCache.size;
+  
+  for (const [hash, data] of responseCache.entries()) {
+    if (now - data.timestamp > CACHE_TTL) {
+      responseCache.delete(hash);
+    }
+  }
+  
+  const cleaned = beforeSize - responseCache.size;
+  if (cleaned > 0) {
+    console.log(`🧹 Response cache cleanup: ${cleaned} entradas expiradas removidas`);
+  }
+}
+
+// Hash simples para mensagens (para cache)
+function hashMessage(message) {
+  let hash = 0;
+  for (let i = 0; i < message.length; i++) {
+    const char = message.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
 }
 
 // Middleware CORS dinâmico
