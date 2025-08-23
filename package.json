@@ -31,6 +31,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "madge": "^8.0.0",
     "serve": "^14.2.4"
   },
   "repository": {
