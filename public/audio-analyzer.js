@@ -84,6 +84,11 @@ class AudioAnalyzer {
     if (DEBUG_MODE_REFERENCE) {
       console.log('🔍 [MODE_DEBUG] analyzeAudioFile called with mode:', mode);
       console.log('🔍 [MODE_DEBUG] options:', options);
+      
+      // 🎯 NOVO: Log específico para modo extract_metrics
+      if (mode === 'extract_metrics') {
+        console.log('🔍 [MODE_DEBUG] extract_metrics mode: apenas extrair métricas, sem comparação');
+      }
     }
     
     const tsStart = new Date().toISOString();

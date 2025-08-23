@@ -1509,19 +1509,19 @@ async function handleReferenceFileSelection(file) {
         showModalLoading();
         updateModalProgress(10, '🎵 Analisando sua música...');
         
-        // 🎯 CORREÇÃO: Passar modo correto para análise
-        const analysisOptions = { 
-          mode: 'reference', 
+        // 🎯 PRIMEIRO: Analisar arquivo do usuário sem targets (extração de métricas apenas)
+        const userAnalysisOptions = { 
+          mode: 'extract_metrics', 
           debugModeReference: true 
         };
-        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, analysisOptions);
+        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, userAnalysisOptions);
         
-        // 🐛 DIAGNÓSTICO: Verificar se analysis contém comparação com gênero
-        console.log('🔍 [DIAGNÓSTICO] User analysis concluída');
+        // 🐛 DIAGNÓSTICO: Verificar se analysis contém métricas extraídas apenas
+        console.log('🔍 [DIAGNÓSTICO] User analysis concluída (extração de métricas)');
         console.log('🔍 [DIAGNÓSTICO] User LUFS:', analysis.technicalData?.lufsIntegrated);
-        console.log('🔍 [DIAGNÓSTICO] User analysis tem referência de gênero:', !!analysis.reference);
-        console.log('🔍 [DIAGNÓSTICO] User analysis tem comparison:', !!analysis.comparison);
-        console.log('🔍 [DIAGNÓSTICO] User analysis suggestions count:', analysis.suggestions?.length || 0);
+        console.log('🔍 [DIAGNÓSTICO] User stereoCorrelation:', analysis.technicalData?.stereoCorrelation);
+        console.log('🔍 [DIAGNÓSTICO] User dynamicRange:', analysis.technicalData?.dynamicRange);
+        console.log('🔍 [DIAGNÓSTICO] User analysis mode inicial (deve ser extract_metrics)');
         
         referenceStepState.userAnalysis = analysis;
         
@@ -1543,25 +1543,36 @@ async function handleReferenceFileSelection(file) {
         console.log('🔍 [DIAGNÓSTICO] Current mode:', window.currentAnalysisMode);
         console.log('🔍 [DIAGNÓSTICO] Genre ativo antes da análise:', window.PROD_AI_REF_GENRE);
         
-        // Analisar arquivo de referência
+        // Analisar arquivo de referência (extração de métricas apenas)
         showModalLoading();
         updateModalProgress(50, '🎯 Analisando música de referência...');
         
-        // 🎯 CORREÇÃO: Passar modo correto para análise
-        const analysisOptions = { 
-          mode: 'reference', 
+        // 🎯 CORREÇÃO: Analisar arquivo de referência para extrair métricas baseline
+        const refAnalysisOptions = { 
+          mode: 'extract_metrics', // Novo modo para extrair métricas apenas
           debugModeReference: true 
         };
-        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, analysisOptions);
+        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, refAnalysisOptions);
         
-        // 🐛 DIAGNÓSTICO: Verificar se analysis de referência contém comparação com gênero
+        // 🐛 DIAGNÓSTICO: Verificar se analysis de referência contém métricas extraídas
         console.log('🔍 [DIAGNÓSTICO] Reference analysis concluída');
         console.log('🔍 [DIAGNÓSTICO] Reference LUFS:', analysis.technicalData?.lufsIntegrated);
-        console.log('🔍 [DIAGNÓSTICO] Reference analysis tem referência de gênero:', !!analysis.reference);
-        console.log('🔍 [DIAGNÓSTICO] Reference analysis tem comparison:', !!analysis.comparison);
-        console.log('🔍 [DIAGNÓSTICO] Reference analysis suggestions count:', analysis.suggestions?.length || 0);
+        console.log('🔍 [DIAGNÓSTICO] Reference stereoCorrelation:', analysis.technicalData?.stereoCorrelation);
+        console.log('🔍 [DIAGNÓSTICO] Reference dynamicRange:', analysis.technicalData?.dynamicRange);
+        console.log('🔍 [DIAGNÓSTICO] Reference truePeak:', analysis.technicalData?.truePeakDbtp);
+        
+        // 🎯 CRIAR targets baseados na referência para usar na análise do usuário
+        const referenceTargets = {
+          lufs: analysis.technicalData?.lufsIntegrated || -14.0,
+          stereoCorrelation: analysis.technicalData?.stereoCorrelation || 0.8,
+          dynamicRange: analysis.technicalData?.dynamicRange || 10.0,
+          truePeak: analysis.technicalData?.truePeakDbtp || -1.0
+        };
+        
+        console.log('🔍 [DIAGNÓSTICO] Reference targets extraídos:', referenceTargets);
         
         referenceStepState.referenceAnalysis = analysis;
+        referenceStepState.referenceTargets = referenceTargets;
         
         // Executar comparação
         updateReferenceStep('analysis');
@@ -1691,43 +1702,61 @@ function updateUploadAreaForReferenceStep() {
 async function performReferenceComparison() {
     window.logReferenceEvent('reference_comparison_started');
     
-    // 🐛 DIAGNÓSTICO: Logs temporários para detectar fonte do baseline
-    console.log('🔍 [DIAGNÓSTICO] Iniciando comparação - modo:', window.currentAnalysisMode);
-    console.log('🔍 [DIAGNÓSTICO] Genre selecionado:', window.PROD_AI_REF_GENRE);
-    console.log('🔍 [DIAGNÓSTICO] Active ref data:', !!__activeRefData);
-    console.log('🔍 [DIAGNÓSTICO] Active ref genre:', __activeRefGenre);
-    
     try {
         updateModalProgress(70, '🔄 Comparando as duas músicas...');
         
         const userAnalysis = referenceStepState.userAnalysis;
         const refAnalysis = referenceStepState.referenceAnalysis;
+        const referenceTargets = referenceStepState.referenceTargets;
         
-        if (!userAnalysis || !refAnalysis) {
-            throw new Error('Análises não encontradas para comparação');
+        if (!userAnalysis || !refAnalysis || !referenceTargets) {
+            throw new Error('Análises ou targets de referência não encontrados para comparação');
         }
         
-        // 🎯 CORREÇÃO: Validar que temos métricas válidas para modo referência
-        const userLufs = userAnalysis.technicalData?.lufsIntegrated;
-        const refLufs = refAnalysis.technicalData?.lufsIntegrated;
+        console.log('🔍 [DIAGNÓSTICO] Iniciando comparação - modo referência');
+        console.log('🔍 [DIAGNÓSTICO] Targets da referência:', referenceTargets);
         
-        if (!Number.isFinite(userLufs) || !Number.isFinite(refLufs)) {
-            console.error('🚨 [ERRO] REFERENCE_BASELINE_MISSING - Métricas LUFS inválidas');
-            console.error('🚨 User LUFS:', userLufs, 'Reference LUFS:', refLufs);
-            throw new Error('REFERENCE_BASELINE_MISSING: Falha ao calcular métricas de LUFS. Reenvie os arquivos ou verifique se são válidos.');
+        // 🎯 CORREÇÃO: Re-analisar arquivo do usuário usando targets da referência
+        console.log('🔍 [DIAGNÓSTICO] Re-analisando usuário com targets da referência...');
+        
+        // Aplicar targets da referência globalmente (temporariamente)
+        const originalRefData = window.PROD_AI_REF_DATA;
+        window.PROD_AI_REF_DATA = {
+            reference_music: referenceTargets // Criar um "gênero" temporário com os targets da referência
+        };
+        
+        // Re-analisar arquivo do usuário com targets da referência
+        const userFileFromState = referenceStepState.userAudioFile; // Arquivo original já guardado
+        if (!userFileFromState) {
+            throw new Error('Arquivo do usuário não encontrado no estado');
         }
         
-        // 🎯 NOVO: Verificar que não há contaminação de targets de gênero
-        if (userAnalysis.comparison || refAnalysis.comparison) {
-            console.warn('⚠️ [AVISO] Análises contaminadas com comparação de gênero detectada');
-            console.warn('⚠️ User tem comparison:', !!userAnalysis.comparison);
-            console.warn('⚠️ Reference tem comparison:', !!refAnalysis.comparison);
+        const finalUserAnalysisOptions = { 
+            mode: 'genre', // Usar modo gênero para aplicar os targets
+            genre: 'reference_music', // Usar o "gênero" temporário criado
+            debugModeReference: true 
+        };
+        
+        // 🎯 CRUCIAL: Re-analisar arquivo do usuário com targets da referência
+        const finalUserAnalysis = await window.audioAnalyzer.analyzeAudioFile(userFileFromState, finalUserAnalysisOptions);
+        
+        // Restaurar dados originais
+        window.PROD_AI_REF_DATA = originalRefData;
+        
+        console.log('🔍 [DIAGNÓSTICO] Análise final do usuário concluída');
+        console.log('🔍 [DIAGNÓSTICO] Final user LUFS:', finalUserAnalysis.technicalData?.lufsIntegrated);
+        console.log('🔍 [DIAGNÓSTICO] Final user tem comparison:', !!finalUserAnalysis.comparison);
+        console.log('🔍 [DIAGNÓSTICO] Final user suggestions count:', finalUserAnalysis.suggestions?.length || 0);
+        
+        // 🎯 VERIFICAR se a comparação está correta
+        if (finalUserAnalysis.comparison) {
+            console.log('🔍 [DIAGNÓSTICO] Comparison LUFS baseline:', finalUserAnalysis.comparison.loudness?.baseline);
+            console.log('🔍 [DIAGNÓSTICO] Comparison LUFS actual:', finalUserAnalysis.comparison.loudness?.actual);
+            console.log('🔍 [DIAGNÓSTICO] Comparison LUFS difference:', finalUserAnalysis.comparison.loudness?.difference);
         }
         
-        // 🐛 DIAGNÓSTICO: Verificar dados das análises
-        console.log('🔍 [DIAGNÓSTICO] User analysis LUFS:', userAnalysis.technicalData?.lufsIntegrated);
-        console.log('🔍 [DIAGNÓSTICO] Reference analysis LUFS:', refAnalysis.technicalData?.lufsIntegrated);
-        console.log('🔍 [DIAGNÓSTICO] User analysis tem comparação com gênero:', !!userAnalysis.comparison);
+        // Atualizar estado com análise final
+        referenceStepState.finalUserAnalysis = finalUserAnalysis;
         console.log('🔍 [DIAGNÓSTICO] Reference analysis tem comparação com gênero:', !!refAnalysis.comparison);
         
         // 🎯 NOVO: Verificar se análises estão "limpas" (sem contaminar com gênero)
