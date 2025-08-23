@@ -1928,7 +1928,24 @@ async function performReferenceComparison() {
                 dynamicRange: refAnalysis.technicalData?.dynamicRange,
                 lra: refAnalysis.technicalData?.lra,
                 stereoCorrelation: refAnalysis.technicalData?.stereoCorrelation,
-                bands: refAnalysis.technicalData?.bandEnergies
+                // 🔧 CORREÇÃO: Criar estrutura de bands compatível
+                bands: refAnalysis.technicalData?.bandEnergies ? (() => {
+                    const refBands = {};
+                    const refBandEnergies = refAnalysis.technicalData.bandEnergies;
+                    
+                    // Criar estrutura de bands usando as métricas da referência como targets
+                    Object.entries(refBandEnergies).forEach(([bandName, bandData]) => {
+                        if (bandData && Number.isFinite(bandData.rms_db)) {
+                            refBands[bandName] = {
+                                target_db: bandData.rms_db,  // Usar valor da referência como target
+                                tol_db: 3.0,  // Tolerância padrão
+                                _target_na: false
+                            };
+                        }
+                    });
+                    
+                    return refBands;
+                })() : null
             },
             // 🐛 DIAGNÓSTICO: Adicionar metadados para diagnóstico
             _diagnostic: {
