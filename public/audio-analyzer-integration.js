@@ -1921,6 +1921,15 @@ async function performReferenceComparison() {
             analysisMode: 'reference',
             referenceFile: referenceStepState.referenceAudioFile.name,
             userFile: referenceStepState.userAudioFile.name,
+            // 🎯 NOVO: Incluir métricas da referência para renderReferenceComparisons
+            referenceMetrics: {
+                lufs: refAnalysis.technicalData?.lufsIntegrated,
+                truePeakDbtp: refAnalysis.technicalData?.truePeakDbtp,
+                dynamicRange: refAnalysis.technicalData?.dynamicRange,
+                lra: refAnalysis.technicalData?.lra,
+                stereoCorrelation: refAnalysis.technicalData?.stereoCorrelation,
+                bands: refAnalysis.technicalData?.bandEnergies
+            },
             // 🐛 DIAGNÓSTICO: Adicionar metadados para diagnóstico
             _diagnostic: {
                 baseline_source: 'reference_audio',
@@ -3358,20 +3367,39 @@ function renderReferenceComparisons(analysis) {
     const container = document.getElementById('referenceComparisons');
     if (!container) return;
     
-    // 🎯 DETECÇÃO DE MODO REFERÊNCIA - Não exibir se já foi exibido via displayReferenceResults
+    // 🎯 DETECÇÃO DE MODO REFERÊNCIA - Usar dados da referência em vez de gênero
     const isReferenceMode = analysis.analysisMode === 'reference' || 
                            analysis.baseline_source === 'reference' ||
                            (analysis.comparison && analysis.comparison.baseline_source === 'reference');
     
-    if (isReferenceMode) {
-        // Modo referência já tem sua própria exibição via displayReferenceResults
-        container.innerHTML = '<div style="font-size:12px;opacity:.6;color:#888;">✅ Análise por referência exibida acima</div>';
-        return;
+    let ref, titleText;
+    
+    if (isReferenceMode && analysis.referenceMetrics) {
+        // Modo referência: usar métricas extraídas do áudio de referência
+        ref = {
+            lufs_target: analysis.referenceMetrics.lufs,
+            true_peak_target: analysis.referenceMetrics.truePeakDbtp,
+            dr_target: analysis.referenceMetrics.dynamicRange,
+            lra_target: analysis.referenceMetrics.lra,
+            stereo_target: analysis.referenceMetrics.stereoCorrelation,
+            tol_lufs: 0.2,
+            tol_true_peak: 0.2,
+            tol_dr: 0.5,
+            tol_lra: 0.5,
+            tol_stereo: 0.05,
+            bands: analysis.referenceMetrics.bands || null
+        };
+        titleText = "Música de Referência";
+    } else {
+        // Modo gênero: usar targets de gênero como antes
+        ref = __activeRefData;
+        titleText = window.PROD_AI_REF_GENRE;
+        if (!ref) { 
+            container.innerHTML = '<div style="font-size:12px;opacity:.6">Referências não carregadas</div>'; 
+            return; 
+        }
     }
     
-    // Modo gênero normal
-    const ref = __activeRefData;
-    if (!ref) { container.innerHTML = '<div style="font-size:12px;opacity:.6">Referências não carregadas</div>'; return; }
     const tech = analysis.technicalData || {};
     // Mapeamento de métricas
     const rows = [];
@@ -3467,7 +3495,7 @@ function renderReferenceComparisons(analysis) {
         });
     }
     container.innerHTML = `<div class="card" style="margin-top:12px;">
-        <div class="card-title">📌 Comparação com Targets de Gênero (${window.PROD_AI_REF_GENRE})</div>
+        <div class="card-title">📌 Comparação de Referência (${titleText})</div>
         <table class="ref-compare-table">
             <thead><tr>
                 <th>Métrica</th><th>Valor</th><th>Alvo</th><th>Δ</th>
