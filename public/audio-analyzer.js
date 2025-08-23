@@ -478,7 +478,20 @@ class AudioAnalyzer {
               let scorerMod = null;
               try { scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null); } catch {}
               if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
-                const scoreRes = scorerMod.computeMixScore(td, activeRef);
+                // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo
+                let genreSpecificRef = null;
+                if (mode === 'genre' && activeRef) {
+                  const activeGenre = window.PROD_AI_REF_GENRE || 'default';
+                  genreSpecificRef = activeRef[activeGenre] || null;
+                  if (DEBUG_MODE_REFERENCE) {
+                    console.log('🔍 [MODE_DEBUG] Using genre-specific ref for scoring:', activeGenre);
+                    console.log('🔍 [MODE_DEBUG] Genre ref targets:', genreSpecificRef);
+                  }
+                } else if (DEBUG_MODE_REFERENCE) {
+                  console.log('🔍 [MODE_DEBUG] Skipping genre-specific ref (mode=' + mode + ')');
+                }
+                
+                const scoreRes = scorerMod.computeMixScore(td, genreSpecificRef);
                 baseAnalysis.mixScore = scoreRes;
                 baseAnalysis.mixClassification = scoreRes.classification;
                 baseAnalysis.mixScorePct = scoreRes.scorePct;
@@ -894,7 +907,20 @@ class AudioAnalyzer {
         try {
           const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
-            const finalScore = scorerMod.computeMixScore(tdFinal, activeRef);
+            // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
+            let genreSpecificRef = null;
+            if (mode === 'genre' && activeRef) {
+              const activeGenre = window.PROD_AI_REF_GENRE || 'default';
+              genreSpecificRef = activeRef[activeGenre] || null;
+              if (DEBUG_MODE_REFERENCE) {
+                console.log('🔍 [MODE_DEBUG] Final scoring using genre-specific ref:', activeGenre);
+                console.log('🔍 [MODE_DEBUG] Final genre ref targets:', genreSpecificRef);
+              }
+            } else if (DEBUG_MODE_REFERENCE) {
+              console.log('🔍 [MODE_DEBUG] Final scoring skipping genre-specific ref (mode=' + mode + ')');
+            }
+            
+            const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
             console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
             
             // TESTE MANUAL COM DADOS CONHECIDOS
@@ -912,7 +938,14 @@ class AudioAnalyzer {
               "technical.distortionLevel": { classification: "red" },
               "technical.noiseFloor": { classification: "yellow" }
             };
-            const testScore = scorerMod.computeMixScore(testData, activeRef);
+            // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (terceira ocorrência - teste)
+            let testGenreSpecificRef = null;
+            if (mode === 'genre' && activeRef) {
+              const activeGenre = window.PROD_AI_REF_GENRE || 'default';
+              testGenreSpecificRef = activeRef[activeGenre] || null;
+            }
+            
+            const testScore = scorerMod.computeMixScore(testData, testGenreSpecificRef);
             console.log('[COLOR_RATIO_V2_TEST] Manual test G=5, Y=4, R=3, T=12 should be 59:', testScore);
             // O scoring.js agora está correto, não precisa de override
             baseAnalysis.mixScore = finalScore;

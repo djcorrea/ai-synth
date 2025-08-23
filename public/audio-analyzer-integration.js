@@ -1715,33 +1715,53 @@ async function performReferenceComparison() {
         
         console.log('🔍 [DIAGNÓSTICO] Iniciando comparação - modo referência');
         console.log('🔍 [DIAGNÓSTICO] Targets da referência:', referenceTargets);
+        console.log('🔍 [DIAGNÓSTICO] userAudioFile existe:', !!referenceStepState.userAudioFile);
+        console.log('🔍 [DIAGNÓSTICO] userAudioFile nome:', referenceStepState.userAudioFile?.name);
         
         // 🎯 CORREÇÃO: Re-analisar arquivo do usuário usando targets da referência
         console.log('🔍 [DIAGNÓSTICO] Re-analisando usuário com targets da referência...');
         
         // Aplicar targets da referência globalmente (temporariamente)
         const originalRefData = window.PROD_AI_REF_DATA;
+        const originalRefGenre = window.PROD_AI_REF_GENRE; // 🎯 SALVAR gênero original
+        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_DATA original:', originalRefData);
+        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_GENRE original:', originalRefGenre);
+        
         window.PROD_AI_REF_DATA = {
             reference_music: referenceTargets // Criar um "gênero" temporário com os targets da referência
         };
+        window.PROD_AI_REF_GENRE = 'reference_music'; // 🎯 DEFINIR gênero ativo
+        
+        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_DATA após aplicação:', window.PROD_AI_REF_DATA);
+        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_GENRE após aplicação:', window.PROD_AI_REF_GENRE);
         
         // Re-analisar arquivo do usuário com targets da referência
         const userFileFromState = referenceStepState.userAudioFile; // Arquivo original já guardado
         if (!userFileFromState) {
+            console.error('🚨 [ERRO] Arquivo do usuário não encontrado no estado');
+            console.error('🚨 referenceStepState:', referenceStepState);
             throw new Error('Arquivo do usuário não encontrado no estado');
         }
         
+        console.log('🔍 [DIAGNÓSTICO] Arquivo do usuário para re-análise:', userFileFromState.name);
+        
         const finalUserAnalysisOptions = { 
-            mode: 'genre', // Usar modo gênero para aplicar os targets
-            genre: 'reference_music', // Usar o "gênero" temporário criado
+            mode: 'genre', // 🎯 USAR modo gênero para aplicar os targets
+            genre: 'reference_music', // 🎯 USAR o "gênero" temporário criado
             debugModeReference: true 
         };
+        
+        console.log('🔍 [DIAGNÓSTICO] Opções para análise final:', finalUserAnalysisOptions);
         
         // 🎯 CRUCIAL: Re-analisar arquivo do usuário com targets da referência
         const finalUserAnalysis = await window.audioAnalyzer.analyzeAudioFile(userFileFromState, finalUserAnalysisOptions);
         
         // Restaurar dados originais
         window.PROD_AI_REF_DATA = originalRefData;
+        window.PROD_AI_REF_GENRE = originalRefGenre; // 🎯 RESTAURAR gênero original
+        
+        console.log('🔍 [DIAGNÓSTICO] Dados originais restaurados');
+        console.log('🔍 [DIAGNÓSTICO] PROD_AI_REF_GENRE restaurado para:', window.PROD_AI_REF_GENRE);
         
         console.log('🔍 [DIAGNÓSTICO] Análise final do usuário concluída');
         console.log('🔍 [DIAGNÓSTICO] Final user LUFS:', finalUserAnalysis.technicalData?.lufsIntegrated);
