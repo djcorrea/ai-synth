@@ -76,7 +76,16 @@ class AudioAnalyzer {
   }
 
   // 📁 Analisar arquivo de áudio
-  async analyzeAudioFile(file) {
+  async analyzeAudioFile(file, options = {}) {
+    // 🎯 CORREÇÃO: Propagar contexto de modo
+    const mode = options.mode || 'genre'; // Default para compatibilidade
+    const DEBUG_MODE_REFERENCE = options.debugModeReference || false;
+    
+    if (DEBUG_MODE_REFERENCE) {
+      console.log('🔍 [MODE_DEBUG] analyzeAudioFile called with mode:', mode);
+      console.log('🔍 [MODE_DEBUG] options:', options);
+    }
+    
     const tsStart = new Date().toISOString();
   const disableCache = (typeof window !== 'undefined' && window.DISABLE_ANALYSIS_CACHE === true);
   // ====== CACHE POR HASH (somente leitura de conteúdo) ======
@@ -447,7 +456,18 @@ class AudioAnalyzer {
               let activeRef = null;
               try {
                 if (typeof window !== 'undefined') {
-                  activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null;
+                  // 🎯 CORREÇÃO: Apenas usar PROD_AI_REF_DATA no modo gênero
+                  if (mode === 'genre') {
+                    activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null;
+                    if (DEBUG_MODE_REFERENCE) {
+                      console.log('🔍 [MODE_DEBUG] Using genre targets for scoring, mode:', mode);
+                    }
+                  } else {
+                    activeRef = null; // Modo referência não usa targets de gênero
+                    if (DEBUG_MODE_REFERENCE) {
+                      console.log('🔍 [MODE_DEBUG] Skipping genre targets, mode:', mode);
+                    }
+                  }
                 }
               } catch {}
               let scorerMod = null;
@@ -761,7 +781,17 @@ class AudioAnalyzer {
     // ===== Quality Breakdown (preencher se ausente) =====
     try {
       if (!baseAnalysis.qualityBreakdown) {
-        const ref = (typeof window !== 'undefined' && window.PROD_AI_REF_DATA) ? window.PROD_AI_REF_DATA : null;
+        // 🎯 CORREÇÃO: Apenas usar PROD_AI_REF_DATA no modo gênero
+        let ref = null;
+        if (mode === 'genre' && typeof window !== 'undefined') {
+          ref = window.PROD_AI_REF_DATA;
+          if (DEBUG_MODE_REFERENCE) {
+            console.log('🔍 [MODE_DEBUG] Using genre ref for quality breakdown, mode:', mode);
+          }
+        } else if (DEBUG_MODE_REFERENCE) {
+          console.log('🔍 [MODE_DEBUG] Skipping genre ref for quality breakdown, mode:', mode);
+        }
+        
         const safe = (v,def=0)=> Number.isFinite(v)?v:def;
         // FASE 2: Usar dados unificados para LUFS (sem fallback RMS problemático)
         const lufsInt = safe(td.lufsIntegrated, null); // Não usar RMS como fallback
@@ -845,7 +875,17 @@ class AudioAnalyzer {
         console.log('[COLOR_RATIO_V2_DEBUG] tdFinal input:', tdFinal);
         console.log('[COLOR_RATIO_V2_DEBUG] tdFinal keys:', Object.keys(tdFinal || {}));
         let activeRef = null;
-        try { activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null; } catch {}
+        // 🎯 CORREÇÃO: Apenas usar PROD_AI_REF_DATA no modo gênero
+        try { 
+          if (mode === 'genre') {
+            activeRef = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA || null;
+            if (DEBUG_MODE_REFERENCE) {
+              console.log('🔍 [MODE_DEBUG] Using genre ref for scoring, mode:', mode);
+            }
+          } else if (DEBUG_MODE_REFERENCE) {
+            console.log('🔍 [MODE_DEBUG] Skipping genre ref for scoring, mode:', mode);
+          }
+        } catch {}
         try {
           const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
