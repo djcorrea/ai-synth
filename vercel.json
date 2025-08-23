@@ -17,5 +17,25 @@
     { "src": "/api/(.*)", "dest": "api/$1.js" },
     { "src": "/", "dest": "/public/landing.html" },
     { "src": "/(.*)", "dest": "/public/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/refs/embedded-refs.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/public/refs/embedded-refs.js",
+      "headers": [
+        {
+          "key": "Cache-Control", 
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
   ]
 }
