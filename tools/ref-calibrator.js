@@ -439,6 +439,8 @@ async function main() {
         if (gNew.bands[bk]) gNew.bands[bk] = { ...gNew.bands[bk], tol_db: tolVal };
       }
     }
+    // Atualizar contagem real de faixas processadas
+    gNew.num_tracks = perFile.length;
     // Bump version & timestamp
     const versionOld = g.version || json.version || '1.0.0';
     gNew.version = bumpPatch(versionOld);

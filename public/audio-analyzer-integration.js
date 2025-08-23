@@ -562,24 +562,24 @@ const __INLINE_EMBEDDED_REFS__ = {
         trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:2.5}, low_bass:{target_db:-14.6,tol_db:4.3}, upper_bass:{target_db:-14.8,tol_db:2.5}, low_mid:{target_db:-12.6,tol_db:3.7}, mid:{target_db:-12,tol_db:4.0}, high_mid:{target_db:-20.2,tol_db:3.6}, brilho:{target_db:-24.7,tol_db:2.5}, presenca:{target_db:-32.1,tol_db:3.6} } },
     // Perfil atualizado Funk Mandela 2025-08-fixed-flex.1 - REPROCESSADO 23/08/2025
     funk_mandela:   { 
-        version: "2025-08-fixed-flex.1", 
+        version: "2025-08-fixed-flex.2", 
         lufs_target: -8, tol_lufs: 1, tol_lufs_min: 1, tol_lufs_max: 1, 
-        true_peak_target: -0.3, tol_true_peak: 0.3, true_peak_streaming_max: -0.3, true_peak_baile_max: 0.0, 
+        true_peak_target: -10.9, tol_true_peak: 2.0, true_peak_streaming_max: -10.9, true_peak_baile_max: 0.0, 
         dr_target: 8, tol_dr: 1, 
-        lra_target: 2.5, lra_min: 1.0, lra_max: 4.0, tol_lra: 1.5, 
-        stereo_target: 0.22, tol_stereo: 0.2, stereo_width_mids_highs_tolerance: "wide", 
+        lra_target: 9.9, lra_min: 7.6, lra_max: 12.2, tol_lra: 2.3, 
+        stereo_target: 0.6, tol_stereo: 0.2, stereo_width_mids_highs_tolerance: "wide", 
         low_end_mono_cutoff: 100, clipping_sample_pct_max: 0.02, vocal_band_min_delta: -1.5,
         fixed: {
             lufs: { integrated: { target: -8.0, tolerance: 1.0 } },
             rms: { policy: "deriveFromLUFS" },
-            truePeak: { streamingMax: -0.3, baileMax: 0.0 },
+            truePeak: { streamingMax: -10.9, baileMax: 0.0 },
             dynamicRange: { dr: { target: 8.0, tolerance: 1.0 } },
             lowEnd: { mono: { cutoffHz: 100 } },
             vocalPresence: { bandHz: [1000, 4000], vocalBandMinDeltaDb: -1.5 }
         },
         flex: {
             clipping: { samplePctMax: 0.02 },
-            lra: { min: 1.0, max: 4.0 },
+            lra: { min: 7.6, max: 12.2 },
             stereo: { width: { midsHighsTolerance: "wide" } }
         },
         pattern_rules: { 
