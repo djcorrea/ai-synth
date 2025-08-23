@@ -476,7 +476,14 @@ class AudioAnalyzer {
                 }
               } catch {}
               let scorerMod = null;
-              try { scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null); } catch {}
+              // 🚀 SCORING V2 INTEGRATION - Fallback automático para V1 se V2 falhar
+              try { 
+                scorerMod = await import('/lib/audio/features/scoring-integration.js?v=' + Date.now()).catch(()=>null); 
+                if (!scorerMod) {
+                  // Fallback para scoring original se integration falhar
+                  scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+                }
+              } catch {}
               if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
                 // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo
                 let genreSpecificRef = null;
@@ -905,7 +912,11 @@ class AudioAnalyzer {
           }
         } catch {}
         try {
-          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+          // 🚀 SCORING V2 INTEGRATION - Fallback automático para V1 se V2 falhar
+          const scorerMod = await import('/lib/audio/features/scoring-integration.js?v=' + Date.now()).catch(async ()=> {
+            // Fallback para scoring original se integration falhar
+            return await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+          });
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
             // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
             let genreSpecificRef = null;
