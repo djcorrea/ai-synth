@@ -475,23 +475,47 @@ class AudioAnalyzer {
                   }
                 }
               } catch {}
+              
+              // 🔧 FUNÇÃO PARA CARREGAR SCORING V1 COMO FALLBACK
+              async function loadScoringV1() {
+                try {
+                  const script = document.createElement('script');
+                  script.src = '/lib/audio/features/scoring.js?v=' + Date.now();
+                  script.type = 'text/javascript';
+                  
+                  return new Promise((resolve, reject) => {
+                    script.onload = () => {
+                      console.log('✅ [FALLBACK] Scoring V1 carregado');
+                      resolve();
+                    };
+                    script.onerror = () => {
+                      console.error('❌ [FALLBACK] Erro ao carregar Scoring V1');
+                      reject(new Error('Falha no carregamento V1'));
+                    };
+                    document.head.appendChild(script);
+                  });
+                } catch (error) {
+                  console.error('❌ [FALLBACK] Erro na função loadScoringV1:', error);
+                }
+              }
+              
               let scorerMod = null;
-              // 🚀 SCORING V2 INTEGRATION - Usar sistema global carregado
+              // 🚀 SCORING V2 COMPLETE - Sistema simplificado
               try {
-                // Verificar se sistema global está carregado
-                if (window.ScoringIntegration && window.ScoringIntegration.computeMixScore) {
-                  scorerMod = window.ScoringIntegration;
-                  console.log('✅ [ANALYZER] Usando ScoringIntegration global');
+                // Verificar se sistema V2 completo está carregado
+                if (window.ScoringV2Complete && window.ScoringV2Complete.computeMixScore) {
+                  scorerMod = window.ScoringV2Complete;
+                  console.log('✅ [ANALYZER] Usando ScoringV2Complete');
                 } else if (window.computeMixScore) {
                   scorerMod = { computeMixScore: window.computeMixScore };
                   console.log('✅ [ANALYZER] Usando função global computeMixScore');
-                } else if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
-                  scorerMod = window.ScoringV1;
-                  console.log('⚠️ [ANALYZER] Fallback para ScoringV1 global');
                 } else {
-                  console.warn('⚠️ [ANALYZER] Nenhum módulo de scoring global encontrado, tentando import dinâmico...');
-                  // Último recurso: tentar import dinâmico
-                  scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+                  console.warn('⚠️ [ANALYZER] Carregando scoring V1 como fallback...');
+                  // Último recurso: carregar V1 original diretamente
+                  await loadScoringV1();
+                  if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
+                    scorerMod = window.ScoringV1;
+                  }
                 }
               } catch (error) {
                 console.error('❌ [ANALYZER] Erro ao carregar scoring:', error);
