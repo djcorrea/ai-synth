@@ -1407,8 +1407,9 @@ class AudioAnalyzer {
     const N = samples.length;
     const spectrum = new Array(N);
     
-    // Limitar N para evitar travamento
-    const maxN = Math.min(N, 512);
+    // 🔧 CORREÇÃO CRÍTICA: Usar N completo, não limitado a 512
+    // Para análise espectral precisa, processar todos os bins
+    const maxN = N; // Remover limitação artificial
     
     for (let k = 0; k < maxN; k++) {
       let real = 0;
@@ -1421,11 +1422,6 @@ class AudioAnalyzer {
       }
       
       spectrum[k] = Math.sqrt(real * real + imag * imag);
-    }
-    
-    // Preencher o resto com zeros
-    for (let k = maxN; k < N; k++) {
-      spectrum[k] = 0;
     }
     
     return spectrum;
