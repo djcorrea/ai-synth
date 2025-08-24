@@ -910,6 +910,9 @@ async function loadReferenceData(genre) {
         // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
         console.log('🌐 Tentando carregar JSON externo primeiro...');
         try {
+            // 🔧 CORREÇÃO: Declarar version antes de usar
+            const version = Date.now(); // Force cache bust
+            
             // 🔧 FIX: Detectar se está rodando via Vercel e usar servidor local
             const isVercel = window.location.hostname.includes('vercel.app');
             const baseUrls = isVercel ? [
