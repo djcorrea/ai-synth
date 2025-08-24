@@ -371,6 +371,11 @@ class AudioAnalyzer {
         Mid: spectralResult.summary3Bands.Mid.energyPct.toFixed(2) + '%', 
         High: spectralResult.summary3Bands.High.energyPct.toFixed(2) + '%'
       });
+      console.log('🔍 SPECTRAL RAW - Dados completos:', JSON.stringify({
+        Low: spectralResult.summary3Bands.Low,
+        Mid: spectralResult.summary3Bands.Mid,
+        High: spectralResult.summary3Bands.High
+      }, null, 2));
       baseAnalysis.spectralBalance = spectralResult;
       
       // Preparar dados para o V2 usar no scoring
