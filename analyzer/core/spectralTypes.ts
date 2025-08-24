@@ -1,202 +1,174 @@
 /**
- * 📋 TIPOS TYPESCRIPT - BALANÇO ESPECTRAL
- * 
- * Definições de tipos para o sistema de balanço espectral por bandas
+ * 🎯 TIPOS TYPESCRIPT - Sistema de Balanço Espectral V2
+ * Definições de tipos para o sistema de análise espectral
  */
 
-// Enum das bandas espectrais
-export type SpectralBand = "sub" | "bass" | "low_mid" | "mid" | "high_mid" | "presence" | "air";
+// 🎛️ CONFIGURAÇÕES E CONSTANTES
+export const SPECTRAL_INTERNAL_MODE = "percent" as const;
 
-// Resultado da análise de uma banda
-export interface SpectralDelta {
-    band: SpectralBand;
-    hzRange: string;          // ex: "20–60 Hz"
-    deltaDB: number;          // 10*log10(pct_user/pct_ref)
-    pctUser: number;          // 0–1
-    pctRef: number;           // 0–1
-    status: 'ideal' | 'ajustar' | 'corrigir';
-    colorClass: 'green' | 'yellow' | 'red';
+// 🎵 TIPOS BASE
+export type SpectralMode = "percent" | "legacy";
+
+export type BandStatus = "OK" | "HIGH" | "LOW" | "NO_REF";
+
+export type BandName = 
+  | "sub" 
+  | "bass" 
+  | "low_mid" 
+  | "mid" 
+  | "high_mid" 
+  | "presence" 
+  | "air";
+
+export type AggregateBandName = "low" | "mid" | "high";
+
+// 📊 INTERFACES DE DADOS
+export interface SpectralBandData {
+  readonly band: BandName;
+  readonly hz: string;
+  readonly deltaDB: number | null;
+  readonly pctUser: number;
+  readonly pctRef: number | null;
+  readonly status: BandStatus;
+  readonly tolerance?: number;
 }
 
-// Resumo das 3 bandas principais
-export interface SpectralSummary3Bands {
-    lowDB: number;       // Grave (Sub + Bass) em dB
-    midDB: number;       // Médio (Low-Mid + Mid) em dB
-    highDB: number;      // Agudo (High-Mid + Presence + Air) em dB
-    lowPct: number;      // Grave em % (0-100)
-    midPct: number;      // Médio em % (0-100)
-    highPct: number;     // Agudo em % (0-100)
+export interface SpectralSummary3Band {
+  readonly lowDB: number | null;
+  readonly midDB: number | null; 
+  readonly highDB: number | null;
+  readonly lowPct: number;
+  readonly midPct: number;
+  readonly highPct: number;
 }
 
-// Resultado completo da análise espectral
-export interface SpectralSummary {
-    lowMidHigh: SpectralSummary3Bands;
-    bands: SpectralDelta[];
-    mode: "percent" | "legacy";
-    timestamp: string;
-    validation: {
-        totalEnergyCheck: number;  // ~1.0
-        bandsProcessed: number;
-        errors: string[];
-    };
+export interface SpectralBalanceAnalysis {
+  readonly mode: SpectralMode;
+  readonly bands: readonly SpectralBandData[];
+  readonly summary3: SpectralSummary3Band;
+  readonly totalEnergyLinear: number;
+  readonly normalizationApplied: boolean;
+  readonly processingTimeMs: number;
+  readonly version: "v2";
+  readonly cacheKey: string;
 }
 
-// Configuração de tolerâncias por banda
-export interface SpectralToleranceConfig {
-    sub: number;          // ±2.5 dB
-    bass: number;         // ±2.5 dB
-    low_mid: number;      // ±2.0 dB
-    mid: number;          // ±1.5 dB
-    high_mid: number;     // ±1.5 dB
-    presence: number;     // ±2.0 dB
-    air: number;          // ±2.5 dB
-    defaultPp: number;    // Tolerância padrão em pontos percentuais
+// 🔧 CONFIGURAÇÃO DO SISTEMA
+export interface SpectralConfig {
+  readonly mode: SpectralMode;
+  readonly includeAirInHigh: boolean;
+  readonly normalizationLUFS: number;
+  readonly defaultTolerancePP: number;
+  readonly fftSize: number;
+  readonly enableCache: boolean;
 }
 
-// Targets de referência (% de energia)
-export interface SpectralReferenceTargets {
-    sub: number;          // % energia (0-100)
-    bass: number;         // % energia (0-100)
-    low_mid: number;      // % energia (0-100)
-    mid: number;          // % energia (0-100)
-    high_mid: number;     // % energia (0-100)
-    presence: number;     // % energia (0-100)
-    air: number;          // % energia (0-100)
+// 📋 REFERÊNCIAS
+export interface SpectralReference {
+  readonly bands: Record<BandName, number>;
+  readonly summary3: {
+    readonly low: number;
+    readonly mid: number;
+    readonly high: number;
+  };
+  readonly version: string;
+  readonly source: string;
 }
 
-// Estatísticas de referência (para agregação)
-export interface SpectralReferenceStats {
-    [bandName: string]: {
-        median: number;
-        std: number;
-        count: number;
-    };
+// 🎪 RESPOSTA DA API/ENDPOINT
+export interface SpectralBalanceEndpointResponse {
+  readonly mode: SpectralMode;
+  readonly bands: Array<{
+    readonly band: BandName;
+    readonly hz: string;
+    readonly deltaDB: number | null;
+    readonly pctUser: number;
+    readonly pctRef: number | null;
+    readonly status: BandStatus;
+  }>;
+  readonly summary3: SpectralSummary3Band;
+  readonly metadata: {
+    readonly processingTimeMs: number;
+    readonly normalizationApplied: boolean;
+    readonly version: "v2";
+    readonly cacheKey: string;
+  };
 }
 
-// Estrutura do JSON de referências
-export interface SpectralReferenceData {
-    targets: {
-        bands: SpectralReferenceTargets;
-    };
-    stats: {
-        bands: SpectralReferenceStats;
-    };
-    metadata: {
-        version: string;
-        trackCount: number;
-        lastUpdated: string;
-        method: 'arithmetic_mean' | 'median';
-    };
+// 🎨 TIPOS PARA UI
+export interface SpectralUIData {
+  readonly band: BandName;
+  readonly friendlyName: string;
+  readonly hz: string;
+  readonly deltaDB: number | null;
+  readonly deltaText: string;
+  readonly colorClass: string;
+  readonly tooltipText: string;
+  readonly status: BandStatus;
 }
 
-// Resposta da API de análise (estendida)
-export interface AudioAnalysisResponse {
-    // Métricas existentes (não alterar)
-    lufsIntegrated: number;
-    truePeakDbtp: number;
-    dynamicRange: number;
-    stereoCorrelation: number;
-    lra: number;
-    
-    // NOVO: Sistema de balanço espectral
-    spectralBalance?: SpectralSummary;
-    
-    // Metadados
-    timestamp: string;
-    mode: "percent" | "legacy";
-    performance: {
-        processingTime: string;
-    };
+export interface SpectralColorConfig {
+  readonly ok: string;
+  readonly high: string;
+  readonly low: string;
+  readonly noRef: string;
+  readonly thresholds: {
+    readonly minor: number; // ±1.5 dB
+    readonly major: number; // ±3.0 dB
+  };
 }
 
-// DTO para comunicação frontend/backend
-export interface SpectralAnalysisDTO {
-    // Entrada
-    audioData: ArrayBuffer | Float32Array[];
-    sampleRate: number;
-    referenceTargets?: SpectralReferenceTargets;
-    config?: {
-        spectralMode: "percent" | "legacy";
-        lufsTarget: number;  // Para normalização (-14 LUFS)
-        filterMethod: 'fir' | 'iir' | 'fft';
-        smoothing: '1/3_octave' | 'none';
-    };
-    
-    // Saída
-    result?: SpectralSummary;
-    errors?: string[];
+// 🔄 INTEGRAÇÃO COM SISTEMA LEGADO
+export interface LegacySpectralData {
+  readonly bandEnergies?: Record<string, { rms_db: number; energy?: number }>;
+  readonly tonalBalance?: Record<string, { rms_db: number }>;
+  readonly bandScale?: string;
 }
 
-// Props para componentes UI
-export interface SpectralBalanceUIProps {
-    spectralData: SpectralSummary;
-    showAdvanced?: boolean;  // Mostrar 6-7 bandas ou apenas resumo 3 bandas
-    toleranceConfig: SpectralToleranceConfig;
-    onBandClick?: (band: SpectralBand) => void;
-    colorTheme?: 'default' | 'dark' | 'high-contrast';
+export interface SpectralIntegrationResult {
+  readonly newSystem: SpectralBalanceAnalysis;
+  readonly legacyCompat: LegacySpectralData;
+  readonly migrationApplied: boolean;
 }
 
-// Estado do cache/SWR
-export interface SpectralCacheKey {
-    audioHash: string;       // Hash do áudio
-    spectralVersion: string; // "spectral:v2:percent"
-    referenceVersion: string;
-    configHash: string;
+// 🧪 TIPOS PARA TESTES
+export interface SpectralTestCase {
+  readonly name: string;
+  readonly description: string;
+  readonly audioFreq: number; // Hz para tom de teste
+  readonly expectedBand: BandName;
+  readonly expectedPctMin: number;
+  readonly tolerance: number;
 }
 
-// Telemetria e logs
-export interface SpectralTelemetry {
-    mode: "percent" | "legacy";
-    latencyMs: number;
-    bandsProcessed: number;
-    outliers: {
-        band: SpectralBand;
-        deltaDB: number;
-        severity: 'warning' | 'error';
-    }[];
-    cacheHit: boolean;
-    timestamp: string;
+// 🎯 VALIDAÇÃO E ERRO
+export interface SpectralValidationError {
+  readonly type: "INVALID_CONFIG" | "MISSING_REFERENCE" | "AUDIO_ERROR" | "FFT_ERROR";
+  readonly message: string;
+  readonly details?: Record<string, any>;
 }
 
-// Configuração de integração
-export interface SpectralIntegrationConfig {
-    // Feature flags
-    enablePercentMode: boolean;
-    enableReferenceTargets: boolean;
-    enableValidation: boolean;
-    
-    // Performance
-    maxProcessingTimeMs: number;
-    enableCaching: boolean;
-    cacheExpiryHours: number;
-    
-    // UI
-    defaultShowAdvanced: boolean;
-    enableTooltips: boolean;
-    enableColorCoding: boolean;
-    
-    // Debug
-    enableDebugLogs: boolean;
-    enablePerformanceLogs: boolean;
+export type SpectralResult<T> = {
+  readonly success: true;
+  readonly data: T;
+} | {
+  readonly success: false;
+  readonly error: SpectralValidationError;
+};
+
+// 🎛️ FEATURE FLAGS
+export interface SpectralFeatureFlags {
+  readonly SPECTRAL_INTERNAL_MODE: SpectralMode;
+  readonly ENABLE_SPECTRAL_CACHE: boolean;
+  readonly SPECTRAL_UI_SHOW_PERCENTAGES: boolean;
+  readonly SPECTRAL_FORCE_NORMALIZATION: boolean;
+  readonly SPECTRAL_DEBUG_MODE: boolean;
 }
 
-// Hook personalizado para React
-export interface UseSpectralBalanceHook {
-    spectralData: SpectralSummary | null;
-    isLoading: boolean;
-    error: string | null;
-    refetch: () => Promise<void>;
-    clearCache: () => void;
-}
-
-// Fallbacks e tratamento de erros
-export interface SpectralFallbackData {
-    mode: "legacy";
-    bands: Array<{
-        name: string;
-        value: number;
-        unit: 'dB';
-        status: 'unknown';
-    }>;
-    message: string;
-}
+export const DEFAULT_SPECTRAL_FLAGS: SpectralFeatureFlags = {
+  SPECTRAL_INTERNAL_MODE: "percent",
+  ENABLE_SPECTRAL_CACHE: true,
+  SPECTRAL_UI_SHOW_PERCENTAGES: false,
+  SPECTRAL_FORCE_NORMALIZATION: true,
+  SPECTRAL_DEBUG_MODE: false
+} as const;

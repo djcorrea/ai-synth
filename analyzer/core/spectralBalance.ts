@@ -1,643 +1,424 @@
 /**
- * 🎼 SPECTRAL BALANCE ANALYZER
+ * 🎵 SPECTRAL BALANCE V2 - Sistema de balanço espectral por bandas
+ * Implementação com cálculo interno em porcentagem e exibição em dB
  * 
- * Módulo isolado para análise de balanço espectral por bandas com cálculo INTERNO em porcentagem
- * de energia, mantendo a UI exibindo valores em dB.
- * 
- * Requisitos de arquitetura:
- * - Não alterar métricas existentes
- * - API clara e isolada
- * - Compatibilidade com tela atual (3 bandas resumo + 6-7 bandas avançado)
- * - Pipeline determinístico de medição
+ * Características:
+ * - Normalização prévia para -14 LUFS (apenas para medição)
+ * - Cálculo de energia por banda como % do total
+ * - Comparação com referências em %
+ * - Exibição de delta em dB na UI
+ * - Bandas configuráveis e agregação para 3 bandas (graves, médios, agudos)
  */
 
-// Configuração das bandas espectrais
+import type { 
+  SpectralBandData, 
+  SpectralSummary3Band, 
+  SpectralMode,
+  BandName,
+  BandStatus 
+} from './spectralTypes.js';
+
+// 🎛️ CONFIGURAÇÃO DAS BANDAS
 export interface SpectralBandConfig {
-    name: string;
-    freqRange: [number, number]; // Hz
-    displayName: string;
-    category: 'grave' | 'medio' | 'agudo';
+  readonly name: BandName;
+  readonly hz: readonly [number, number];
+  readonly friendlyName: string;
 }
 
-// Resultado da análise por banda
-export interface BandAnalysisResult {
-    name: string;
-    freqRange: [number, number];
-    rmsDb: number;           // dB RMS da banda
-    powerLinear: number;     // Potência linear (para cálculo de %)
-    energyPercent: number;   // % da energia total (0-100)
-    targetPercent?: number;  // % alvo (se disponível)
-    deltaDb?: number;        // Diferença em dB vs alvo
-    tolerancePp?: number;    // Tolerância em pontos percentuais
-    status?: 'ideal' | 'ajustar' | 'corrigir';
-}
+export const SPECTRAL_BANDS: readonly SpectralBandConfig[] = [
+  { name: 'sub', hz: [20, 60], friendlyName: 'Sub' },
+  { name: 'bass', hz: [60, 120], friendlyName: 'Bass' },
+  { name: 'low_mid', hz: [120, 250], friendlyName: 'Low-Mid' },
+  { name: 'mid', hz: [250, 1000], friendlyName: 'Mid' },
+  { name: 'high_mid', hz: [1000, 4000], friendlyName: 'High-Mid' },
+  { name: 'presence', hz: [4000, 8000], friendlyName: 'Presence' },
+  { name: 'air', hz: [8000, 16000], friendlyName: 'Air' }
+] as const;
 
-// Configuração do analisador
+// 🎯 AGREGAÇÃO PARA 3 BANDAS
+export const BAND_AGGREGATION = {
+  low: ['sub', 'bass'] as const,           // Graves = Sub + Bass
+  mid: ['low_mid', 'mid'] as const,        // Médios = Low-Mid + Mid  
+  high: ['high_mid', 'presence'] as const  // Agudos = High-Mid + Presence (Air opcional)
+} as const;
+
+// 🔧 CONFIGURAÇÕES
 export interface SpectralBalanceConfig {
-    // Configuração global
-    spectralInternalMode: 'percent' | 'legacy';
-    
-    // Pipeline de medição  
-    measurementTarget: {
-        lufsTarget: number;     // LUFS alvo para normalização (-14 LUFS padrão)
-        dcCutoff: number;       // Frequência de corte para DC (20 Hz)
-        maxFreq: number;        // Frequência máxima (16 kHz)
-    };
-    
-    // Método de filtragem
-    filterMethod: 'fir' | 'iir' | 'fft';
-    smoothing: '1/3_octave' | 'none';
-    
-    // Tolerâncias padrão
-    defaultTolerancePp: number; // Pontos percentuais padrão
-    
-    // Bandas de análise
-    bands: SpectralBandConfig[];
+  /** Modo interno: "percent" (novo) ou "legacy" (compatibilidade) */
+  readonly mode: SpectralMode;
+  /** Incluir banda Air na agregação de agudos */
+  readonly includeAirInHigh: boolean;
+  /** LUFS alvo para normalização interna */
+  readonly normalizationLUFS: number;
+  /** Tolerância padrão em pontos percentuais */
+  readonly defaultTolerancePP: number;
 }
 
-// Resultado completo da análise
-export interface SpectralBalanceResult {
-    // Metadados
-    timestamp: string;
-    sampleRate: number;
-    durationSeconds: number;
-    
-    // Pipeline usado
-    pipeline: {
-        normalizedToLufs: number;
-        filterMethod: string;
-        smoothing: string;
-        dcCutoff: number;
-        maxFreq: number;
-    };
-    
-    // Resultados por banda
-    bands: BandAnalysisResult[];
-    
-    // Agregações (resumo 3 bandas)
-    summary: {
-        grave: BandAnalysisResult;  // Sub + Bass
-        medio: BandAnalysisResult;  // Low-Mid + Mid  
-        agudo: BandAnalysisResult;  // High-Mid + Presence + Air
-    };
-    
-    // Validação
-    validation: {
-        totalEnergyCheck: number;  // Deve ser ~1.0
-        bandsProcessed: number;    // Deve ser igual ao esperado
-        errors: string[];
-    };
-}
-
-// Configuração padrão das bandas
-export const DEFAULT_SPECTRAL_BANDS: SpectralBandConfig[] = [
-    { name: 'sub', freqRange: [20, 60], displayName: 'Sub Bass', category: 'grave' },
-    { name: 'bass', freqRange: [60, 120], displayName: 'Bass', category: 'grave' },
-    { name: 'low_mid', freqRange: [120, 250], displayName: 'Low-Mid', category: 'medio' },
-    { name: 'mid', freqRange: [250, 1000], displayName: 'Mid', category: 'medio' },
-    { name: 'high_mid', freqRange: [1000, 4000], displayName: 'High-Mid', category: 'agudo' },
-    { name: 'presence', freqRange: [4000, 8000], displayName: 'Presence', category: 'agudo' },
-    { name: 'air', freqRange: [8000, 16000], displayName: 'Air', category: 'agudo' }
-];
-
-// Configuração padrão
 export const DEFAULT_CONFIG: SpectralBalanceConfig = {
-    spectralInternalMode: 'percent',
-    measurementTarget: {
-        lufsTarget: -14.0,  // EBU R128 padrão
-        dcCutoff: 20.0,
-        maxFreq: 16000.0
-    },
-    filterMethod: 'fft',
-    smoothing: '1/3_octave',
-    defaultTolerancePp: 2.5,
-    bands: DEFAULT_SPECTRAL_BANDS
+  mode: 'percent',
+  includeAirInHigh: false,
+  normalizationLUFS: -14.0,
+  defaultTolerancePP: 2.5
 };
 
+export interface SpectralBalanceResult {
+  readonly mode: SpectralMode;
+  readonly bands: readonly SpectralBandData[];
+  readonly summary3: SpectralSummary3Band;
+  readonly totalEnergyLinear: number;
+  readonly normalizationApplied: boolean;
+  readonly processingTimeMs: number;
+}
+
+// 🎵 FUNÇÕES PURAS DO NÚCLEO
+
 /**
- * 🎼 SPECTRAL BALANCE ANALYZER
+ * 🎶 Normalizar áudio para LUFS alvo (apenas para medição)
+ * @param audioData - Canal de áudio (Float32Array)
+ * @param sampleRate - Taxa de amostragem
+ * @param targetLUFS - LUFS alvo (default: -14)
+ * @returns Áudio normalizado
  */
-export class SpectralBalanceAnalyzer {
-    private config: SpectralBalanceConfig;
-    private logger: (msg: string) => void;
-    
-    constructor(config: Partial<SpectralBalanceConfig> = {}, logger?: (msg: string) => void) {
-        this.config = { ...DEFAULT_CONFIG, ...config };
-        this.logger = logger || console.log;
-        
-        this.validateConfig();
-    }
-    
-    /**
-     * Análise principal - processa áudio e retorna balanço espectral
-     */
-    async analyzeSpectralBalance(
-        audioBuffer: Float32Array[], 
-        sampleRate: number,
-        referenceTargets?: { [bandName: string]: number }
-    ): Promise<SpectralBalanceResult> {
-        
-        const startTime = performance.now();
-        this.logger(`[SpectralBalance] Iniciando análise - SR: ${sampleRate}Hz, Canais: ${audioBuffer.length}`);
-        
-        try {
-            // 1) Normalizar para medição
-            const normalizedAudio = await this.normalizeForMeasurement(audioBuffer, sampleRate);
-            this.logger(`[SpectralBalance] Áudio normalizado para ${this.config.measurementTarget.lufsTarget} LUFS`);
-            
-            // 2) Análise por bandas
-            const bandResults = await this.analyzeBands(normalizedAudio, sampleRate);
-            this.logger(`[SpectralBalance] ${bandResults.length} bandas analisadas`);
-            
-            // 3) Converter para porcentagens
-            const bandsWithPercents = this.calculateEnergyPercentages(bandResults);
-            
-            // 4) Comparar com alvos se disponível
-            const bandsWithComparison = this.compareWithTargets(bandsWithPercents, referenceTargets);
-            
-            // 5) Gerar agregações (resumo 3 bandas)
-            const summary = this.generateSummary(bandsWithComparison);
-            
-            // 6) Validação final
-            const validation = this.validateResults(bandsWithComparison);
-            
-            const result: SpectralBalanceResult = {
-                timestamp: new Date().toISOString(),
-                sampleRate,
-                durationSeconds: normalizedAudio[0].length / sampleRate,
-                pipeline: {
-                    normalizedToLufs: this.config.measurementTarget.lufsTarget,
-                    filterMethod: this.config.filterMethod,
-                    smoothing: this.config.smoothing,
-                    dcCutoff: this.config.measurementTarget.dcCutoff,
-                    maxFreq: this.config.measurementTarget.maxFreq
-                },
-                bands: bandsWithComparison,
-                summary,
-                validation
-            };
-            
-            const elapsed = performance.now() - startTime;
-            this.logger(`[SpectralBalance] Análise concluída em ${elapsed.toFixed(2)}ms`);
-            
-            return result;
-            
-        } catch (error) {
-            this.logger(`[SpectralBalance] ERRO: ${error.message}`);
-            throw error;
-        }
-    }
-    
-    /**
-     * 1) Normalizar áudio para medição (TEMPORÁRIO - não altera original)
-     */
-    private async normalizeForMeasurement(
-        audioBuffer: Float32Array[], 
-        sampleRate: number
-    ): Promise<Float32Array[]> {
-        
-        // TODO: Implementar normalização LUFS real
-        // Por enquanto, retorna cópia do áudio original
-        // Em implementação real, usar biblioteca LUFS como loudness-validator
-        
-        const normalized = audioBuffer.map(channel => new Float32Array(channel));
-        
-        // Log de placeholder
-        this.logger(`[SpectralBalance] Normalização aplicada (placeholder) - alvo: ${this.config.measurementTarget.lufsTarget} LUFS`);
-        
-        return normalized;
-    }
-    
-    /**
-     * 2) Análise por bandas usando filtros ou FFT
-     */
-    private async analyzeBands(
-        audioBuffer: Float32Array[], 
-        sampleRate: number
-    ): Promise<Omit<BandAnalysisResult, 'energyPercent'>[]> {
-        
-        const results: Omit<BandAnalysisResult, 'energyPercent'>[] = [];
-        
-        for (const bandConfig of this.config.bands) {
-            const bandResult = await this.analyzeSingleBand(audioBuffer, sampleRate, bandConfig);
-            results.push(bandResult);
-            
-            this.logger(`[SpectralBalance] Banda ${bandConfig.name}: ${bandResult.rmsDb.toFixed(2)} dB, potência: ${bandResult.powerLinear.toExponential(3)}`);
-        }
-        
-        return results;
-    }
-    
-    /**
-     * Análise de uma banda individual
-     */
-    private async analyzeSingleBand(
-        audioBuffer: Float32Array[], 
-        sampleRate: number, 
-        bandConfig: SpectralBandConfig
-    ): Promise<Omit<BandAnalysisResult, 'energyPercent'>> {
-        
-        let bandEnergy = 0;
-        const [minFreq, maxFreq] = bandConfig.freqRange;
-        
-        // Converter para mono se necessário
-        const monoSignal = this.convertToMono(audioBuffer);
-        
-        if (this.config.filterMethod === 'fft') {
-            bandEnergy = this.analyzeBandFFT(monoSignal, sampleRate, minFreq, maxFreq);
-        } else {
-            bandEnergy = this.analyzeBandFilter(monoSignal, sampleRate, minFreq, maxFreq);
-        }
-        
-        // Converter potência para dB RMS
-        const rmsDb = bandEnergy > 0 ? 10 * Math.log10(bandEnergy) : -80;
-        
-        return {
-            name: bandConfig.name,
-            freqRange: bandConfig.freqRange,
-            rmsDb,
-            powerLinear: bandEnergy
-        };
-    }
-    
-    /**
-     * Análise usando FFT
-     */
-    private analyzeBandFFT(
-        signal: Float32Array, 
-        sampleRate: number, 
-        minFreq: number, 
-        maxFreq: number
-    ): number {
-        
-        const fftSize = 2048;
-        const hopSize = fftSize / 2;
-        const window = this.createHannWindow(fftSize);
-        
-        let totalEnergy = 0;
-        let frameCount = 0;
-        
-        // Processar em janelas
-        for (let i = 0; i <= signal.length - fftSize; i += hopSize) {
-            const frame = signal.slice(i, i + fftSize);
-            
-            // Aplicar janela
-            for (let j = 0; j < fftSize; j++) {
-                frame[j] *= window[j];
-            }
-            
-            // FFT (implementação simplificada - em produção usar FFT real)
-            const spectrum = this.simpleFFT(frame);
-            
-            // Calcular energia da banda
-            const bandEnergy = this.extractBandEnergy(spectrum, sampleRate, fftSize, minFreq, maxFreq);
-            totalEnergy += bandEnergy;
-            frameCount++;
-        }
-        
-        return frameCount > 0 ? totalEnergy / frameCount : 0;
-    }
-    
-    /**
-     * Análise usando filtros (placeholder)
-     */
-    private analyzeBandFilter(
-        signal: Float32Array, 
-        sampleRate: number, 
-        minFreq: number, 
-        maxFreq: number
-    ): number {
-        
-        // TODO: Implementar filtros IIR/FIR reais
-        // Por enquanto, usa método FFT como fallback
-        this.logger(`[SpectralBalance] Filtro ${this.config.filterMethod} não implementado, usando FFT`);
-        
-        return this.analyzeBandFFT(signal, sampleRate, minFreq, maxFreq);
-    }
-    
-    /**
-     * 3) Converter para porcentagens de energia
-     */
-    private calculateEnergyPercentages(
-        bandResults: Omit<BandAnalysisResult, 'energyPercent'>[]
-    ): BandAnalysisResult[] {
-        
-        // Calcular energia total (apenas bandas válidas)
-        const totalPower = bandResults.reduce((sum, band) => {
-            return sum + Math.max(0, band.powerLinear);
-        }, 0);
-        
-        if (totalPower <= 0) {
-            this.logger(`[SpectralBalance] AVISO: Energia total zero ou negativa`);
-            return bandResults.map(band => ({
-                ...band,
-                energyPercent: 0
-            }));
-        }
-        
-        // Calcular porcentagens
-        const bandsWithPercents: BandAnalysisResult[] = bandResults.map(band => {
-            const energyPercent = (band.powerLinear / totalPower) * 100;
-            
-            return {
-                ...band,
-                energyPercent
-            };
-        });
-        
-        // Log de verificação
-        const totalPercent = bandsWithPercents.reduce((sum, band) => sum + band.energyPercent, 0);
-        this.logger(`[SpectralBalance] Total de energia: ${totalPercent.toFixed(2)}% (deve ser ~100%)`);
-        
-        return bandsWithPercents;
-    }
-    
-    /**
-     * 4) Comparar com alvos de referência
-     */
-    private compareWithTargets(
-        bandResults: BandAnalysisResult[],
-        referenceTargets?: { [bandName: string]: number }
-    ): BandAnalysisResult[] {
-        
-        if (!referenceTargets) {
-            this.logger(`[SpectralBalance] Nenhum alvo de referência fornecido`);
-            return bandResults;
-        }
-        
-        return bandResults.map(band => {
-            const targetPercent = referenceTargets[band.name];
-            
-            if (targetPercent === undefined) {
-                return band;
-            }
-            
-            // Calcular diferença em dB
-            const deltaDb = 10 * Math.log10(band.energyPercent / targetPercent);
-            
-            // Determinar status baseado na tolerância
-            const tolerancePp = this.config.defaultTolerancePp;
-            const percentDiff = Math.abs(band.energyPercent - targetPercent);
-            
-            let status: 'ideal' | 'ajustar' | 'corrigir';
-            if (percentDiff <= tolerancePp) {
-                status = 'ideal';
-            } else if (percentDiff <= tolerancePp * 1.5) {
-                status = 'ajustar';
-            } else {
-                status = 'corrigir';
-            }
-            
-            return {
-                ...band,
-                targetPercent,
-                deltaDb,
-                tolerancePp,
-                status
-            };
-        });
-    }
-    
-    /**
-     * 5) Gerar resumo (3 bandas)
-     */
-    private generateSummary(bandResults: BandAnalysisResult[]): {
-        grave: BandAnalysisResult;
-        medio: BandAnalysisResult;
-        agudo: BandAnalysisResult;
-    } {
-        
-        const categories = {
-            grave: bandResults.filter(band => 
-                band.name === 'sub' || band.name === 'bass'
-            ),
-            medio: bandResults.filter(band => 
-                band.name === 'low_mid' || band.name === 'mid'
-            ),
-            agudo: bandResults.filter(band => 
-                band.name === 'high_mid' || band.name === 'presence' || band.name === 'air'
-            )
-        };
-        
-        const summary = {} as any;
-        
-        for (const [categoryName, bands] of Object.entries(categories)) {
-            if (bands.length === 0) {
-                continue;
-            }
-            
-            // Agregar energia e porcentagens
-            const totalPower = bands.reduce((sum, band) => sum + band.powerLinear, 0);
-            const totalPercent = bands.reduce((sum, band) => sum + band.energyPercent, 0);
-            const avgTargetPercent = bands
-                .filter(band => band.targetPercent !== undefined)
-                .reduce((sum, band, _, arr) => sum + band.targetPercent! / arr.length, 0);
-            
-            const aggregatedRmsDb = totalPower > 0 ? 10 * Math.log10(totalPower) : -80;
-            const deltaDb = avgTargetPercent > 0 ? 10 * Math.log10(totalPercent / avgTargetPercent) : undefined;
-            
-            summary[categoryName] = {
-                name: categoryName,
-                freqRange: [
-                    Math.min(...bands.map(b => b.freqRange[0])),
-                    Math.max(...bands.map(b => b.freqRange[1]))
-                ] as [number, number],
-                rmsDb: aggregatedRmsDb,
-                powerLinear: totalPower,
-                energyPercent: totalPercent,
-                targetPercent: avgTargetPercent > 0 ? avgTargetPercent : undefined,
-                deltaDb,
-                tolerancePp: this.config.defaultTolerancePp,
-                status: this.determineAggregatedStatus(bands)
-            };
-        }
-        
-        return summary;
-    }
-    
-    /**
-     * 6) Validação dos resultados
-     */
-    private validateResults(bandResults: BandAnalysisResult[]): {
-        totalEnergyCheck: number;
-        bandsProcessed: number;
-        errors: string[];
-    } {
-        
-        const errors: string[] = [];
-        
-        // Verificar contagem de bandas
-        const expectedBands = this.config.bands.length;
-        if (bandResults.length !== expectedBands) {
-            errors.push(`Esperado ${expectedBands} bandas, processado ${bandResults.length}`);
-        }
-        
-        // Verificar soma das porcentagens
-        const totalPercent = bandResults.reduce((sum, band) => sum + band.energyPercent, 0);
-        const totalEnergyCheck = totalPercent / 100; // Deve ser ~1.0
-        
-        if (Math.abs(totalEnergyCheck - 1.0) > 1e-6) {
-            errors.push(`Soma das porcentagens: ${totalPercent.toFixed(2)}% (deveria ser 100%)`);
-        }
-        
-        // Verificar valores suspeitos
-        bandResults.forEach(band => {
-            if (!Number.isFinite(band.rmsDb) || !Number.isFinite(band.energyPercent)) {
-                errors.push(`Banda ${band.name}: valores não finitos`);
-            }
-            if (band.energyPercent < 0 || band.energyPercent > 50) {
-                errors.push(`Banda ${band.name}: porcentagem suspeita (${band.energyPercent.toFixed(2)}%)`);
-            }
-        });
-        
-        return {
-            totalEnergyCheck,
-            bandsProcessed: bandResults.length,
-            errors
-        };
-    }
-    
-    // === MÉTODOS AUXILIARES ===
-    
-    private validateConfig(): void {
-        if (this.config.bands.length === 0) {
-            throw new Error('Configuração deve ter pelo menos uma banda');
-        }
-        
-        if (this.config.measurementTarget.lufsTarget > -1) {
-            throw new Error('LUFS target muito alto');
-        }
-    }
-    
-    private convertToMono(audioBuffer: Float32Array[]): Float32Array {
-        if (audioBuffer.length === 1) {
-            return audioBuffer[0];
-        }
-        
-        const length = audioBuffer[0].length;
-        const mono = new Float32Array(length);
-        
-        for (let i = 0; i < length; i++) {
-            let sum = 0;
-            for (let ch = 0; ch < audioBuffer.length; ch++) {
-                sum += audioBuffer[ch][i];
-            }
-            mono[i] = sum / audioBuffer.length;
-        }
-        
-        return mono;
-    }
-    
-    private createHannWindow(size: number): Float32Array {
-        const window = new Float32Array(size);
-        for (let i = 0; i < size; i++) {
-            window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (size - 1)));
-        }
-        return window;
-    }
-    
-    private simpleFFT(frame: Float32Array): Float32Array {
-        // Implementação FFT muito simplificada para demonstração
-        // Em produção, usar biblioteca FFT real (ex: fft.js)
-        const spectrum = new Float32Array(frame.length / 2);
-        
-        for (let k = 0; k < spectrum.length; k++) {
-            let real = 0, imag = 0;
-            for (let n = 0; n < frame.length; n++) {
-                const angle = -2 * Math.PI * k * n / frame.length;
-                real += frame[n] * Math.cos(angle);
-                imag += frame[n] * Math.sin(angle);
-            }
-            spectrum[k] = real * real + imag * imag;
-        }
-        
-        return spectrum;
-    }
-    
-    private extractBandEnergy(
-        spectrum: Float32Array, 
-        sampleRate: number, 
-        fftSize: number, 
-        minFreq: number, 
-        maxFreq: number
-    ): number {
-        
-        const freqResolution = sampleRate / fftSize;
-        const minBin = Math.floor(minFreq / freqResolution);
-        const maxBin = Math.min(spectrum.length - 1, Math.floor(maxFreq / freqResolution));
-        
-        let energy = 0;
-        for (let i = minBin; i <= maxBin; i++) {
-            energy += spectrum[i];
-        }
-        
-        return energy;
-    }
-    
-    private determineAggregatedStatus(bands: BandAnalysisResult[]): 'ideal' | 'ajustar' | 'corrigir' {
-        const statuses = bands.map(band => band.status).filter(Boolean);
-        
-        if (statuses.includes('corrigir')) return 'corrigir';
-        if (statuses.includes('ajustar')) return 'ajustar';
-        return 'ideal';
-    }
+export function normalizeToLUFS(
+  audioData: Float32Array, 
+  sampleRate: number, 
+  targetLUFS: number = -14.0
+): Float32Array {
+  // Implementação simplificada: usar RMS como proxy para LUFS
+  // Em implementação real, usar medição LUFS adequada
+  const rms = Math.sqrt(audioData.reduce((sum, sample) => sum + sample * sample, 0) / audioData.length);
+  
+  if (rms === 0) return new Float32Array(audioData.length);
+  
+  // Converter RMS para dB aproximado
+  const currentDB = 20 * Math.log10(rms);
+  const gainDB = targetLUFS - currentDB;
+  const gainLinear = Math.pow(10, gainDB / 20);
+  
+  // Aplicar ganho
+  const normalized = new Float32Array(audioData.length);
+  for (let i = 0; i < audioData.length; i++) {
+    normalized[i] = audioData[i] * gainLinear;
+  }
+  
+  return normalized;
 }
 
 /**
- * 🎯 FACTORY FUNCTION - Criar analisador com configuração
+ * 🔍 Analisar espectro usando FFT
+ * @param audioData - Dados de áudio normalizados
+ * @param sampleRate - Taxa de amostragem
+ * @param fftSize - Tamanho da FFT (default: 8192)
+ * @returns Magnitude do espectro e bins de frequência
  */
-export function createSpectralBalanceAnalyzer(
-    config?: Partial<SpectralBalanceConfig>,
-    logger?: (msg: string) => void
-): SpectralBalanceAnalyzer {
-    return new SpectralBalanceAnalyzer(config, logger);
-}
-
-/**
- * 📊 UTILITY - Converter resultado para formato de exibição UI
- */
-export function formatForUI(result: SpectralBalanceResult): {
-    bands: Array<{
-        name: string;
-        displayName: string;
-        freqRange: string;
-        deltaDb: number;
-        energyPercent: number;
-        status: string;
-        colorClass: string;
-    }>;
-    summary: Array<{
-        category: string;
-        deltaDb: number;
-        energyPercent: number;
-        status: string;
-        colorClass: string;
-    }>;
-} {
-    
-    const formatBand = (band: BandAnalysisResult) => {
-        const bandConfig = DEFAULT_SPECTRAL_BANDS.find(b => b.name === band.name);
-        return {
-            name: band.name,
-            displayName: bandConfig?.displayName || band.name,
-            freqRange: `${band.freqRange[0]}-${band.freqRange[1]} Hz`,
-            deltaDb: band.deltaDb || 0,
-            energyPercent: band.energyPercent,
-            status: band.status || 'unknown',
-            colorClass: band.status === 'ideal' ? 'green' : 
-                       band.status === 'ajustar' ? 'yellow' : 'red'
-        };
+export function analyzeSpectrum(
+  audioData: Float32Array, 
+  sampleRate: number,
+  fftSize: number = 8192
+): { magnitudes: Float32Array; freqBins: Float32Array } {
+  // Implementação simplificada - em produção usar biblioteca FFT otimizada
+  const windowSize = Math.min(fftSize, audioData.length);
+  const hopSize = Math.floor(windowSize / 4);
+  const numFrames = Math.floor((audioData.length - windowSize) / hopSize) + 1;
+  
+  if (numFrames <= 0) {
+    return {
+      magnitudes: new Float32Array(windowSize / 2),
+      freqBins: new Float32Array(windowSize / 2).map((_, i) => (i * sampleRate) / windowSize)
     };
+  }
+  
+  // Acumular energia espectral
+  const spectrumSum = new Float32Array(windowSize / 2);
+  
+  for (let frame = 0; frame < numFrames; frame++) {
+    const start = frame * hopSize;
+    const window = audioData.slice(start, start + windowSize);
+    
+    // FFT simples (placeholder - usar biblioteca real)
+    const spectrum = performSimpleFFT(window);
+    
+    for (let i = 0; i < spectrum.length; i++) {
+      spectrumSum[i] += spectrum[i];
+    }
+  }
+  
+  // Média
+  for (let i = 0; i < spectrumSum.length; i++) {
+    spectrumSum[i] /= numFrames;
+  }
+  
+  // Bins de frequência
+  const freqBins = new Float32Array(windowSize / 2);
+  for (let i = 0; i < freqBins.length; i++) {
+    freqBins[i] = (i * sampleRate) / windowSize;
+  }
+  
+  return { magnitudes: spectrumSum, freqBins };
+}
+
+/**
+ * 🔢 FFT simples (placeholder - substituir por implementação real)
+ */
+function performSimpleFFT(window: Float32Array): Float32Array {
+  // Implementação placeholder - retorna espectro simulado
+  const spectrum = new Float32Array(window.length / 2);
+  
+  for (let k = 0; k < spectrum.length; k++) {
+    let real = 0, imag = 0;
+    
+    for (let n = 0; n < window.length; n++) {
+      const angle = -2 * Math.PI * k * n / window.length;
+      real += window[n] * Math.cos(angle);
+      imag += window[n] * Math.sin(angle);
+    }
+    
+    spectrum[k] = Math.sqrt(real * real + imag * imag);
+  }
+  
+  return spectrum;
+}
+
+/**
+ * 📊 Medir potência por banda como porcentagem
+ * @param magnitudes - Magnitudes do espectro
+ * @param freqBins - Bins de frequência
+ * @param bands - Configuração das bandas
+ * @returns Porcentagens por banda
+ */
+export function measureBandPowers(
+  magnitudes: Float32Array,
+  freqBins: Float32Array,
+  bands: readonly SpectralBandConfig[] = SPECTRAL_BANDS
+): Map<string, number> {
+  const bandPowers = new Map<string, number>();
+  let totalPower = 0;
+  
+  // Calcular potência total
+  for (let i = 1; i < magnitudes.length; i++) { // Skip DC
+    totalPower += magnitudes[i] * magnitudes[i];
+  }
+  
+  if (totalPower === 0) {
+    // Retornar distribuição uniforme se não há energia
+    const uniformPct = 100 / bands.length;
+    bands.forEach(band => bandPowers.set(band.name, uniformPct));
+    return bandPowers;
+  }
+  
+  // Calcular potência por banda
+  for (const band of bands) {
+    let bandPower = 0;
+    
+    for (let i = 1; i < freqBins.length; i++) {
+      const freq = freqBins[i];
+      if (freq >= band.hz[0] && freq < band.hz[1]) {
+        bandPower += magnitudes[i] * magnitudes[i];
+      }
+    }
+    
+    const percentage = (bandPower / totalPower) * 100;
+    bandPowers.set(band.name, percentage);
+  }
+  
+  return bandPowers;
+}
+
+/**
+ * 🔄 Agregar bandas em 3 grupos (graves, médios, agudos)
+ * @param bandPowers - Porcentagens por banda
+ * @param config - Configuração
+ * @returns Agregação em 3 bandas
+ */
+export function aggregateTo3Bands(
+  bandPowers: Map<string, number>,
+  config: SpectralBalanceConfig = DEFAULT_CONFIG
+): { low: number; mid: number; high: number } {
+  const aggregation = BAND_AGGREGATION;
+  
+  const low = aggregation.low.reduce((sum, band) => sum + (bandPowers.get(band) || 0), 0);
+  const mid = aggregation.mid.reduce((sum, band) => sum + (bandPowers.get(band) || 0), 0);
+  
+  const highBands: string[] = [...aggregation.high];
+  if (config.includeAirInHigh) {
+    highBands.push('air');
+  }
+  
+  const high = highBands.reduce((sum, band) => sum + (bandPowers.get(band) || 0), 0);
+  
+  return { low, mid, high };
+}
+
+/**
+ * 📈 Calcular delta em dB entre usuário e referência
+ * @param userPct - Porcentagem do usuário
+ * @param refPct - Porcentagem de referência
+ * @returns Delta em dB
+ */
+export function calculateDeltaDB(userPct: number, refPct: number): number {
+  if (refPct <= 0 || userPct <= 0) return 0;
+  return 10 * Math.log10(userPct / refPct);
+}
+
+/**
+ * 🎯 Análise completa de balanço espectral
+ * @param audioData - Canal de áudio
+ * @param sampleRate - Taxa de amostragem
+ * @param referenceData - Dados de referência (% por banda)
+ * @param config - Configuração
+ * @returns Resultado completo da análise
+ */
+export function analyzeSpectralBalance(
+  audioData: Float32Array,
+  sampleRate: number,
+  referenceData: Map<string, number> | null = null,
+  config: SpectralBalanceConfig = DEFAULT_CONFIG
+): SpectralBalanceResult {
+  const startTime = performance.now();
+  
+  // 1. Normalizar para LUFS alvo (apenas para medição)
+  const normalizedAudio = normalizeToLUFS(audioData, sampleRate, config.normalizationLUFS);
+  
+  // 2. Analisar espectro
+  const { magnitudes, freqBins } = analyzeSpectrum(normalizedAudio, sampleRate);
+  
+  // 3. Medir potência por banda como %
+  const bandPowers = measureBandPowers(magnitudes, freqBins, SPECTRAL_BANDS);
+  
+  // 4. Calcular deltas em dB vs referência
+  const bands: SpectralBandData[] = SPECTRAL_BANDS.map(bandConfig => {
+    const userPct = bandPowers.get(bandConfig.name) || 0;
+    const refPct = referenceData?.get(bandConfig.name) || null;
+    
+    let deltaDB: number | null = null;
+    let status: BandStatus = 'NO_REF';
+    
+    if (refPct !== null && refPct > 0) {
+      deltaDB = calculateDeltaDB(userPct, refPct);
+      
+      // Determinar status baseado na tolerância em dB
+      const toleranceDB = 10 * Math.log10((100 + config.defaultTolerancePP) / 100);
+      if (Math.abs(deltaDB) <= toleranceDB) {
+        status = 'OK';
+      } else if (deltaDB > 0) {
+        status = 'HIGH';
+      } else {
+        status = 'LOW';
+      }
+    }
     
     return {
-        bands: result.bands.map(formatBand),
-        summary: Object.entries(result.summary).map(([category, data]) => ({
-            category,
-            deltaDb: data.deltaDb || 0,
-            energyPercent: data.energyPercent,
-            status: data.status || 'unknown',
-            colorClass: data.status === 'ideal' ? 'green' : 
-                       data.status === 'ajustar' ? 'yellow' : 'red'
-        }))
+      band: bandConfig.name,
+      hz: `${bandConfig.hz[0]}–${bandConfig.hz[1]}Hz`,
+      pctUser: userPct,
+      pctRef: refPct,
+      deltaDB,
+      status
     };
+  });
+  
+  // 5. Agregação em 3 bandas
+  const aggregated = aggregateTo3Bands(bandPowers, config);
+  
+  // Calcular deltas para agregação (se referência disponível)
+  let lowDB: number | null = null;
+  let midDB: number | null = null;
+  let highDB: number | null = null;
+  
+  if (referenceData) {
+    const refAggregated = aggregateTo3Bands(referenceData, config);
+    lowDB = calculateDeltaDB(aggregated.low, refAggregated.low);
+    midDB = calculateDeltaDB(aggregated.mid, refAggregated.mid);
+    highDB = calculateDeltaDB(aggregated.high, refAggregated.high);
+  }
+  
+  const summary3: SpectralSummary3Band = {
+    lowDB,
+    midDB,
+    highDB,
+    lowPct: aggregated.low,
+    midPct: aggregated.mid,
+    highPct: aggregated.high
+  };
+  
+  const processingTime = performance.now() - startTime;
+  
+  return {
+    mode: config.mode,
+    bands,
+    summary3,
+    totalEnergyLinear: magnitudes.reduce((sum, mag) => sum + mag * mag, 0),
+    normalizationApplied: true,
+    processingTimeMs: processingTime
+  };
+}
+
+/**
+ * 📄 Converter referências do formato JSON legado para Map
+ * @param jsonBands - Bandas do JSON de referência
+ * @returns Map com porcentagens por banda
+ */
+export function convertLegacyReferencesToPercent(
+  jsonBands: Record<string, { target_db?: number; target_percent?: number }>
+): Map<string, number> {
+  const percentMap = new Map<string, number>();
+  
+  // Se já tem target_percent, usar diretamente
+  for (const [band, data] of Object.entries(jsonBands)) {
+    if (data.target_percent && data.target_percent > 0) {
+      percentMap.set(band, data.target_percent);
+    }
+  }
+  
+  // Se temos todas as porcentagens, retornar
+  if (percentMap.size === Object.keys(jsonBands).length) {
+    return percentMap;
+  }
+  
+  // Caso contrário, converter de dB para aproximação percentual
+  // (Isto é uma aproximação - idealmente as referências já devem estar em %)
+  const totalWeight = Object.values(jsonBands).reduce((sum, data) => {
+    if (data.target_db && Number.isFinite(data.target_db)) {
+      // Converter dB para peso linear (aproximação)
+      const linear = Math.pow(10, data.target_db / 10);
+      return sum + Math.max(0.001, linear); // Evitar valores negativos
+    }
+    return sum;
+  }, 0);
+  
+  if (totalWeight > 0) {
+    for (const [band, data] of Object.entries(jsonBands)) {
+      if (!percentMap.has(band) && data.target_db && Number.isFinite(data.target_db)) {
+        const linear = Math.pow(10, data.target_db / 10);
+        const weight = Math.max(0.001, linear);
+        const percent = (weight / totalWeight) * 100;
+        percentMap.set(band, percent);
+      }
+    }
+  }
+  
+  return percentMap;
+}
+
+/**
+ * 🔄 Modo legado (compatibilidade)
+ * @param audioData - Canal de áudio
+ * @param sampleRate - Taxa de amostragem  
+ * @param legacyRefs - Referências no formato antigo
+ * @returns Resultado no formato legado
+ */
+export function analyzeLegacyMode(
+  audioData: Float32Array,
+  sampleRate: number,
+  legacyRefs: any = null
+): SpectralBalanceResult {
+  // Implementação simplificada do modo legado
+  // Retorna estrutura compatível mas com mode: 'legacy'
+  
+  const config: SpectralBalanceConfig = {
+    ...DEFAULT_CONFIG,
+    mode: 'legacy'
+  };
+  
+  return analyzeSpectralBalance(audioData, sampleRate, null, config);
 }

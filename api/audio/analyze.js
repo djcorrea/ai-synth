@@ -1,23 +1,13 @@
 /**
- * API de Análise de Áudio - Modo Gênero e Referência + Balanço Espectral
+ * API de Análise de Áudio - Modo Gênero e Referência
  * Suporta análise por gênero (atual) e por música de referência (novo)
- * NOVO: Sistema de balanço espectral por bandas com cálculo interno em %
  * 
  * Implementação: 22 de agosto de 2025
- * Atualização espectral: 24 de agosto de 2025
  */
 
-import { createWriteStream, mkdirSync, existsSync, unlinkSync, readFileSync } from 'fs';
+import { createWriteStream, mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-
-// Importar sistema de balanço espectral
-import { 
-  createSpectralBalanceAnalyzer,
-  formatForUI,
-  SPECTRAL_INTERNAL_MODE 
-} from '../../analyzer/core/spectralBalance.ts';
-import { isSpectralPercentModeEnabled, isLegacyModeEnabled } from '../../analyzer/core/spectralFeatureFlags.ts';
 
 // Configuração via variável de ambiente
 const MAX_UPLOAD_MB = parseInt(process.env.MAX_UPLOAD_MB || '60');
@@ -175,146 +165,7 @@ function parseMultipartData(req) {
 }
 
 /**
- * Carregar targets de referência do JSON
- */
-function loadSpectralReferenceTargets() {
-  try {
-    const refsPath = join(process.cwd(), 'refs', 'out', 'funk_mandela.json');
-    if (!existsSync(refsPath)) {
-      console.log('[ANALYZE] Arquivo de referência não encontrado, usando targets padrão');
-      return null;
-    }
-    
-    const refsContent = readFileSync(refsPath, 'utf8');
-    const refsData = JSON.parse(refsContent);
-    
-    // Verificar se existe a nova estrutura de targets espectrais
-    if (refsData.funk_mandela?.targets?.bands) {
-      console.log('[ANALYZE] Targets espectrais carregados do JSON');
-      return refsData.funk_mandela.targets.bands;
-    }
-    
-    // Fallback: converter bandas legacy para % (aproximação)
-    if (refsData.funk_mandela?.legacy_compatibility?.bands) {
-      console.log('[ANALYZE] Convertendo bandas legacy para targets espectrais');
-      const legacyBands = refsData.funk_mandela.legacy_compatibility.bands;
-      
-      // Conversão aproximada dB para % (será substituída por cálculo real)
-      return {
-        sub: 15.0,        // Aproximadamente 15% para sub bass
-        bass: 20.0,       // Aproximadamente 20% para bass
-        low_mid: 18.0,    // Aproximadamente 18% para low-mid
-        mid: 25.0,        // Aproximadamente 25% para mid
-        high_mid: 15.0,   // Aproximadamente 15% para high-mid
-        presence: 5.0,    // Aproximadamente 5% para presence
-        air: 2.0          // Aproximadamente 2% para air
-      };
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('[ANALYZE] Erro ao carregar targets espectrais:', error);
-    return null;
-  }
-}
-
-/**
- * Processar análise espectral (NOVO)
- */
-async function processSpectralBalance(audioData, sampleRate, referenceTargets) {
-  const startTime = performance.now();
-  
-  try {
-    console.log('[ANALYZE] Iniciando análise espectral...');
-    
-    // Verificar feature flag
-    if (!isSpectralPercentModeEnabled()) {
-      console.log('[ANALYZE] Modo espectral não habilitado, pulando');
-      return null;
-    }
-    
-    // Criar analisador
-    const analyzer = createSpectralBalanceAnalyzer({
-      spectralInternalMode: SPECTRAL_INTERNAL_MODE,
-      measurementTarget: {
-        lufsTarget: -14.0,  // Normalização para -14 LUFS
-        dcCutoff: 20.0,
-        maxFreq: 16000.0
-      },
-      filterMethod: 'fft',
-      smoothing: '1/3_octave',
-      defaultTolerancePp: 2.5
-    }, (msg) => console.log('[SpectralBalance]', msg));
-    
-    // Converter dados de áudio para formato Float32Array[]
-    let audioBuffer;
-    if (audioData instanceof ArrayBuffer) {
-      // Simulação: converter ArrayBuffer para Float32Array mono
-      const float32Data = new Float32Array(audioData);
-      audioBuffer = [float32Data];  // Mono
-    } else if (Array.isArray(audioData)) {
-      audioBuffer = audioData;
-    } else {
-      throw new Error('Formato de áudio não suportado para análise espectral');
-    }
-    
-    // Executar análise
-    const spectralResult = await analyzer.analyzeSpectralBalance(
-      audioBuffer,
-      sampleRate,
-      referenceTargets
-    );
-    
-    // Formatar para UI
-    const uiFormat = formatForUI(spectralResult);
-    
-    const elapsed = performance.now() - startTime;
-    console.log(`[ANALYZE] Análise espectral concluída em ${elapsed.toFixed(2)}ms`);
-    
-    // Retornar no formato SpectralSummary
-    return {
-      lowMidHigh: {
-        lowDB: uiFormat.summary.find(s => s.category === 'grave')?.deltaDb || 0,
-        midDB: uiFormat.summary.find(s => s.category === 'medio')?.deltaDb || 0,
-        highDB: uiFormat.summary.find(s => s.category === 'agudo')?.deltaDb || 0,
-        lowPct: uiFormat.summary.find(s => s.category === 'grave')?.energyPercent || 0,
-        midPct: uiFormat.summary.find(s => s.category === 'medio')?.energyPercent || 0,
-        highPct: uiFormat.summary.find(s => s.category === 'agudo')?.energyPercent || 0
-      },
-      bands: uiFormat.bands.map(band => ({
-        band: band.name,
-        hzRange: band.freqRange,
-        deltaDB: band.deltaDb,
-        pctUser: band.energyPercent / 100,  // Converter para 0-1
-        pctRef: 0, // TODO: calcular da referência
-        status: band.status,
-        colorClass: band.colorClass
-      })),
-      mode: SPECTRAL_INTERNAL_MODE,
-      timestamp: spectralResult.timestamp,
-      validation: spectralResult.validation
-    };
-    
-  } catch (error) {
-    console.error('[ANALYZE] Erro na análise espectral:', error);
-    
-    // Fallback para modo legacy
-    if (isLegacyModeEnabled()) {
-      console.log('[ANALYZE] Usando fallback para modo legacy');
-      return {
-        mode: 'legacy',
-        bands: [],
-        lowMidHigh: { lowDB: 0, midDB: 0, highDB: 0, lowPct: 0, midPct: 0, highPct: 0 },
-        timestamp: new Date().toISOString(),
-        validation: { totalEnergyCheck: 0, bandsProcessed: 0, errors: [error.message] }
-      };
-    }
-    
-    throw error;
-  }
-}
-/**
- * Processar modo gênero (comportamento atual + análise espectral)
+ * Processar modo gênero (comportamento atual)
  */
 async function processGenreMode(data) {
   const { audio, genre } = data;
@@ -338,30 +189,7 @@ async function processGenreMode(data) {
   
   console.log(`[ANALYZE] Processando modo gênero: ${genre}, arquivo: ${audio.filename}`);
   
-  // NOVO: Carregar targets espectrais para o gênero
-  const spectralTargets = loadSpectralReferenceTargets();
-  
-  // NOVO: Processar análise espectral (se habilitada)
-  let spectralBalance = null;
-  if (isSpectralPercentModeEnabled()) {
-    try {
-      // Simular dados de áudio (em produção real, seria decodificação do arquivo)
-      const mockSampleRate = 48000;
-      const mockAudioData = [new Float32Array(mockSampleRate * 10)]; // 10 segundos de silêncio
-      
-      spectralBalance = await processSpectralBalance(
-        mockAudioData,
-        mockSampleRate,
-        spectralTargets
-      );
-      
-      console.log('[ANALYZE] Análise espectral integrada com sucesso');
-    } catch (error) {
-      console.warn('[ANALYZE] Falha na análise espectral, continuando sem ela:', error.message);
-    }
-  }
-  
-  const result = {
+  return {
     success: true,
     mode: 'genre',
     genre,
@@ -371,17 +199,8 @@ async function processGenreMode(data) {
       format: audio.filename.split('.').pop()?.toLowerCase()
     },
     analysis: {
-      // Métricas existentes (placeholder)
-      lufsIntegrated: -12.5,
-      truePeakDbtp: -1.2,
-      dynamicRange: 8.5,
-      stereoCorrelation: 0.85,
-      lra: 9.2,
-      
-      // NOVO: Balanço espectral
-      spectralBalance,
-      
-      // Metadados
+      // Aqui seria integrado com o sistema de análise existente
+      // Por enquanto, retornamos uma estrutura placeholder
       message: 'Análise por gênero processada com sucesso',
       recommendation: audio.filename.toLowerCase().endsWith('.mp3') 
         ? 'MP3 detectado. Para maior precisão na análise, considere usar WAV ou FLAC.'
@@ -389,19 +208,10 @@ async function processGenreMode(data) {
       analysisReady: true
     }
   };
-  
-  // Log de diagnóstico
-  console.log('[ANALYZE] Resultado do modo gênero:', {
-    hasSpectralBalance: !!spectralBalance,
-    spectralMode: spectralBalance?.mode || 'disabled',
-    bandsCount: spectralBalance?.bands?.length || 0
-  });
-  
-  return result;
 }
 
 /**
- * Processar modo referência (novo + análise espectral)
+ * Processar modo referência (novo)
  */
 async function processReferenceMode(data) {
   const { userAudio, referenceAudio, options } = data;
@@ -436,8 +246,7 @@ async function processReferenceMode(data) {
     normalizeLoudness: options?.normalizeLoudness !== 'false',
     windowDuration: parseInt(options?.windowDuration || '30'),
     fftSize: parseInt(options?.fftSize || '4096'),
-    mode: 'reference', // 🎯 IMPORTANTE: Garantir que modo seja propagado
-    spectralMode: options?.spectralMode || SPECTRAL_INTERNAL_MODE
+    mode: 'reference' // 🎯 IMPORTANTE: Garantir que modo seja propagado
   };
   
   console.log(`[ANALYZE] Processando modo referência:`);
@@ -450,7 +259,6 @@ async function processReferenceMode(data) {
   console.log(`🔍 [API_DEBUG] baseline_source: reference_audio`);
   console.log(`🔍 [API_DEBUG] usedWindowSeconds: ${analysisOptions.windowDuration}`);
   console.log(`🔍 [API_DEBUG] normalizeLoudness: ${analysisOptions.normalizeLoudness}`);
-  console.log(`🔍 [API_DEBUG] spectralMode: ${analysisOptions.spectralMode}`);
   
   // 🎯 CORREÇÃO: Implementação real ao invés de placeholder
   try {
@@ -462,49 +270,7 @@ async function processReferenceMode(data) {
     
     console.log(`🔍 [API_DEBUG] normalizedLUFS: {user: ${userSimulatedLufs}, ref: ${refSimulatedLufs}}`);
     
-    // NOVO: Análise espectral comparativa (se habilitada)
-    let spectralBalance = null;
-    if (isSpectralPercentModeEnabled() && analysisOptions.spectralMode === 'percent') {
-      try {
-        // Simular análise espectral da referência para extrair targets
-        const mockSampleRate = 48000;
-        const mockUserAudio = [new Float32Array(mockSampleRate * 10)];
-        const mockRefAudio = [new Float32Array(mockSampleRate * 10)];
-        
-        // Processar áudio de referência para extrair targets
-        console.log('[ANALYZE] Extraindo targets espectrais da referência...');
-        const referenceAnalyzer = createSpectralBalanceAnalyzer({
-          spectralInternalMode: 'percent'
-        });
-        
-        const refSpectralResult = await referenceAnalyzer.analyzeSpectralBalance(
-          mockRefAudio,
-          mockSampleRate
-        );
-        
-        // Converter resultado da referência para targets
-        const spectralTargets = {};
-        refSpectralResult.bands.forEach(band => {
-          spectralTargets[band.name] = band.energyPercent;
-        });
-        
-        console.log('[ANALYZE] Targets extraídos da referência:', spectralTargets);
-        
-        // Processar áudio do usuário com targets da referência
-        spectralBalance = await processSpectralBalance(
-          mockUserAudio,
-          mockSampleRate,
-          spectralTargets
-        );
-        
-        console.log('[ANALYZE] Análise espectral comparativa concluída');
-        
-      } catch (error) {
-        console.warn('[ANALYZE] Falha na análise espectral comparativa:', error.message);
-      }
-    }
-    
-    const result = {
+    return {
       success: true,
       mode: 'reference',
       files: {
@@ -526,9 +292,7 @@ async function processReferenceMode(data) {
           lufsIntegrated: userSimulatedLufs,
           truePeakDbtp: -1.2,
           dynamicRange: 8.5,
-          stereoCorrelation: 0.85,
-          // NOVO: Balanço espectral do usuário
-          spectralBalance
+          stereoCorrelation: 0.85
         },
         reference: {
           lufsIntegrated: refSimulatedLufs,
@@ -548,7 +312,7 @@ async function processReferenceMode(data) {
           reference: 9.2,
           difference: -0.7
         },
-        spectralMatch: spectralBalance ? 0.82 : null // 82% de match espectral simulado
+        spectralMatch: 0.82 // 82% de match espectral simulado
       },
       suggestions: [
         {
@@ -564,21 +328,9 @@ async function processReferenceMode(data) {
       _diagnostic: {
         baseline_source: 'reference_audio',
         usedGenreTargets: false,
-        apiProcessingComplete: true,
-        spectralAnalysisEnabled: !!spectralBalance,
-        spectralMode: analysisOptions.spectralMode
+        apiProcessingComplete: true
       }
     };
-    
-    // Log de diagnóstico
-    console.log('[ANALYZE] Resultado do modo referência:', {
-      hasSpectralBalance: !!spectralBalance,
-      spectralMode: spectralBalance?.mode || 'disabled',
-      bandsCount: spectralBalance?.bands?.length || 0,
-      spectralMatch: result.comparison.spectralMatch
-    });
-    
-    return result;
     
   } catch (error) {
     console.error('[ANALYZE] Erro no processamento do modo referência:', error);

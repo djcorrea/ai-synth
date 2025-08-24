@@ -1,6 +1,5 @@
 // 🎵 AUDIO ANALYZER INTEGRATION
 // Conecta o sistema de análise de áudio com o chat existente
-// ATUALIZAÇÃO: Sistema de balanço espectral por bandas integrado
 
 // 📝 Carregar gerador de texto didático
 if (typeof window !== 'undefined' && !window.SuggestionTextGenerator) {
@@ -16,16 +15,10 @@ if (typeof window !== 'undefined' && !window.SuggestionTextGenerator) {
     document.head.appendChild(script);
 }
 
-// Feature flags do sistema espectral
-const SPECTRAL_INTERNAL_MODE = "percent"; // ou "legacy"
-const ENABLE_SPECTRAL_BALANCE = true;
-const ENABLE_SPECTRAL_UI_ADVANCED = true; // Mostrar 6-7 bandas ao invés de apenas resumo 3
-
 // Debug flag (silencia logs em produção; defina window.DEBUG_ANALYZER = true para habilitar)
 const __DEBUG_ANALYZER__ = true; // 🔧 TEMPORÁRIO: Ativado para debug do problema
 const __dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log('[AUDIO-DEBUG]', ...a); };
 const __dwrn = (...a) => { if (__DEBUG_ANALYZER__) console.warn('[AUDIO-WARN]', ...a); };
-const __spectral_dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log('[SPECTRAL-DEBUG]', ...a); };
 
 let currentModalAnalysis = null;
 let __audioIntegrationInitialized = false; // evita listeners duplicados
@@ -413,162 +406,32 @@ function generateComparisonHTML(data) {
 }
 
 function generateAudioAnalysisCard(analysis) {
-    // Tentar usar novo sistema espectral primeiro
-    let spectralHTML = '';
-    if (analysis.spectralBalance && ENABLE_SPECTRAL_BALANCE) {
-        spectralHTML = renderSpectralBalance(analysis.spectralBalance);
-    } else if (analysis.frequencyBands) {
-        // Fallback para bandas legacy
-        spectralHTML = `
-            <div class="frequency-bands">
-                <h5>Bandas de Frequência</h5>
-                ${analysis.frequencyBands.map(band => `
-                    <div class="band-item">
-                        <span class="band-name">${band.name}</span>
-                        <span class="band-level">${band.level} dB</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-    
     return `
         <div class="spectral-info">
             <div class="info-item">
                 <span class="label">Frequência Fundamental:</span>
-                <span class="value">${analysis.fundamentalFreq || 'N/A'} Hz</span>
+                <span class="value">${analysis.fundamentalFreq} Hz</span>
             </div>
             <div class="info-item">
                 <span class="label">Faixa Dinâmica:</span>
-                <span class="value">${analysis.dynamicRange || analysis.dr || 'N/A'} dB</span>
+                <span class="value">${analysis.dynamicRange} dB</span>
             </div>
             <div class="info-item">
                 <span class="label">Stereo Width:</span>
-                <span class="value">${analysis.stereoWidth || analysis.stereoCorrelation || 'N/A'}${analysis.stereoWidth ? '%' : ''}</span>
+                <span class="value">${analysis.stereoWidth}%</span>
             </div>
         </div>
         
-        ${spectralHTML}
-    `;
-}
-function renderSpectralBalance(spectralData) {
-    if (!spectralData || !ENABLE_SPECTRAL_BALANCE) {
-        __spectral_dbg('Balanço espectral desabilitado ou dados não disponíveis');
-        return '';
-    }
-    
-    __spectral_dbg('Renderizando balanço espectral:', spectralData);
-    
-    const { bands, lowMidHigh, mode, validation } = spectralData;
-    
-    // Verificar se é modo legacy
-    if (mode === 'legacy') {
-        return renderLegacyBands(spectralData);
-    }
-    
-    // Renderizar resumo de 3 bandas
-    const summaryHTML = `
-        <div class="spectral-summary">
-            <h5>🎼 Balanço Tonal (vs Referência)</h5>
-            <div class="summary-bands">
-                <div class="summary-band ${getSpectralStatusClass(lowMidHigh.lowDB)}">
-                    <span class="band-label">Graves</span>
-                    <span class="band-value">${lowMidHigh.lowDB > 0 ? '+' : ''}${lowMidHigh.lowDB.toFixed(1)} dB</span>
-                    <span class="band-percent">(${lowMidHigh.lowPct.toFixed(1)}%)</span>
+        <div class="frequency-bands">
+            <h5>Bandas de Frequência</h5>
+            ${analysis.frequencyBands.map(band => `
+                <div class="band-item">
+                    <span class="band-name">${band.name}</span>
+                    <span class="band-level">${band.level} dB</span>
                 </div>
-                <div class="summary-band ${getSpectralStatusClass(lowMidHigh.midDB)}">
-                    <span class="band-label">Médios</span>
-                    <span class="band-value">${lowMidHigh.midDB > 0 ? '+' : ''}${lowMidHigh.midDB.toFixed(1)} dB</span>
-                    <span class="band-percent">(${lowMidHigh.midPct.toFixed(1)}%)</span>
-                </div>
-                <div class="summary-band ${getSpectralStatusClass(lowMidHigh.highDB)}">
-                    <span class="band-label">Agudos</span>
-                    <span class="band-value">${lowMidHigh.highDB > 0 ? '+' : ''}${lowMidHigh.highDB.toFixed(1)} dB</span>
-                    <span class="band-percent">(${lowMidHigh.highPct.toFixed(1)}%)</span>
-                </div>
-            </div>
+            `).join('')}
         </div>
     `;
-    
-    // Renderizar bandas detalhadas (se habilitado)
-    let detailedHTML = '';
-    if (ENABLE_SPECTRAL_UI_ADVANCED && bands && bands.length > 0) {
-        detailedHTML = `
-            <div class="spectral-detailed">
-                <h6>🔍 Análise Detalhada por Banda</h6>
-                <div class="detailed-bands">
-                    ${bands.map(band => `
-                        <div class="detailed-band ${band.colorClass}" title="${band.hzRange}">
-                            <span class="band-name">${band.band}</span>
-                            <span class="band-range">${band.hzRange}</span>
-                            <span class="band-delta">${band.deltaDB > 0 ? '+' : ''}${band.deltaDB.toFixed(1)} dB</span>
-                            <span class="band-energy">${(band.pctUser * 100).toFixed(1)}%</span>
-                            <span class="band-status ${band.status}">${getStatusIcon(band.status)}</span>
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="spectral-validation">
-                    <small>
-                        ✓ ${validation.bandsProcessed} bandas processadas 
-                        | Energia total: ${(validation.totalEnergyCheck * 100).toFixed(1)}%
-                        ${validation.errors.length > 0 ? ` | ⚠️ ${validation.errors.length} avisos` : ''}
-                    </small>
-                </div>
-            </div>
-        `;
-    }
-    
-    return `
-        <div class="spectral-balance-container">
-            ${summaryHTML}
-            ${detailedHTML}
-        </div>
-    `;
-}
-
-/**
- * 🎨 Função auxiliar para determinar classe CSS baseada no delta dB
- */
-function getSpectralStatusClass(deltaDB) {
-    const abs = Math.abs(deltaDB);
-    if (abs <= 1.5) return 'spectral-green';      // Ideal
-    if (abs <= 3.0) return 'spectral-yellow';     // Ajustar
-    return 'spectral-red';                         // Corrigir
-}
-
-/**
- * 🎯 Ícones de status
- */
-function getStatusIcon(status) {
-    switch (status) {
-        case 'ideal': return '✅';
-        case 'ajustar': return '⚠️';
-        case 'corrigir': return '❌';
-        default: return '❓';
-    }
-}
-
-/**
- * 🔄 Fallback para modo legacy
- */
-function renderLegacyBands(spectralData) {
-    __spectral_dbg('Renderizando em modo legacy');
-    
-    if (spectralData.bands && spectralData.bands.length > 0) {
-        return `
-            <div class="frequency-bands legacy-mode">
-                <h5>Bandas de Frequência (Legacy)</h5>
-                ${spectralData.bands.map(band => `
-                    <div class="band-item">
-                        <span class="band-name">${band.name || band.band}</span>
-                        <span class="band-level">${band.value || band.deltaDB || 0} dB</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-    
-    return '<div class="spectral-fallback">Análise espectral não disponível</div>';
 }
 
 function generateDifferencesGrid(differences) {
@@ -4099,6 +3962,54 @@ function renderReferenceComparisons(analysis) {
             }
         });
     }
+    
+    // 🎵 NOVO: Renderizar dados espectrais V2 se disponível
+    const spectralV2 = tech.spectralBalanceV2;
+    if (spectralV2 && spectralV2.mode === 'percent' && spectralV2.bands) {
+        rows.push('<tr style="border-top: 2px solid rgba(255,255,255,.2);"><td colspan="4" style="padding:8px 6px; font-weight:600; color:#7c4dff;">🎵 Balanço Espectral V2 (dB)</td></tr>');
+        
+        for (const bandData of spectralV2.bands) {
+            if (bandData.deltaDB !== null && Number.isFinite(bandData.deltaDB)) {
+                const deltaText = bandData.deltaDB > 0 ? `+${bandData.deltaDB.toFixed(1)}` : bandData.deltaDB.toFixed(1);
+                const statusClass = bandData.status === 'OK' ? 'ok' : 
+                                  bandData.status === 'HIGH' ? 'warn' : 
+                                  bandData.status === 'LOW' ? 'yellow' : '';
+                
+                const enhancedLabel = `${bandData.band.toUpperCase()} (${bandData.hz})`;
+                const toleranceText = bandData.pctRef ? ` (±${(DEFAULT_CONFIG?.defaultTolerancePP || 2.5).toFixed(1)}pp)` : '';
+                
+                rows.push(`<tr>
+                    <td>${enhancedLabel}</td>
+                    <td>${bandData.pctUser.toFixed(1)}%</td>
+                    <td>${bandData.pctRef ? bandData.pctRef.toFixed(1) + '%' : 'N/A'}</td>
+                    <td class="${statusClass}">${deltaText} dB<span class="tol">${toleranceText}</span></td>
+                </tr>`);
+            }
+        }
+        
+        // Adicionar resumo de 3 bandas
+        if (spectralV2.summary3) {
+            const summary = spectralV2.summary3;
+            rows.push('<tr style="border-top: 1px solid rgba(255,255,255,.1);"><td colspan="4" style="padding:4px 6px; font-size:10px; opacity:.8;">Resumo 3 Bandas:</td></tr>');
+            
+            if (summary.lowDB !== null) {
+                const deltaText = summary.lowDB > 0 ? `+${summary.lowDB.toFixed(1)}` : summary.lowDB.toFixed(1);
+                const statusClass = Math.abs(summary.lowDB) <= 3 ? 'ok' : 'warn';
+                rows.push(`<tr><td>GRAVES (Sub+Bass)</td><td>${summary.lowPct.toFixed(1)}%</td><td>—</td><td class="${statusClass}">${deltaText} dB</td></tr>`);
+            }
+            if (summary.midDB !== null) {
+                const deltaText = summary.midDB > 0 ? `+${summary.midDB.toFixed(1)}` : summary.midDB.toFixed(1);
+                const statusClass = Math.abs(summary.midDB) <= 3 ? 'ok' : 'warn';
+                rows.push(`<tr><td>MÉDIOS (Low-Mid+Mid)</td><td>${summary.midPct.toFixed(1)}%</td><td>—</td><td class="${statusClass}">${deltaText} dB</td></tr>`);
+            }
+            if (summary.highDB !== null) {
+                const deltaText = summary.highDB > 0 ? `+${summary.highDB.toFixed(1)}` : summary.highDB.toFixed(1);
+                const statusClass = Math.abs(summary.highDB) <= 3 ? 'ok' : 'warn';
+                rows.push(`<tr><td>AGUDOS (High-Mid+Presence)</td><td>${summary.highPct.toFixed(1)}%</td><td>—</td><td class="${statusClass}">${deltaText} dB</td></tr>`);
+            }
+        }
+    }
+    
     container.innerHTML = `<div class="card" style="margin-top:12px;">
         <div class="card-title">📌 Comparação de Referência (${titleText})</div>
         <table class="ref-compare-table">
