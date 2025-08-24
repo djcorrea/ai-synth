@@ -1,6 +1,6 @@
 {
   "funk_mandela": {
-    "version": "2025-08-updated-targets.2.1.2",
+    "version": "2025-08-mandela-targets.3",
     "generated_at": "2025-08-24T13:39:47.661Z",
     "num_tracks": 17,
     "aggregation_method": "hybrid_fixed_flexible",
@@ -59,8 +59,8 @@
               20,
               60
             ],
-            "target_db": -6.7,
-            "toleranceDb": 3
+            "target_db": -7.2,
+            "toleranceDb": 1.7
           },
           {
             "name": "low_bass",
@@ -68,8 +68,8 @@
               60,
               100
             ],
-            "target_db": -8,
-            "toleranceDb": 2.5
+            "target_db": -8.9,
+            "toleranceDb": 1.2
           },
           {
             "name": "upper_bass",
@@ -77,8 +77,8 @@
               100,
               200
             ],
-            "target_db": -12,
-            "toleranceDb": 2.5
+            "target_db": -12.8,
+            "toleranceDb": 1.5
           },
           {
             "name": "low_mid",
@@ -86,8 +86,8 @@
               200,
               500
             ],
-            "target_db": -8.4,
-            "toleranceDb": 2
+            "target_db": -9.2,
+            "toleranceDb": 1.2
           },
           {
             "name": "mid",
@@ -95,8 +95,8 @@
               500,
               2000
             ],
-            "target_db": -6.3,
-            "toleranceDb": 2
+            "target_db": -6.8,
+            "toleranceDb": 0.9
           },
           {
             "name": "high_mid",
@@ -104,8 +104,8 @@
               2000,
               6000
             ],
-            "target_db": -11.2,
-            "toleranceDb": 2.5
+            "target_db": -12.3,
+            "toleranceDb": 1.5
           },
           {
             "name": "brilho",
@@ -113,8 +113,8 @@
               6000,
               12000
             ],
-            "target_db": -14.8,
-            "toleranceDb": 3
+            "target_db": -16.2,
+            "toleranceDb": 1.7
           },
           {
             "name": "presenca",
@@ -122,8 +122,8 @@
               12000,
               20000
             ],
-            "target_db": -19.2,
-            "toleranceDb": 3.5
+            "target_db": -19.1,
+            "toleranceDb": 2.5
           }
         ]
       }
@@ -170,48 +170,49 @@
       },
       "bands": {
         "sub": {
-          "target_db": -6.7,
-          "tol_db": 3,
+          "target_db": -7.2,
+          "tol_db": 1.7,
           "severity": "soft"
         },
         "low_bass": {
-          "target_db": -8,
-          "tol_db": 2.5,
+          "target_db": -8.9,
+          "tol_db": 1.2,
           "severity": "soft"
         },
         "upper_bass": {
-          "target_db": -12,
-          "tol_db": 2.5,
+          "target_db": -12.8,
+          "tol_db": 1.5,
           "severity": "soft"
         },
         "low_mid": {
-          "target_db": -8.4,
-          "tol_db": 2,
+          "target_db": -9.2,
+          "tol_db": 1.2,
           "severity": "soft"
         },
         "mid": {
-          "target_db": -6.3,
-          "tol_db": 2,
+          "target_db": -6.8,
+          "tol_db": 0.9,
           "severity": "hard",
           "vocal_presence_range": true
         },
         "high_mid": {
-          "target_db": -11.2,
-          "tol_db": 2.5,
+          "target_db": -12.3,
+          "tol_db": 1.5,
           "severity": "soft"
         },
         "brilho": {
-          "target_db": -14.8,
-          "tol_db": 3,
+          "target_db": -16.2,
+          "tol_db": 1.7,
           "severity": "soft"
         },
         "presenca": {
-          "target_db": -19.2,
-          "tol_db": 3.5,
+          "target_db": -19.1,
+          "tol_db": 2.5,
           "severity": "hard",
           "vocal_presence_range": true
         }
       }
-    }
+    },
+    "last_updated": "2025-08-24T15:12:15.793Z"
   }
 }

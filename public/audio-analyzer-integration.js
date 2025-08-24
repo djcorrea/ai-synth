@@ -661,14 +661,14 @@ const __INLINE_EMBEDDED_REFS__ = {
             soft_constraints: ["clipping", "lra", "stereo", "tonalCurve"] 
         }, 
         bands: { 
-            sub:{target_db:-8.0,tol_db:2.5,severity:"soft",range_hz:"60-120"}, 
-            low_bass:{target_db:-8.0,tol_db:2.5,severity:"soft",range_hz:"60-120"}, 
-            upper_bass:{target_db:-12.0,tol_db:2.5,severity:"soft",range_hz:"120-200"}, 
-            low_mid:{target_db:-8.4,tol_db:2.0,severity:"soft",range_hz:"200-500"}, 
-            mid:{target_db:-6.3,tol_db:2.0,severity:"hard",vocal_presence_range:true,range_hz:"500-2000"}, 
-            high_mid:{target_db:-11.2,tol_db:2.5,severity:"soft",range_hz:"2000-4000"}, 
-            brilho:{target_db:-14.8,tol_db:3.0,severity:"soft",range_hz:"4000-8000"}, 
-            presenca:{target_db:-19.2,tol_db:3.5,severity:"hard",vocal_presence_range:true,range_hz:"8000-12000"} 
+            sub:{target_db:-7.2,tol_db:1.7,severity:"soft",range_hz:"60-120"}, 
+            low_bass:{target_db:-8.9,tol_db:1.2,severity:"soft",range_hz:"60-120"}, 
+            upper_bass:{target_db:-12.8,tol_db:1.5,severity:"soft",range_hz:"120-200"}, 
+            low_mid:{target_db:-9.2,tol_db:1.2,severity:"soft",range_hz:"200-500"}, 
+            mid:{target_db:-6.8,tol_db:0.9,severity:"hard",vocal_presence_range:true,range_hz:"500-2000"}, 
+            high_mid:{target_db:-12.3,tol_db:1.5,severity:"soft",range_hz:"2000-4000"}, 
+            brilho:{target_db:-16.2,tol_db:1.7,severity:"soft",range_hz:"4000-8000"}, 
+            presenca:{target_db:-19.1,tol_db:2.5,severity:"hard",vocal_presence_range:true,range_hz:"8000-12000"} 
         } 
     },
         funk_bruxaria: { 
