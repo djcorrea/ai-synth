@@ -2199,15 +2199,15 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     const hopSize = fftSize / 4;
     const maxFrames = 50;
     
-    // Definir bandas de frequência - COBERTURA COMPLETA sem gaps
+    // Definir bandas de frequência - OTIMIZADO PARA FUNK MANDELA
     const bandDefinitions = [
       { name: 'Sub Bass', hzLow: 20, hzHigh: 60 },
       { name: 'Bass', hzLow: 60, hzHigh: 120 },
       { name: 'Low Mid', hzLow: 120, hzHigh: 250 },
       { name: 'Mid', hzLow: 250, hzHigh: 1000 },
       { name: 'High Mid', hzLow: 1000, hzHigh: 4000 },
-      { name: 'High', hzLow: 4000, hzHigh: 12000 }, // 🔧 ESTENDIDO para cobrir até presença
-      { name: 'Presence', hzLow: 12000, hzHigh: 18000 } // 🔧 ALINHADO com sistema legado
+      { name: 'High', hzLow: 4000, hzHigh: 8000 }, // 🔧 AJUSTADO para funk
+      { name: 'Presence', hzLow: 8000, hzHigh: 20000 } // 🔧 EXPANDIDO para capturar toda energia aguda
     ];
     
     const nyquist = sampleRate / 2;
@@ -2674,8 +2674,8 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               low_mid: [250, 500],
               mid: [500, 2000],
               high_mid: [2000, 6000],
-              brilho: [6000, 12000],
-              presenca: [12000, 18000]
+              brilho: [6000, 8000], // 🔧 ALINHADO com sistema espectral
+              presenca: [8000, 20000] // 🔧 EXPANDIDO para capturar energia aguda
             };
             const bins = specRes.freq_bins_compact;
             const mags = specRes.spectrum_avg;
