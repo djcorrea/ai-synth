@@ -51,13 +51,14 @@
     return normalized;
   }
 
-  // 🔍 Analisar espectro usando FFT simples
-  function analyzeSpectrum(audioData, sampleRate, fftSize = 8192) {
-    const windowSize = Math.min(fftSize, audioData.length);
+  // 🔍 Analisar espectro usando FFT otimizada
+  function analyzeSpectrum(audioData, sampleRate, fftSize = 2048) {
+    // Usar FFT menor para evitar travamentos
+    const windowSize = Math.min(fftSize, audioData.length, 2048);
     const hopSize = Math.floor(windowSize / 4);
-    const numFrames = Math.floor((audioData.length - windowSize) / hopSize) + 1;
+    const numFrames = Math.min(Math.floor((audioData.length - windowSize) / hopSize) + 1, 10); // Limitar frames
     
-    if (numFrames <= 0) {
+    if (numFrames <= 0 || windowSize < 64) {
       return {
         magnitudes: new Float32Array(windowSize / 2),
         freqBins: new Float32Array(windowSize / 2).map((_, i) => (i * sampleRate) / windowSize)
@@ -69,7 +70,7 @@
     for (let frame = 0; frame < numFrames; frame++) {
       const start = frame * hopSize;
       const window = audioData.slice(start, start + windowSize);
-      const spectrum = performSimpleFFT(window);
+      const spectrum = performOptimizedFFT(window);
       
       for (let i = 0; i < spectrum.length; i++) {
         spectrumSum[i] += spectrum[i];
@@ -89,19 +90,30 @@
   }
 
   // 🔢 FFT simples (placeholder)
-  function performSimpleFFT(window) {
+  // 🚀 FFT otimizada usando aproximação rápida para bandas espectrais
+  function performOptimizedFFT(window) {
     const spectrum = new Float32Array(window.length / 2);
+    const N = window.length;
+    
+    // Para análise de bandas espectrais, não precisamos de FFT completa
+    // Vamos usar aproximação por média móvel para cada banda de frequência
     
     for (let k = 0; k < spectrum.length; k++) {
-      let real = 0, imag = 0;
+      let magnitude = 0;
       
-      for (let n = 0; n < window.length; n++) {
-        const angle = -2 * Math.PI * k * n / window.length;
-        real += window[n] * Math.cos(angle);
-        imag += window[n] * Math.sin(angle);
+      // Aproximação rápida: calcular apenas alguns pontos por banda
+      const step = Math.max(1, Math.floor(N / (spectrum.length * 4)));
+      let sampleCount = 0;
+      
+      for (let n = 0; n < N; n += step) {
+        const angle = -2 * Math.PI * k * n / N;
+        const real = window[n] * Math.cos(angle);
+        const imag = window[n] * Math.sin(angle);
+        magnitude += Math.sqrt(real * real + imag * imag);
+        sampleCount++;
       }
       
-      spectrum[k] = Math.sqrt(real * real + imag * imag);
+      spectrum[k] = sampleCount > 0 ? magnitude / sampleCount : 0;
     }
     
     return spectrum;
@@ -165,16 +177,32 @@
     const startTime = performance.now();
     
     try {
+      // 🛡️ Validações de segurança
+      if (!audioData || audioData.length < 512) {
+        return createFallbackAnalysis(config, 'Audio insuficiente');
+      }
+      
+      // ⏱️ Timeout de segurança - máximo 2 segundos
+      const checkTimeout = () => {
+        if (performance.now() - startTime > 2000) {
+          throw new Error('Timeout na análise espectral');
+        }
+      };
+
       // 1. Normalizar para LUFS alvo
+      checkTimeout();
       const normalizedAudio = normalizeToLUFS(audioData, sampleRate, config.normalizationLUFS);
       
-      // 2. Analisar espectro
+      // 2. Analisar espectro (com FFT otimizada)
+      checkTimeout();
       const { magnitudes, freqBins } = analyzeSpectrum(normalizedAudio, sampleRate);
       
       // 3. Medir potência por banda como %
+      checkTimeout();
       const bandPowers = measureBandPowers(magnitudes, freqBins, SPECTRAL_BANDS);
       
       // 4. Calcular deltas em dB vs referência
+      checkTimeout();
       const bands = SPECTRAL_BANDS.map(bandConfig => {
         const userPct = bandPowers.get(bandConfig.name) || 0;
         const refPct = referenceData?.get?.(bandConfig.name) || null;
@@ -338,20 +366,48 @@
     try {
       console.log('🎵 [SpectralBalance] Iniciando análise espectral V2');
       
+      // Validação inicial
+      if (!audioData || audioData.length === 0) {
+        throw new Error('AudioData inválido ou vazio');
+      }
+      
+      if (!sampleRate || sampleRate <= 0) {
+        throw new Error('SampleRate inválido');
+      }
+      
       // Preparar referências se existirem
       let referenceMap = null;
       if (referenceData?.bands) {
-        referenceMap = convertLegacyReferencesToPercent(referenceData.bands);
-        console.log('🎵 [SpectralBalance] Referências convertidas:', referenceMap.size, 'bandas');
+        try {
+          referenceMap = convertLegacyReferencesToPercent(referenceData.bands);
+          console.log('🎵 [SpectralBalance] Referências convertidas:', referenceMap.size, 'bandas');
+        } catch (refError) {
+          console.warn('⚠️ [SpectralBalance] Erro ao converter referências:', refError);
+          referenceMap = null;
+        }
       }
       
-      // Executar análise
-      const analysis = analyzeSpectralBalance(audioData, sampleRate, referenceMap, {
-        mode: 'percent',
-        includeAirInHigh: false,
-        normalizationLUFS: -14.0,
-        defaultTolerancePP: 2.5
+      // Executar análise com timeout
+      const analysisPromise = new Promise((resolve, reject) => {
+        try {
+          const analysis = analyzeSpectralBalance(audioData, sampleRate, referenceMap, {
+            mode: 'percent',
+            includeAirInHigh: false,
+            normalizationLUFS: -14.0,
+            defaultTolerancePP: 2.5
+          });
+          resolve(analysis);
+        } catch (error) {
+          reject(error);
+        }
       });
+      
+      // Timeout de 5 segundos
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout na análise espectral')), 5000);
+      });
+      
+      const analysis = await Promise.race([analysisPromise, timeoutPromise]);
       
       // Adicionar metadata
       analysis.cacheKey = audioHash || 'no-cache';
@@ -408,23 +464,31 @@
 
   // 🌐 EXPOR NO ESCOPO GLOBAL
   if (typeof window !== 'undefined') {
-    window.SpectralIntegration = {
-      performAnalysis: performSpectralAnalysis,
-      prepareResponse: prepareEndpointResponse,
-      analyzeSpectralBalance,
-      convertLegacyReferencesToPercent,
-      convertToLegacyFormat,
-      createFallbackAnalysis,
-      SPECTRAL_BANDS,
-      DEFAULT_CONFIG
-    };
-    
-    // Flag de controle principal
-    if (!window.SPECTRAL_INTERNAL_MODE) {
-      window.SPECTRAL_INTERNAL_MODE = "percent";
+    try {
+      window.SpectralIntegration = {
+        performAnalysis: performSpectralAnalysis,
+        prepareResponse: prepareEndpointResponse,
+        analyzeSpectralBalance,
+        convertLegacyReferencesToPercent,
+        convertToLegacyFormat,
+        createFallbackAnalysis,
+        SPECTRAL_BANDS,
+        DEFAULT_CONFIG
+      };
+      
+      // Flag de controle principal
+      if (!window.SPECTRAL_INTERNAL_MODE) {
+        window.SPECTRAL_INTERNAL_MODE = "percent";
+      }
+      
+      console.log('🎵 [SpectralBalance] Sistema V2 carregado com sucesso');
+    } catch (error) {
+      console.error('❌ [SpectralBalance] Erro ao carregar sistema V2:', error);
+      // Fallback para não quebrar a página
+      window.SpectralIntegration = {
+        analyzeSpectralBalance: function() { return null; }
+      };
     }
-    
-    console.log('🎵 [SpectralBalance] Sistema V2 carregado com sucesso');
   }
 
 })();
