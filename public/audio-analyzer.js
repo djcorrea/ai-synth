@@ -2081,7 +2081,7 @@ class AudioAnalyzer {
           const stWindows = series.slice(-3);
           const stMean = stWindows.length? (stWindows.reduce((a,b)=>a+b,0)/stWindows.length): null;
           outBands[band] = {
-            rmsDb: (Number.isFinite(rmsDb) && rmsDb > -60) ? parseFloat(rmsDb.toFixed(2)) : null,
+            rmsDb: Number.isFinite(rmsDb)? parseFloat(rmsDb.toFixed(2)) : null,
             truePeakDbtpApprox: Number.isFinite(peakDb)? parseFloat(peakDb.toFixed(2)) : null,
             crestFactor: crest,
             lraApprox,
@@ -2263,10 +2263,12 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
       throw new Error('Energia total zero - áudio silencioso ou erro');
     }
     
-    // Calcular porcentagens e dB
+    // Calcular porcentagens e dB RMS real
     const bands = bandEnergies.map(band => {
       const energyPct = (band.totalEnergy / validTotalEnergy) * 100;
-      const rmsDb = band.totalEnergy > 0 ? 10 * Math.log10(band.totalEnergy / validTotalEnergy) : -80;
+      // 🔧 CORREÇÃO: Calcular RMS real em vez de proporção logarítmica
+      const rms = Math.sqrt(band.totalEnergy / (processedFrames || 1)); // RMS verdadeiro
+      const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -80; // 20*log10 para amplitude
       
       return {
         name: band.name,
@@ -2278,19 +2280,23 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
       };
     });
     
-    // Resumo 3 bandas
+    // Resumo 3 bandas - calculado baseado nas bandas reais
+    const lowBands = bands.filter(b => b.hzLow < 250);
+    const midBands = bands.filter(b => b.hzLow >= 250 && b.hzLow < 4000);
+    const highBands = bands.filter(b => b.hzLow >= 4000);
+    
     const summary3Bands = {
       Low: {
-        energyPct: bands.filter(b => b.hzLow < 250).reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: -6.2 // Placeholder - pode ser calculado
+        energyPct: lowBands.reduce((sum, b) => sum + b.energyPct, 0),
+        rmsDb: lowBands.length > 0 ? lowBands.reduce((sum, b) => sum + b.rmsDb, 0) / lowBands.length : -80
       },
       Mid: {
-        energyPct: bands.filter(b => b.hzLow >= 250 && b.hzLow < 4000).reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: -7.6
+        energyPct: midBands.reduce((sum, b) => sum + b.energyPct, 0),
+        rmsDb: midBands.length > 0 ? midBands.reduce((sum, b) => sum + b.rmsDb, 0) / midBands.length : -80
       },
       High: {
-        energyPct: bands.filter(b => b.hzLow >= 4000).reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: -12.3
+        energyPct: highBands.reduce((sum, b) => sum + b.energyPct, 0),
+        rmsDb: highBands.length > 0 ? highBands.reduce((sum, b) => sum + b.rmsDb, 0) / highBands.length : -80
       }
     };
     
@@ -2670,9 +2676,9 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               spectralBands.forEach(band => {
                 const mappedName = bandMapping[band.name] || band.name.toLowerCase().replace(' ', '_');
                 if (mappedName) {
-                  // Converter % energia para dB relativo
-                  const energyRatio = band.energyPct / 100; // Converter % para proporção
-                  const db = 10 * Math.log10(energyRatio || 1e-9);
+                  // 🔧 CORREÇÃO: Usar rmsDb já calculado corretamente pelo sistema espectral
+                  // Em vez de recalcular DB da porcentagem (que dá valores muito negativos)
+                  const db = band.rmsDb || -80; // Usar valor dB correto do sistema espectral
                   bandEnergies[mappedName] = { 
                     energy: band.energy, 
                     rms_db: db,
