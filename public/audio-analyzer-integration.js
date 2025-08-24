@@ -910,13 +910,20 @@ async function loadReferenceData(genre) {
         // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
         console.log('🌐 Tentando carregar JSON externo primeiro...');
         try {
-            const version = Date.now(); // Force cache bust
-            const json = await fetchRefJsonWithFallback([
+            // 🔧 FIX: Detectar se está rodando via Vercel e usar servidor local
+            const isVercel = window.location.hostname.includes('vercel.app');
+            const baseUrls = isVercel ? [
+                `http://localhost:3000/public/refs/out/${genre}.json?v=${version}`,
+                `http://localhost:3000/refs/out/${genre}.json?v=${version}`
+            ] : [
                 `/public/refs/out/${genre}.json?v=${version}`,
                 `/refs/out/${genre}.json?v=${version}`,
                 `refs/out/${genre}.json?v=${version}`,
                 `../refs/out/${genre}.json?v=${version}`
-            ]);
+            ];
+            
+            console.log('🌐 [REFS] Detectado ambiente:', isVercel ? 'Vercel (usando localhost:3000)' : 'Local');
+            const json = await fetchRefJsonWithFallback(baseUrls);
             const rootKey = Object.keys(json)[0];
             const data = json[rootKey];
             if (data && typeof data === 'object' && data.version) {
