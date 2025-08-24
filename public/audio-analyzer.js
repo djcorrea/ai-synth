@@ -2285,7 +2285,7 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
       };
     });
     
-    // Resumo 3 bandas - calculado com valores compatíveis
+    // Resumo 3 bandas - calculado CORRETAMENTE (não média aritmética de dB!)
     const lowBands = bands.filter(b => b.hzLow < 250);
     const midBands = bands.filter(b => b.hzLow >= 250 && b.hzLow < 4000);
     const highBands = bands.filter(b => b.hzLow >= 4000);
@@ -2293,15 +2293,28 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     const summary3Bands = {
       Low: {
         energyPct: lowBands.reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: lowBands.length > 0 ? lowBands.reduce((sum, b) => sum + b.rmsDb, 0) / lowBands.length : -80
+        // 🔧 CORREÇÃO CRÍTICA: Somar energias e reconverter para dB
+        rmsDb: (() => {
+          const totalEnergy = lowBands.reduce((sum, b) => sum + b.energy, 0);
+          const proportion = totalEnergy / validTotalEnergy;
+          return proportion > 0 ? 10 * Math.log10(proportion) : -80;
+        })()
       },
       Mid: {
         energyPct: midBands.reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: midBands.length > 0 ? midBands.reduce((sum, b) => sum + b.rmsDb, 0) / midBands.length : -80
+        rmsDb: (() => {
+          const totalEnergy = midBands.reduce((sum, b) => sum + b.energy, 0);
+          const proportion = totalEnergy / validTotalEnergy;
+          return proportion > 0 ? 10 * Math.log10(proportion) : -80;
+        })()
       },
       High: {
         energyPct: highBands.reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: highBands.length > 0 ? highBands.reduce((sum, b) => sum + b.rmsDb, 0) / highBands.length : -80
+        rmsDb: (() => {
+          const totalEnergy = highBands.reduce((sum, b) => sum + b.energy, 0);
+          const proportion = totalEnergy / validTotalEnergy;
+          return proportion > 0 ? 10 * Math.log10(proportion) : -80;
+        })()
       }
     };
     
