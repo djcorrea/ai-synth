@@ -2272,9 +2272,11 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
         console.warn(`🔍 PRESENCE DEBUG: energia muito baixa - ${energyPct.toFixed(6)}% (${band.totalEnergy}/${validTotalEnergy})`);
       }
       
-      // 🔧 CORREÇÃO CRÍTICA: Calcular RMS real da banda, não energia relativa
-      // RMS = sqrt(energia_média_por_sample)
-      const rmsLinear = Math.sqrt(band.totalEnergy / (processedFrames * fftSize / 2));
+      // 🔧 CORREÇÃO SIMPLES: RMS normalizado pela energia da banda
+      // Energia da banda / energia total * referência típica de funk
+      const proportion = band.totalEnergy / validTotalEnergy;
+      const referenceRms = 0.1; // Referência típica para funk (ajustável)
+      const rmsLinear = proportion * referenceRms;
       const rmsDb = rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
       
       return {
@@ -2295,10 +2297,12 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     const summary3Bands = {
       Low: {
         energyPct: lowBands.reduce((sum, b) => sum + b.energyPct, 0),
-        // 🔧 CORREÇÃO CRÍTICA: Calcular RMS real das bandas baixas
+        // 🔧 CORREÇÃO SIMPLES: RMS proporcional à energia
         rmsDb: (() => {
           const totalEnergy = lowBands.reduce((sum, b) => sum + b.energy, 0);
-          const rmsLinear = Math.sqrt(totalEnergy / (processedFrames * fftSize / 2));
+          const proportion = totalEnergy / validTotalEnergy;
+          const referenceRms = 0.1;
+          const rmsLinear = proportion * referenceRms;
           return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
         })()
       },
@@ -2306,7 +2310,9 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
         energyPct: midBands.reduce((sum, b) => sum + b.energyPct, 0),
         rmsDb: (() => {
           const totalEnergy = midBands.reduce((sum, b) => sum + b.energy, 0);
-          const rmsLinear = Math.sqrt(totalEnergy / (processedFrames * fftSize / 2));
+          const proportion = totalEnergy / validTotalEnergy;
+          const referenceRms = 0.1;
+          const rmsLinear = proportion * referenceRms;
           return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
         })()
       },
@@ -2314,7 +2320,9 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
         energyPct: highBands.reduce((sum, b) => sum + b.energyPct, 0),
         rmsDb: (() => {
           const totalEnergy = highBands.reduce((sum, b) => sum + b.energy, 0);
-          const rmsLinear = Math.sqrt(totalEnergy / (processedFrames * fftSize / 2));
+          const proportion = totalEnergy / validTotalEnergy;
+          const referenceRms = 0.1;
+          const rmsLinear = proportion * referenceRms;
           return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
         })()
       }
