@@ -1,5 +1,6 @@
 // 🎵 AUDIO ANALYZER INTEGRATION
 // Conecta o sistema de análise de áudio com o chat existente
+// ATUALIZAÇÃO: Sistema de balanço espectral por bandas integrado
 
 // 📝 Carregar gerador de texto didático
 if (typeof window !== 'undefined' && !window.SuggestionTextGenerator) {
@@ -15,58 +16,16 @@ if (typeof window !== 'undefined' && !window.SuggestionTextGenerator) {
     document.head.appendChild(script);
 }
 
+// Feature flags do sistema espectral
+const SPECTRAL_INTERNAL_MODE = "percent"; // ou "legacy"
+const ENABLE_SPECTRAL_BALANCE = true;
+const ENABLE_SPECTRAL_UI_ADVANCED = true; // Mostrar 6-7 bandas ao invés de apenas resumo 3
+
 // Debug flag (silencia logs em produção; defina window.DEBUG_ANALYZER = true para habilitar)
 const __DEBUG_ANALYZER__ = true; // 🔧 TEMPORÁRIO: Ativado para debug do problema
 const __dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log('[AUDIO-DEBUG]', ...a); };
 const __dwrn = (...a) => { if (__DEBUG_ANALYZER__) console.warn('[AUDIO-WARN]', ...a); };
-
-// 🎼 SPECTRAL BALANCE - Configuração e Feature Flags
-const SPECTRAL_INTERNAL_MODE = window.SPECTRAL_INTERNAL_MODE || 'percent'; // 'percent' | 'legacy'
-const SPECTRAL_LOGGING = window.SPECTRAL_LOGGING !== false; // logging habilitado por padrão
-
-// 🎼 SPECTRAL BALANCE - Cache e estado
-let __spectralBalanceCache = {}; // cache de resultados espectrais
-let __spectralReferenceTargets = {}; // alvos de referência por gênero
-
-// �️ ENERGY TO DB CONVERTER - Conversor para sugestões DAW
-function convertEnergyToDbSuggestion(energyPercentCurrent, energyPercentTarget, bandName) {
-    const energyRatio = energyPercentCurrent / energyPercentTarget;
-    const dbDifference = 10 * Math.log10(energyRatio);
-    
-    const freqRanges = {
-        'sub': { center: 40, range: '20-60 Hz', q: 0.7 },
-        'bass': { center: 80, range: '60-120 Hz', q: 1.0 },
-        'low_mid': { center: 180, range: '120-250 Hz', q: 1.2 },
-        'mid': { center: 500, range: '250-1000 Hz', q: 1.0 },
-        'high_mid': { center: 2000, range: '1k-4k Hz', q: 1.2 },
-        'presence': { center: 5000, range: '4k-8k Hz', q: 1.0 },
-        'air': { center: 12000, range: '8k-16k Hz', q: 0.8 }
-    };
-    
-    const bandInfo = freqRanges[bandName] || freqRanges['mid'];
-    const absDiff = Math.abs(dbDifference);
-    const actionVerb = dbDifference > 0 ? 'Corte' : 'Boost';
-    
-    return {
-        band: bandName,
-        energy_current: energyPercentCurrent.toFixed(1) + '%',
-        energy_target: energyPercentTarget.toFixed(1) + '%',
-        db_adjustment: dbDifference.toFixed(1) + 'dB',
-        daw_instruction: `${actionVerb} ${absDiff.toFixed(1)}dB @ ${bandInfo.center}Hz (Q=${bandInfo.q})`,
-        urgency: absDiff > 6 ? 'high' : absDiff > 3 ? 'medium' : 'low'
-    };
-}
-
-// �🎼 SPECTRAL BALANCE - Configuração das bandas
-const SPECTRAL_BANDS_CONFIG = [
-    { name: 'sub', freqRange: [20, 60], displayName: 'Sub Bass', category: 'grave' },
-    { name: 'bass', freqRange: [60, 120], displayName: 'Bass', category: 'grave' },
-    { name: 'low_mid', freqRange: [120, 250], displayName: 'Low-Mid', category: 'medio' },
-    { name: 'mid', freqRange: [250, 1000], displayName: 'Mid', category: 'medio' },
-    { name: 'high_mid', freqRange: [1000, 4000], displayName: 'High-Mid', category: 'agudo' },
-    { name: 'presence', freqRange: [4000, 8000], displayName: 'Presence', category: 'agudo' },
-    { name: 'air', freqRange: [8000, 16000], displayName: 'Air', category: 'agudo' }
-];
+const __spectral_dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log('[SPECTRAL-DEBUG]', ...a); };
 
 let currentModalAnalysis = null;
 let __audioIntegrationInitialized = false; // evita listeners duplicados
@@ -454,32 +413,162 @@ function generateComparisonHTML(data) {
 }
 
 function generateAudioAnalysisCard(analysis) {
+    // Tentar usar novo sistema espectral primeiro
+    let spectralHTML = '';
+    if (analysis.spectralBalance && ENABLE_SPECTRAL_BALANCE) {
+        spectralHTML = renderSpectralBalance(analysis.spectralBalance);
+    } else if (analysis.frequencyBands) {
+        // Fallback para bandas legacy
+        spectralHTML = `
+            <div class="frequency-bands">
+                <h5>Bandas de Frequência</h5>
+                ${analysis.frequencyBands.map(band => `
+                    <div class="band-item">
+                        <span class="band-name">${band.name}</span>
+                        <span class="band-level">${band.level} dB</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
     return `
         <div class="spectral-info">
             <div class="info-item">
                 <span class="label">Frequência Fundamental:</span>
-                <span class="value">${analysis.fundamentalFreq} Hz</span>
+                <span class="value">${analysis.fundamentalFreq || 'N/A'} Hz</span>
             </div>
             <div class="info-item">
                 <span class="label">Faixa Dinâmica:</span>
-                <span class="value">${analysis.dynamicRange} dB</span>
+                <span class="value">${analysis.dynamicRange || analysis.dr || 'N/A'} dB</span>
             </div>
             <div class="info-item">
                 <span class="label">Stereo Width:</span>
-                <span class="value">${analysis.stereoWidth}%</span>
+                <span class="value">${analysis.stereoWidth || analysis.stereoCorrelation || 'N/A'}${analysis.stereoWidth ? '%' : ''}</span>
             </div>
         </div>
         
-        <div class="frequency-bands">
-            <h5>Bandas de Frequência</h5>
-            ${analysis.frequencyBands.map(band => `
-                <div class="band-item">
-                    <span class="band-name">${band.name}</span>
-                    <span class="band-level">${band.level} dB</span>
+        ${spectralHTML}
+    `;
+}
+function renderSpectralBalance(spectralData) {
+    if (!spectralData || !ENABLE_SPECTRAL_BALANCE) {
+        __spectral_dbg('Balanço espectral desabilitado ou dados não disponíveis');
+        return '';
+    }
+    
+    __spectral_dbg('Renderizando balanço espectral:', spectralData);
+    
+    const { bands, lowMidHigh, mode, validation } = spectralData;
+    
+    // Verificar se é modo legacy
+    if (mode === 'legacy') {
+        return renderLegacyBands(spectralData);
+    }
+    
+    // Renderizar resumo de 3 bandas
+    const summaryHTML = `
+        <div class="spectral-summary">
+            <h5>🎼 Balanço Tonal (vs Referência)</h5>
+            <div class="summary-bands">
+                <div class="summary-band ${getSpectralStatusClass(lowMidHigh.lowDB)}">
+                    <span class="band-label">Graves</span>
+                    <span class="band-value">${lowMidHigh.lowDB > 0 ? '+' : ''}${lowMidHigh.lowDB.toFixed(1)} dB</span>
+                    <span class="band-percent">(${lowMidHigh.lowPct.toFixed(1)}%)</span>
                 </div>
-            `).join('')}
+                <div class="summary-band ${getSpectralStatusClass(lowMidHigh.midDB)}">
+                    <span class="band-label">Médios</span>
+                    <span class="band-value">${lowMidHigh.midDB > 0 ? '+' : ''}${lowMidHigh.midDB.toFixed(1)} dB</span>
+                    <span class="band-percent">(${lowMidHigh.midPct.toFixed(1)}%)</span>
+                </div>
+                <div class="summary-band ${getSpectralStatusClass(lowMidHigh.highDB)}">
+                    <span class="band-label">Agudos</span>
+                    <span class="band-value">${lowMidHigh.highDB > 0 ? '+' : ''}${lowMidHigh.highDB.toFixed(1)} dB</span>
+                    <span class="band-percent">(${lowMidHigh.highPct.toFixed(1)}%)</span>
+                </div>
+            </div>
         </div>
     `;
+    
+    // Renderizar bandas detalhadas (se habilitado)
+    let detailedHTML = '';
+    if (ENABLE_SPECTRAL_UI_ADVANCED && bands && bands.length > 0) {
+        detailedHTML = `
+            <div class="spectral-detailed">
+                <h6>🔍 Análise Detalhada por Banda</h6>
+                <div class="detailed-bands">
+                    ${bands.map(band => `
+                        <div class="detailed-band ${band.colorClass}" title="${band.hzRange}">
+                            <span class="band-name">${band.band}</span>
+                            <span class="band-range">${band.hzRange}</span>
+                            <span class="band-delta">${band.deltaDB > 0 ? '+' : ''}${band.deltaDB.toFixed(1)} dB</span>
+                            <span class="band-energy">${(band.pctUser * 100).toFixed(1)}%</span>
+                            <span class="band-status ${band.status}">${getStatusIcon(band.status)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="spectral-validation">
+                    <small>
+                        ✓ ${validation.bandsProcessed} bandas processadas 
+                        | Energia total: ${(validation.totalEnergyCheck * 100).toFixed(1)}%
+                        ${validation.errors.length > 0 ? ` | ⚠️ ${validation.errors.length} avisos` : ''}
+                    </small>
+                </div>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="spectral-balance-container">
+            ${summaryHTML}
+            ${detailedHTML}
+        </div>
+    `;
+}
+
+/**
+ * 🎨 Função auxiliar para determinar classe CSS baseada no delta dB
+ */
+function getSpectralStatusClass(deltaDB) {
+    const abs = Math.abs(deltaDB);
+    if (abs <= 1.5) return 'spectral-green';      // Ideal
+    if (abs <= 3.0) return 'spectral-yellow';     // Ajustar
+    return 'spectral-red';                         // Corrigir
+}
+
+/**
+ * 🎯 Ícones de status
+ */
+function getStatusIcon(status) {
+    switch (status) {
+        case 'ideal': return '✅';
+        case 'ajustar': return '⚠️';
+        case 'corrigir': return '❌';
+        default: return '❓';
+    }
+}
+
+/**
+ * 🔄 Fallback para modo legacy
+ */
+function renderLegacyBands(spectralData) {
+    __spectral_dbg('Renderizando em modo legacy');
+    
+    if (spectralData.bands && spectralData.bands.length > 0) {
+        return `
+            <div class="frequency-bands legacy-mode">
+                <h5>Bandas de Frequência (Legacy)</h5>
+                ${spectralData.bands.map(band => `
+                    <div class="band-item">
+                        <span class="band-name">${band.name || band.band}</span>
+                        <span class="band-level">${band.value || band.deltaDB || 0} dB</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    return '<div class="spectral-fallback">Análise espectral não disponível</div>';
 }
 
 function generateDifferencesGrid(differences) {
@@ -1089,403 +1178,6 @@ function updateRefStatus(text, color) {
     if (el) { el.textContent = text; el.style.background = color || '#1f2b40'; }
 }
 
-// 🎼 ============================================
-// SPECTRAL BALANCE - SISTEMA DE BALANÇO ESPECTRAL
-// ============================================
-
-/**
- * 🎼 SPECTRAL BALANCE ANALYZER - Implementação Simplificada
- * Análise de balanço espectral por bandas com cálculo interno em porcentagem
- */
-class SpectralBalanceAnalyzer {
-    constructor(config = {}) {
-        this.config = {
-            spectralInternalMode: SPECTRAL_INTERNAL_MODE,
-            measurementTarget: { lufsTarget: -14.0, dcCutoff: 20.0, maxFreq: 16000.0 },
-            filterMethod: 'fft',
-            defaultTolerancePp: 2.5,
-            bands: SPECTRAL_BANDS_CONFIG,
-            logging: SPECTRAL_LOGGING,
-            ...config
-        };
-        this.logger = this.config.logging ? 
-            (msg) => console.log(`[SpectralBalance] ${msg}`) : () => {};
-    }
-    
-    async analyzeSpectralBalance(audioBuffer, sampleRate, referenceTargets) {
-        if (this.config.spectralInternalMode === 'legacy') {
-            this.logger('Modo legacy ativo - usando sistema anterior');
-            return null;
-        }
-        
-        try {
-            this.logger(`Analisando ${audioBuffer.length} canais, ${sampleRate}Hz`);
-            
-            // 1) Análise por bandas
-            const bandResults = await this.analyzeBands(audioBuffer, sampleRate);
-            
-            // 2) Converter para porcentagens
-            const bandsWithPercents = this.calculateEnergyPercentages(bandResults);
-            
-            // 3) Comparar com alvos
-            const bandsWithComparison = this.compareWithTargets(bandsWithPercents, referenceTargets);
-            
-            // 4) Gerar resumo (3 categorias)
-            const summary = this.generateSummary(bandsWithComparison);
-            
-            // 5) Validação
-            const validation = this.validateResults(bandsWithComparison);
-            
-            const result = {
-                timestamp: new Date().toISOString(),
-                sampleRate,
-                pipeline: {
-                    normalizedToLufs: this.config.measurementTarget.lufsTarget,
-                    filterMethod: this.config.filterMethod,
-                    mode: this.config.spectralInternalMode
-                },
-                bands: bandsWithComparison,
-                summary,
-                validation
-            };
-            
-            this.logger(`Análise concluída - ${bandsWithComparison.length} bandas processadas`);
-            return result;
-            
-        } catch (error) {
-            this.logger(`ERRO: ${error.message}`);
-            throw error;
-        }
-    }
-    
-    async analyzeBands(audioBuffer, sampleRate) {
-        const monoSignal = this.convertToMono(audioBuffer);
-        const results = [];
-        
-        for (const bandConfig of this.config.bands) {
-            const bandResult = await this.analyzeSingleBand(monoSignal, sampleRate, bandConfig);
-            results.push(bandResult);
-        }
-        
-        return results;
-    }
-    
-    async analyzeSingleBand(signal, sampleRate, bandConfig) {
-        const [minFreq, maxFreq] = bandConfig.freqRange;
-        
-        // Simulação de análise FFT (em produção, usar biblioteca FFT real)
-        let bandEnergy = this.simulateBandEnergy(signal, sampleRate, minFreq, maxFreq);
-        
-        // Aplicar fatores de correção baseados na experiência do sistema anterior
-        bandEnergy = this.applyEnergyCorrection(bandEnergy, bandConfig.name);
-        
-        const rmsDb = bandEnergy > 0 ? 10 * Math.log10(bandEnergy) : -80;
-        
-        return {
-            name: bandConfig.name,
-            freqRange: bandConfig.freqRange,
-            rmsDb,
-            powerLinear: bandEnergy
-        };
-    }
-    
-    simulateBandEnergy(signal, sampleRate, minFreq, maxFreq) {
-        // Simulação baseada na distribuição típica do Funk Mandela
-        // Em produção, substituir por análise FFT real
-        
-        const centerFreq = Math.sqrt(minFreq * maxFreq);
-        const bandwidth = maxFreq - minFreq;
-        
-        // Energia base simulada por faixa de frequência
-        let baseEnergy;
-        if (centerFreq <= 100) baseEnergy = 0.20; // Graves fortes
-        else if (centerFreq <= 400) baseEnergy = 0.15; // Médios-baixos
-        else if (centerFreq <= 1500) baseEnergy = 0.25; // Médios (vocais)
-        else if (centerFreq <= 5000) baseEnergy = 0.10; // Médios-altos
-        else baseEnergy = 0.05; // Agudos
-        
-        // Adicionar variação baseada no sinal real (simplificada)
-        const signalFactor = this.calculateSignalFactor(signal);
-        return baseEnergy * signalFactor;
-    }
-    
-    calculateSignalFactor(signal) {
-        // Análise simplificada do sinal para variação realística
-        let sum = 0;
-        for (let i = 0; i < Math.min(signal.length, 4410); i++) { // Analisa primeiros 100ms
-            sum += signal[i] * signal[i];
-        }
-        const rms = Math.sqrt(sum / Math.min(signal.length, 4410));
-        return Math.max(0.1, Math.min(2.0, rms * 10)); // Normalizar entre 0.1-2.0
-    }
-    
-    applyEnergyCorrection(energy, bandName) {
-        // Fatores de correção baseados no sistema legado
-        const corrections = {
-            'sub': 1.0,
-            'bass': 0.9,
-            'low_mid': 0.7,
-            'mid': 1.1,
-            'high_mid': 0.6,
-            'presence': 0.3,
-            'air': 0.15
-        };
-        
-        return energy * (corrections[bandName] || 1.0);
-    }
-    
-    calculateEnergyPercentages(bandResults) {
-        const totalPower = bandResults.reduce((sum, band) => sum + Math.max(0, band.powerLinear), 0);
-        
-        if (totalPower <= 0) {
-            this.logger('AVISO: Energia total zero');
-            return bandResults.map(band => ({ ...band, energyPercent: 0 }));
-        }
-        
-        return bandResults.map(band => ({
-            ...band,
-            energyPercent: (band.powerLinear / totalPower) * 100
-        }));
-    }
-    
-    compareWithTargets(bandResults, referenceTargets) {
-        if (!referenceTargets) return bandResults;
-        
-        return bandResults.map(band => {
-            const targetPercent = referenceTargets[band.name];
-            if (targetPercent === undefined) return band;
-            
-            const deltaDb = 10 * Math.log10(band.energyPercent / targetPercent);
-            const tolerancePp = this.config.defaultTolerancePp;
-            const percentDiff = Math.abs(band.energyPercent - targetPercent);
-            
-            let status;
-            if (percentDiff <= tolerancePp) status = 'ideal';
-            else if (percentDiff <= tolerancePp * 1.5) status = 'ajustar';
-            else status = 'corrigir';
-            
-            return {
-                ...band,
-                targetPercent,
-                deltaDb,
-                tolerancePp,
-                status
-            };
-        });
-    }
-    
-    generateSummary(bandResults) {
-        const categories = {
-            grave: bandResults.filter(b => ['sub', 'bass'].includes(b.name)),
-            medio: bandResults.filter(b => ['low_mid', 'mid'].includes(b.name)),
-            agudo: bandResults.filter(b => ['high_mid', 'presence', 'air'].includes(b.name))
-        };
-        
-        const summary = {};
-        
-        Object.entries(categories).forEach(([categoryName, bands]) => {
-            const totalPower = bands.reduce((sum, band) => sum + band.powerLinear, 0);
-            const totalPercent = bands.reduce((sum, band) => sum + band.energyPercent, 0);
-            const avgTargetPercent = bands
-                .filter(band => band.targetPercent !== undefined)
-                .reduce((sum, band, _, arr) => sum + band.targetPercent / arr.length, 0) * bands.length;
-            
-            summary[categoryName] = {
-                name: categoryName,
-                freqRange: [
-                    Math.min(...bands.map(b => b.freqRange[0])),
-                    Math.max(...bands.map(b => b.freqRange[1]))
-                ],
-                rmsDb: totalPower > 0 ? 10 * Math.log10(totalPower) : -80,
-                powerLinear: totalPower,
-                energyPercent: totalPercent,
-                targetPercent: avgTargetPercent > 0 ? avgTargetPercent : undefined,
-                deltaDb: avgTargetPercent > 0 ? 10 * Math.log10(totalPercent / avgTargetPercent) : undefined,
-                status: this.determineAggregatedStatus(bands)
-            };
-        });
-        
-        return summary;
-    }
-    
-    validateResults(bandResults) {
-        const errors = [];
-        const totalPercent = bandResults.reduce((sum, band) => sum + band.energyPercent, 0);
-        
-        if (Math.abs(totalPercent - 100) > 1.0) {
-            errors.push(`Total: ${totalPercent.toFixed(1)}% ≠ 100%`);
-        }
-        
-        bandResults.forEach(band => {
-            if (!Number.isFinite(band.energyPercent) || band.energyPercent < 0) {
-                errors.push(`Banda ${band.name}: valor inválido`);
-            }
-        });
-        
-        return {
-            totalEnergyCheck: totalPercent / 100,
-            bandsProcessed: bandResults.length,
-            errors
-        };
-    }
-    
-    convertToMono(audioBuffer) {
-        if (audioBuffer.length === 1) return audioBuffer[0];
-        
-        const length = audioBuffer[0].length;
-        const mono = new Float32Array(length);
-        
-        for (let i = 0; i < length; i++) {
-            let sum = 0;
-            for (let ch = 0; ch < audioBuffer.length; ch++) {
-                sum += audioBuffer[ch][i];
-            }
-            mono[i] = sum / audioBuffer.length;
-        }
-        
-        return mono;
-    }
-    
-    determineAggregatedStatus(bands) {
-        const statuses = bands.map(band => band.status).filter(Boolean);
-        if (statuses.includes('corrigir')) return 'corrigir';
-        if (statuses.includes('ajustar')) return 'ajustar';
-        return 'ideal';
-    }
-}
-
-/**
- * 🎯 INTEGRAÇÃO ESPECTRAL - Carregar alvos de referência
- */
-async function loadSpectralReferenceTargets(genreName) {
-    try {
-        // Carregar do JSON atualizado
-        const paths = [
-            `/refs/out/${genreName}.json`,
-            `./refs/out/${genreName}.json`,
-            `refs/out/${genreName}.json`
-        ];
-        
-        for (const path of paths) {
-            try {
-                const response = await fetch(path + '?v=' + Date.now());
-                if (response.ok) {
-                    const data = await response.json();
-                    const spectralBalance = data[genreName]?.spectralBalance;
-                    
-                    if (spectralBalance && spectralBalance.bands) {
-                        const targets = {};
-                        Object.entries(spectralBalance.bands).forEach(([bandName, config]) => {
-                            if (config.target_energy_percent !== undefined) {
-                                targets[bandName] = config.target_energy_percent;
-                            }
-                        });
-                        
-                        if (Object.keys(targets).length > 0) {
-                            __spectralReferenceTargets[genreName] = targets;
-                            console.log(`[SpectralIntegration] Alvos carregados para ${genreName}: ${Object.keys(targets).length} bandas`);
-                            return targets;
-                        }
-                    }
-                }
-            } catch (e) {
-                // Tentar próximo path
-                continue;
-            }
-        }
-        
-        console.log(`[SpectralIntegration] Nenhum alvo espectral encontrado para ${genreName}`);
-        return null;
-        
-    } catch (error) {
-        console.warn(`[SpectralIntegration] Erro ao carregar alvos: ${error.message}`);
-        return null;
-    }
-}
-
-/**
- * 🎼 ANÁLISE ESPECTRAL INTEGRADA - Função principal
- */
-async function analyzeSpectralBalance(audioBuffer, sampleRate, genreName) {
-    if (SPECTRAL_INTERNAL_MODE === 'legacy') {
-        console.log('[SpectralIntegration] Modo legacy ativo - pulando análise espectral');
-        return null;
-    }
-    
-    try {
-        const analyzer = new SpectralBalanceAnalyzer();
-        
-        // Carregar alvos de referência
-        let referenceTargets = __spectralReferenceTargets[genreName];
-        if (!referenceTargets && genreName) {
-            referenceTargets = await loadSpectralReferenceTargets(genreName);
-        }
-        
-        // Executar análise
-        const result = await analyzer.analyzeSpectralBalance(audioBuffer, sampleRate, referenceTargets);
-        
-        // Cache do resultado
-        __spectralBalanceCache[genreName || 'default'] = result;
-        
-        return result;
-        
-    } catch (error) {
-        console.error(`[SpectralIntegration] Erro na análise: ${error.message}`);
-        return null;
-    }
-}
-
-/**
- * 🎨 CONVERSÃO PARA UI - Converter resultado espectral para formato de exibição
- */
-function convertSpectralToLegacyUI(spectralResult, genreName) {
-    if (!spectralResult) return null;
-    
-    try {
-        const legacyBands = {};
-        
-        // Converter bandas individuais
-        spectralResult.bands.forEach(band => {
-            legacyBands[band.name] = {
-                energy_db: band.rmsDb,
-                rms_db: band.rmsDb,
-                target_db: band.deltaDb ? (band.rmsDb - band.deltaDb) : undefined,
-                tolerance_db: band.tolerancePp ? (band.tolerancePp * 0.4) : undefined,
-                range_hz: band.freqRange,
-                status: band.status || 'unknown',
-                // Campos novos para compatibilidade
-                energy_percent: band.energyPercent,
-                target_percent: band.targetPercent,
-                delta_db: band.deltaDb
-            };
-        });
-        
-        // Adicionar resumo (3 categorias)
-        Object.entries(spectralResult.summary).forEach(([category, data]) => {
-            legacyBands[category] = {
-                energy_db: data.rmsDb,
-                rms_db: data.rmsDb,
-                range_hz: data.freqRange,
-                status: data.status,
-                category: true,
-                energy_percent: data.energyPercent,
-                target_percent: data.targetPercent,
-                delta_db: data.deltaDb
-            };
-        });
-        
-        return legacyBands;
-        
-    } catch (error) {
-        console.error(`[SpectralIntegration] Erro na conversão UI: ${error.message}`);
-        return null;
-    }
-}
-
-// 🎼 ============================================
-// FIM DO SISTEMA DE BALANÇO ESPECTRAL
-// ============================================
-
 function applyGenreSelection(genre) {
     if (!genre) return Promise.resolve();
     window.PROD_AI_REF_GENRE = genre;
@@ -1663,19 +1355,6 @@ function initializeAudioAnalyzerIntegration() {
                 const v = params.get('debug');
                 window.DEBUG_ANALYZER = (v === '1' || v === 'true');
                 __dbg(`[FLAG] DEBUG_ANALYZER = ${window.DEBUG_ANALYZER}`);
-            }
-            // 🎼 SPECTRAL BALANCE - Feature flags por URL
-            if (params.has('spectral')) {
-                const v = params.get('spectral');
-                if (v === 'legacy' || v === 'percent') {
-                    window.SPECTRAL_INTERNAL_MODE = v;
-                    __dbg(`[FLAG] SPECTRAL_INTERNAL_MODE = ${window.SPECTRAL_INTERNAL_MODE} (via URL)`);
-                }
-            }
-            if (params.has('spectralLog')) {
-                const v = params.get('spectralLog');
-                window.SPECTRAL_LOGGING = !(v === '0' || v === 'false');
-                __dbg(`[FLAG] SPECTRAL_LOGGING = ${window.SPECTRAL_LOGGING}`);
             }
             // Preferir métricas avançadas (ITU/oversampling) quando disponíveis, sem sobrescrever configs do usuário
             if (typeof window.PREFER_ADVANCED_METRICS === 'undefined') {
@@ -2314,59 +1993,6 @@ async function handleGenreFileSelection(file) {
     currentModalAnalysis = analysis;
     
     __dbg('✅ Análise concluída:', analysis);
-    
-    // 🎼 INTEGRAÇÃO ESPECTRAL - Executar análise de balanço espectral
-    if (SPECTRAL_INTERNAL_MODE === 'percent' && analysis && analysis.audioBuffer) {
-        try {
-            updateModalProgress(85, '🎼 Analisando Balanço Espectral...');
-            const genreName = window.PROD_AI_REF_GENRE || 'funk_mandela';
-            
-            __dbg(`🎼 Executando análise espectral - Gênero: ${genreName}`);
-            const spectralResult = await analyzeSpectralBalance(
-                analysis.audioBuffer, 
-                analysis.sampleRate || 44100,
-                genreName
-            );
-            
-            if (spectralResult) {
-                // Converter para formato legado (compatibilidade)
-                const legacySpectralBands = convertSpectralToLegacyUI(spectralResult, genreName);
-                
-                // Integrar com resultado principal
-                if (legacySpectralBands) {
-                    analysis.spectralBalance = spectralResult;
-                    analysis.bands = { ...analysis.bands, ...legacySpectralBands };
-                    
-                    console.log('🎼 INTEGRAÇÃO: spectralBalance definido!', analysis.spectralBalance);
-                    console.log('🎼 INTEGRAÇÃO: bands atualizadas!', Object.keys(analysis.bands));
-                    
-                    // Adicionar informações de debug
-                    analysis._spectralDebug = {
-                        mode: SPECTRAL_INTERNAL_MODE,
-                        bandsProcessed: spectralResult.bands.length,
-                        totalEnergyCheck: spectralResult.validation.totalEnergyCheck,
-                        errors: spectralResult.validation.errors
-                    };
-                    
-                    __dbg(`🎼 Balanço espectral integrado - ${spectralResult.bands.length} bandas processadas`);
-                    
-                    // Log das porcentagens para debug
-                    spectralResult.bands.forEach(band => {
-                        const delta = band.deltaDb ? `${band.deltaDb > 0 ? '+' : ''}${band.deltaDb.toFixed(1)}dB` : 'N/A';
-                        __dbg(`  ${band.name}: ${band.energyPercent.toFixed(1)}% (${delta}) - ${band.status || 'N/A'}`);
-                    });
-                }
-            } else {
-                __dbg('🎼 Análise espectral retornou null - usando sistema legado');
-            }
-            
-        } catch (spectralError) {
-            console.warn(`[SpectralIntegration] Erro na análise espectral: ${spectralError.message}`);
-            __dbg(`🎼 Erro espectral: ${spectralError.message} - continuando com sistema legado`);
-        }
-    } else {
-        __dbg(`🎼 Análise espectral pulada - Modo: ${SPECTRAL_INTERNAL_MODE}, Buffer disponível: ${!!analysis?.audioBuffer}`);
-    }
     
     updateModalProgress(90, '🧠 Computando Métricas Avançadas...');
     
@@ -4103,194 +3729,9 @@ function displayModalResults(analysis) {
             </div>
         `;
     
-    // 🎼 EXIBIR SEÇÃO ESPECTRAL se disponível
-    const currentSpectralMode = window.SPECTRAL_INTERNAL_MODE || 'percent';
-    console.log('🎼 DEBUG: spectralBalance existe?', !!analysis.spectralBalance);
-    console.log('🎼 DEBUG: modo atual:', currentSpectralMode);
-    console.log('🎼 DEBUG: analysis completo:', analysis);
-    
-    // FORÇAR RENDERIZAÇÃO PARA DEBUG
-    if (analysis.spectralBalance) {
-        try {
-            console.log('🎼 FORÇANDO renderização da seção espectral...');
-            renderSpectralBalanceSection(analysis.spectralBalance, analysis);
-        } catch(spectralRenderError) {
-            console.error('🎼 ERRO ao renderizar seção espectral:', spectralRenderError);
-        }
-    } else {
-        console.error('🎼 spectralBalance NÃO EXISTE em analysis!');
-    }
-    
     try { renderReferenceComparisons(analysis); } catch(e){ console.warn('ref compare fail', e);}    
         try { if (window.CAIAR_ENABLED) injectValidationControls(); } catch(e){ console.warn('validation controls fail', e); }
     __dbg('📊 Resultados exibidos no modal');
-}
-
-// 🎼 RENDERIZAR SEÇÃO DE BALANÇO ESPECTRAL
-function renderSpectralBalanceSection(spectralData, analysis) {
-    console.log('🎼 renderSpectralBalanceSection INICIADA');
-    console.log('🎼 spectralData:', spectralData);
-    
-    // Tentar múltiplos containers
-    const technicalData = document.getElementById('modalTechnicalData');
-    const modalContent = document.querySelector('.modal-content');
-    const modalBody = document.querySelector('.modal-body');
-    
-    console.log('🎼 Containers disponíveis:', {
-        technicalData: !!technicalData,
-        modalContent: !!modalContent, 
-        modalBody: !!modalBody
-    });
-    
-    const targetContainer = technicalData || modalContent || modalBody;
-    
-    if (!targetContainer) {
-        console.error('🎼 NENHUM container encontrado para a seção espectral!');
-        return;
-    }
-    if (!spectralData) {
-        console.error('🎼 spectralData não fornecido!');
-        return;
-    }
-    
-    // Remover seção existente se houver
-    const existingSection = document.getElementById('spectralBalanceSection');
-    if (existingSection) {
-        existingSection.remove();
-    }
-    
-    console.log('🎼 Criando seção espectral em:', targetContainer.tagName, targetContainer.id || targetContainer.className);
-    
-    // Crear seção espectral
-    const spectralSection = document.createElement('div');
-    spectralSection.id = 'spectralBalanceSection';
-    spectralSection.className = 'card';
-    spectralSection.style.cssText = `
-        margin-top: 16px;
-        background: linear-gradient(135deg, rgba(16, 16, 32, 0.9) 0%, rgba(32, 16, 48, 0.8) 100%);
-        border: 1px solid rgba(147, 51, 234, 0.3);
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    `;
-    
-    // Gerar HTML das bandas
-    const bandsHtml = spectralData.bands.map(band => {
-        const deltaPercent = ((band.energyPercent / band.targetPercent) - 1) * 100;
-        const deltaDb = band.deltaDb || 0;
-        
-        // Determinar cor baseada no status
-        let statusColor = '#4ade80'; // verde
-        let statusText = 'Ideal';
-        let statusIcon = '✅';
-        
-        if (Math.abs(deltaDb) > 3) {
-            statusColor = '#ef4444'; // vermelho
-            statusText = 'Corrigir';
-            statusIcon = '🔴';
-        } else if (Math.abs(deltaDb) > 1.5) {
-            statusColor = '#f59e0b'; // amarelo
-            statusText = 'Ajustar';
-            statusIcon = '⚠️';
-        }
-        
-        // Gerar sugestão DAW
-        const dawSuggestion = convertEnergyToDbSuggestion(
-            band.energyPercent, 
-            band.targetPercent, 
-            band.name
-        );
-        
-        return `
-            <div class="spectral-band" style="
-                background: rgba(255,255,255,0.02);
-                border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 8px;
-                padding: 12px;
-                margin-bottom: 8px;
-            ">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="color: ${statusColor}; font-size: 16px;">${statusIcon}</span>
-                        <strong style="color: #fff; font-size: 14px;">${band.displayName || band.name}</strong>
-                        <span style="color: #666; font-size: 12px;">${band.freqRange}</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="color: ${statusColor}; font-weight: 600; font-size: 12px;">${statusText}</div>
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 12px;">
-                    <div>
-                        <div style="color: #888; margin-bottom: 2px;">Energia Atual</div>
-                        <div style="color: #fff; font-weight: 600;">${band.energyPercent.toFixed(1)}%</div>
-                        <div style="color: #666; font-size: 10px;">(${band.rmsDb.toFixed(1)}dB)</div>
-                    </div>
-                    
-                    <div>
-                        <div style="color: #888; margin-bottom: 2px;">Target</div>
-                        <div style="color: #fff;">${band.targetPercent.toFixed(1)}%</div>
-                        <div style="color: #666; font-size: 10px;">Diferença: ${deltaDb > 0 ? '+' : ''}${deltaDb.toFixed(1)}dB</div>
-                    </div>
-                    
-                    <div>
-                        <div style="color: #888; margin-bottom: 2px;">Sugestão DAW</div>
-                        <div style="color: ${statusColor}; font-weight: 600;">${dawSuggestion.daw_instruction}</div>
-                        <div style="color: #666; font-size: 10px;">Urgência: ${dawSuggestion.urgency}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-    
-    // Calcular estatísticas resumo
-    const bandsOutOfRange = spectralData.bands.filter(b => Math.abs(b.deltaDb || 0) > 1.5).length;
-    const totalBands = spectralData.bands.length;
-    const balanceScore = ((totalBands - bandsOutOfRange) / totalBands * 100).toFixed(0);
-    
-    spectralSection.innerHTML = `
-        <div class="card-title">🎼 Balanço Espectral (Análise em % Energia)</div>
-        
-        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="color: #3b82f6; font-weight: 600; margin-bottom: 4px;">Score de Balanço: ${balanceScore}%</div>
-                    <div style="color: #888; font-size: 12px;">
-                        ${totalBands - bandsOutOfRange} de ${totalBands} bandas no alvo 
-                        ${bandsOutOfRange > 0 ? `• ${bandsOutOfRange} bandas precisam ajuste` : '• Mixagem equilibrada!'}
-                    </div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="color: #3b82f6; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
-                        Modo: ${SPECTRAL_INTERNAL_MODE}
-                    </div>
-                    <div style="color: #666; font-size: 10px;">
-                        Cálculo: % energia real
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        ${bandsHtml}
-        
-        <div style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; font-size: 11px; color: #888;">
-            💡 <strong>Como usar:</strong> Valores em dB são aplicáveis diretamente no EQ da sua DAW. 
-            Análise baseada em energia real (%) para precisão máxima.
-        </div>
-    `;
-    
-    // Adicionar à interface
-    console.log('🎼 Tentando adicionar seção ao DOM...');
-    console.log('🎼 targetContainer element:', targetContainer);
-    console.log('🎼 spectralSection element:', spectralSection);
-    
-    targetContainer.appendChild(spectralSection);
-    
-    // Verificar se foi realmente adicionado
-    const added = document.getElementById('spectralBalanceSection');
-    console.log('🎼 Seção adicionada ao DOM?', !!added);
-    console.log('🎼 Seção espectral renderizada na interface - SUCESSO!');
-    __dbg('🎼 Seção espectral renderizada na interface');
 }
 
     // === Controles de Validação (Suite Objetiva + Subjetiva) ===
