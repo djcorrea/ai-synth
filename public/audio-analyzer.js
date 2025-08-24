@@ -2705,6 +2705,7 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               
               spectralBands.forEach(band => {
                 const mappedName = bandMapping[band.name];
+                console.log(`🔍 SPECTRAL MAPPING: ${band.name} -> ${mappedName}, rmsDb: ${band.rmsDb}`);
                 if (mappedName) {
                   // 🔧 CORREÇÃO CRÍTICA: Usar valor RMS real calculado corretamente
                   bandEnergies[mappedName] = { 
@@ -2713,6 +2714,7 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                     energyPct: band.energyPct,
                     scale: 'spectral_balance_auto' 
                   };
+                  console.log(`✅ MAPPED: ${mappedName} = ${band.rmsDb.toFixed(2)} dB`);
                 }
               });
               
@@ -2757,6 +2759,26 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                   }
                 }
               });
+              
+              // 🔧 CORREÇÃO FINAL: Garantir que brilho e presenca usem dados espectrais corretos
+              if (baseAnalysis.spectralBalance && baseAnalysis.spectralBalance.summary3Bands) {
+                const spectralSummary = baseAnalysis.spectralBalance.summary3Bands;
+                
+                // Usar dados espectrais diretos para brilho (High band)
+                if (spectralSummary.High && bandEnergies.brilho) {
+                  bandEnergies.brilho.rms_db = spectralSummary.High.rmsDb;
+                  bandEnergies.brilho.energyPct = spectralSummary.High.energyPct;
+                  console.log(`🔧 BRILHO CORRIGIDO: ${spectralSummary.High.rmsDb.toFixed(2)} dB (era ${bandEnergies.brilho.rms_db})`);
+                }
+                
+                // Para presenca, vamos usar a banda Presence específica se existir
+                const presenceBand = spectralBands.find(b => b.name === 'Presence');
+                if (presenceBand && bandEnergies.presenca) {
+                  bandEnergies.presenca.rms_db = presenceBand.rmsDb;
+                  bandEnergies.presenca.energyPct = presenceBand.energyPct;
+                  console.log(`🔧 PRESENÇA CORRIGIDA: ${presenceBand.rmsDb.toFixed(2)} dB (era ${bandEnergies.presenca.rms_db})`);
+                }
+              }
               
               td.bandEnergies = bandEnergies;
               (td._sources = td._sources || {}).bandEnergies = 'spectral_balance_auto_fft';
