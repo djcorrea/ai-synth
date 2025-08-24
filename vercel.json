@@ -1,7 +1,7 @@
 {
   "version": 2,
   "env": {
-    "FORCE_REBUILD": "1724440290",
+    "FORCE_REBUILD": "1724440590",
     "NODE_ENV": "production"
   },
   "builds": [
@@ -11,6 +11,13 @@
     { "src": "lib/**", "use": "@vercel/static" }
   ],
   "routes": [
+    { 
+      "src": "/audio-analyzer-integration.js", 
+      "dest": "/public/audio-analyzer-integration.js",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
     { 
       "src": "/refs/embedded-refs.js", 
       "dest": "/public/refs/embedded-refs.js",

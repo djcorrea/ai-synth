@@ -4136,13 +4136,26 @@ function renderSpectralBalanceSection(spectralData, analysis) {
         return;
     }
     
+    // Remover seção existente se houver
+    const existingSection = document.getElementById('spectralBalanceSection');
+    if (existingSection) {
+        existingSection.remove();
+    }
+    
     console.log('🎼 Criando seção espectral...');
     
     // Crear seção espectral
     const spectralSection = document.createElement('div');
     spectralSection.id = 'spectralBalanceSection';
-    spectralSection.className = 'card card-span-2';
-    spectralSection.style.marginTop = '16px';
+    spectralSection.className = 'card';
+    spectralSection.style.cssText = `
+        margin-top: 16px;
+        background: linear-gradient(135deg, rgba(16, 16, 32, 0.9) 0%, rgba(32, 16, 48, 0.8) 100%);
+        border: 1px solid rgba(147, 51, 234, 0.3);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
     
     // Gerar HTML das bandas
     const bandsHtml = spectralData.bands.map(band => {
