@@ -40,6 +40,43 @@ let referenceStepState = {
 
 // 🎯 Funções de Acessibilidade e Gestão de Modais
 
+function openModeSelectionModal() {
+    const modal = document.getElementById('analysisModeModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        
+        // Foco no primeiro botão
+        const firstButton = modal.querySelector('.mode-card button');
+        if (firstButton) {
+            firstButton.focus();
+        }
+        
+        // Adicionar listener para ESC
+        document.addEventListener('keydown', handleModalEscapeKey);
+        
+        // Trap focus no modal
+        trapFocus(modal);
+    }
+}
+
+function closeModeSelectionModal() {
+    const modal = document.getElementById('analysisModeModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        
+        // Remover listeners
+        document.removeEventListener('keydown', handleModalEscapeKey);
+        
+        // Retornar foco para o botão que abriu o modal
+        const audioAnalysisBtn = document.querySelector('button[onclick="openAudioModal()"]');
+        if (audioAnalysisBtn) {
+            audioAnalysisBtn.focus();
+        }
+    }
+}
+
 function handleModalEscapeKey(e) {
     if (e.key === 'Escape') {
         closeModeSelectionModal();
@@ -69,6 +106,25 @@ function trapFocus(modal) {
     };
     
     modal.addEventListener('keydown', handleTabKey);
+}
+
+// 🎯 Função Principal de Seleção de Modo
+function selectAnalysisMode(mode) {
+    console.log('🎯 Modo selecionado:', mode);
+    
+    // Armazenar modo selecionado
+    window.currentAnalysisMode = mode;
+    
+    // Fechar modal de seleção
+    closeModeSelectionModal();
+    
+    if (mode === 'genre') {
+        // Modo tradicional - abrir modal de análise normal
+        openAnalysisModalForMode('genre');
+    } else if (mode === 'reference') {
+        // Modo referência - abrir interface específica
+        openAnalysisModalForMode('reference');
+    }
 }
 
 // 🎯 Modal de Análise por Referência
@@ -2516,34 +2572,57 @@ function displayModalResults(analysis) {
                 </div>`;
         };
 
+        // 🎯 CENTRALIZAÇÃO DAS MÉTRICAS - Funções de acesso unificado
+        const getMetric = (metricPath, fallbackPath = null) => {
+            // Prioridade: metrics centralizadas > technicalData legado > fallback
+            const centralizedValue = analysis.metrics && getNestedValue(analysis.metrics, metricPath);
+            if (Number.isFinite(centralizedValue)) {
+                // Log temporário para validação
+                if (typeof window !== 'undefined' && window.METRICS_UI_VALIDATION !== false) {
+                    const legacyValue = fallbackPath ? getNestedValue(analysis.technicalData, fallbackPath) : getNestedValue(analysis.technicalData, metricPath);
+                    if (Number.isFinite(legacyValue) && Math.abs(centralizedValue - legacyValue) > 0.01) {
+                        console.warn(`🎯 METRIC_DIFF: ${metricPath} centralized=${centralizedValue} vs legacy=${legacyValue}`);
+                    }
+                }
+                return centralizedValue;
+            }
+            
+            // Fallback para technicalData legado
+            const legacyValue = fallbackPath ? getNestedValue(analysis.technicalData, fallbackPath) : getNestedValue(analysis.technicalData, metricPath);
+            return Number.isFinite(legacyValue) ? legacyValue : null;
+        };
+        
+        const getNestedValue = (obj, path) => {
+            return path.split('.').reduce((current, key) => current?.[key], obj);
+        };
+
         const safePct = (v) => (Number.isFinite(v) ? `${(v*100).toFixed(0)}%` : '—');
         const monoCompat = (s) => s ? s : '—';
 
-        // Função para obter o valor LUFS integrado usando a prioridade correta
+        // Função para obter o valor LUFS integrado usando métricas centralizadas
         const getLufsIntegratedValue = () => {
-            const data = analysis.technicalData;
-            return data.lufs?.integrated ?? data.metrics?.lufs ?? data.lufsIntegrated;
+            return getMetric('lufs_integrated', 'lufsIntegrated');
         };
 
         const col1 = [
-            row('Peak', `${safeFixed(analysis.technicalData.peak)} dB`, 'peak'),
-            row('RMS', `${safeFixed(analysis.technicalData.rms)} dB`, 'rms'),
-            row('DR', `${safeFixed(analysis.technicalData.dynamicRange)} dB`, 'dynamicRange'),
-            row('Crest Factor', `${safeFixed(analysis.technicalData.crestFactor)}`, 'crestFactor'),
-            row('True Peak', (advancedReady && Number.isFinite(analysis.technicalData.truePeakDbtp)) ? `${safeFixed(analysis.technicalData.truePeakDbtp)} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
+            row('Peak', `${safeFixed(getMetric('peak_db', 'peak'))} dB`, 'peak'),
+            row('RMS', `${safeFixed(getMetric('rms_db', 'rms'))} dB`, 'rms'),
+            row('DR', `${safeFixed(getMetric('dynamic_range', 'dynamicRange'))} dB`, 'dynamicRange'),
+            row('Crest Factor', `${safeFixed(getMetric('crest_factor', 'crestFactor'))}`, 'crestFactor'),
+            row('True Peak', (advancedReady && Number.isFinite(getMetric('true_peak_dbtp', 'truePeakDbtp'))) ? `${safeFixed(getMetric('true_peak_dbtp', 'truePeakDbtp'))} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
             row('Volume Integrado (padrão streaming)', (advancedReady && Number.isFinite(getLufsIntegratedValue())) ? `${safeFixed(getLufsIntegratedValue())} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
-            row('LRA', (advancedReady && Number.isFinite(analysis.technicalData.lra)) ? `${safeFixed(analysis.technicalData.lra)} dB` : (advancedReady? '—':'⏳'), 'lra')
+            row('LRA', (advancedReady && Number.isFinite(getMetric('lra'))) ? `${safeFixed(getMetric('lra'))} dB` : (advancedReady? '—':'⏳'), 'lra')
             ].join('');
 
         const col2 = [
-            row('Correlação', Number.isFinite(analysis.technicalData.stereoCorrelation) ? safeFixed(analysis.technicalData.stereoCorrelation, 2) : '—', 'stereoCorrelation'),
-            row('Largura', Number.isFinite(analysis.technicalData.stereoWidth) ? safeFixed(analysis.technicalData.stereoWidth, 2) : '—', 'stereoWidth'),
-            row('Balance', Number.isFinite(analysis.technicalData.balanceLR) ? safePct(analysis.technicalData.balanceLR) : '—', 'balanceLR'),
-            row('Mono Compat.', monoCompat(analysis.technicalData.monoCompatibility), 'monoCompatibility'),
-            row('Centroide', Number.isFinite(analysis.technicalData.spectralCentroid) ? safeHz(analysis.technicalData.spectralCentroid) : '—', 'spectralCentroid'),
-            row('Rolloff (85%)', Number.isFinite(analysis.technicalData.spectralRolloff85) ? safeHz(analysis.technicalData.spectralRolloff85) : '—', 'spectralRolloff85'),
-            row('Flux', Number.isFinite(analysis.technicalData.spectralFlux) ? safeFixed(analysis.technicalData.spectralFlux, 3) : '—', 'spectralFlux'),
-            row('Flatness', Number.isFinite(analysis.technicalData.spectralFlatness) ? safeFixed(analysis.technicalData.spectralFlatness, 3) : '—', 'spectralFlatness')
+            row('Correlação', Number.isFinite(getMetric('stereo_correlation', 'stereoCorrelation')) ? safeFixed(getMetric('stereo_correlation', 'stereoCorrelation'), 2) : '—', 'stereoCorrelation'),
+            row('Largura', Number.isFinite(getMetric('stereo_width', 'stereoWidth')) ? safeFixed(getMetric('stereo_width', 'stereoWidth'), 2) : '—', 'stereoWidth'),
+            row('Balance', Number.isFinite(getMetric('balance_lr', 'balanceLR')) ? safePct(getMetric('balance_lr', 'balanceLR')) : '—', 'balanceLR'),
+            row('Mono Compat.', monoCompat(getMetric('mono_compatibility', 'monoCompatibility')), 'monoCompatibility'),
+            row('Centroide', Number.isFinite(getMetric('spectral_centroid', 'spectralCentroid')) ? safeHz(getMetric('spectral_centroid', 'spectralCentroid')) : '—', 'spectralCentroid'),
+            row('Rolloff (85%)', Number.isFinite(getMetric('spectral_rolloff_85', 'spectralRolloff85')) ? safeHz(getMetric('spectral_rolloff_85', 'spectralRolloff85')) : '—', 'spectralRolloff85'),
+            row('Flux', Number.isFinite(getMetric('spectral_flux', 'spectralFlux')) ? safeFixed(getMetric('spectral_flux', 'spectralFlux'), 3) : '—', 'spectralFlux'),
+            row('Flatness', Number.isFinite(getMetric('spectral_flatness', 'spectralFlatness')) ? safeFixed(getMetric('spectral_flatness', 'spectralFlatness'), 3) : '—', 'spectralFlatness')
         ].join('');
 
             const col3Extras = (()=>{
@@ -3594,25 +3673,71 @@ function renderReferenceComparisons(analysis) {
             ${diffCell}
         </tr>`);
     };
+    // 🎯 CENTRALIZAÇÃO DAS MÉTRICAS - Função de acesso para comparação por referência
+    const getMetricForRef = (metricPath, fallbackPath = null) => {
+        // Prioridade: analysis.metrics > tech (technicalData) > fallback
+        const centralizedValue = analysis.metrics && getNestedValue(analysis.metrics, metricPath);
+        if (Number.isFinite(centralizedValue)) {
+            // Log temporário para validação
+            if (typeof window !== 'undefined' && window.METRICS_REF_VALIDATION !== false) {
+                const legacyValue = fallbackPath ? getNestedValue(tech, fallbackPath) : getNestedValue(tech, metricPath);
+                if (Number.isFinite(legacyValue) && Math.abs(centralizedValue - legacyValue) > 0.01) {
+                    console.warn(`🎯 REF_METRIC_DIFF: ${metricPath} centralized=${centralizedValue} vs legacy=${legacyValue}`);
+                }
+            }
+            return centralizedValue;
+        }
+        
+        // Fallback para technicalData legado
+        const legacyValue = fallbackPath ? getNestedValue(tech, fallbackPath) : getNestedValue(tech, metricPath);
+        return Number.isFinite(legacyValue) ? legacyValue : null;
+    };
+    
+    const getNestedValue = (obj, path) => {
+        return path.split('.').reduce((current, key) => current?.[key], obj);
+    };
+    
     // Usar somente métricas reais (sem fallback para RMS/Peak, que têm unidades e conceitos distintos)
-    // Função para obter o valor LUFS integrado usando a prioridade correta
+    // Função para obter o valor LUFS integrado usando métricas centralizadas
     const getLufsIntegratedValue = () => {
-        return tech.lufs?.integrated ?? tech.metrics?.lufs ?? tech.lufsIntegrated;
+        return getMetricForRef('lufs_integrated', 'lufsIntegrated');
     };
     
     pushRow('Volume Integrado (padrão streaming)', getLufsIntegratedValue(), ref.lufs_target, ref.tol_lufs, ' LUFS');
-    pushRow('True Peak', tech.truePeakDbtp, ref.true_peak_target, ref.tol_true_peak, ' dBTP');
-    pushRow('DR', tech.dynamicRange, ref.dr_target, ref.tol_dr, '');
-    pushRow('LRA', tech.lra, ref.lra_target, ref.tol_lra, '');
-    pushRow('Stereo Corr.', tech.stereoCorrelation, ref.stereo_target, ref.tol_stereo, '');
-    // Bandas detalhadas Fase 2: priorizar bandEnergies completas se disponíveis
-    const preferLog = (typeof window !== 'undefined' && window.USE_LOG_BAND_ENERGIES === true);
-    const bandEnergies = (preferLog ? (tech.bandEnergiesLog || tech.bandEnergies) : tech.bandEnergies) || null;
-    if (bandEnergies && ref.bands) {
+    pushRow('True Peak', getMetricForRef('true_peak_dbtp', 'truePeakDbtp'), ref.true_peak_target, ref.tol_true_peak, ' dBTP');
+    pushRow('DR', getMetricForRef('dynamic_range', 'dynamicRange'), ref.dr_target, ref.tol_dr, '');
+    pushRow('LRA', getMetricForRef('lra'), ref.lra_target, ref.tol_lra, '');
+    pushRow('Stereo Corr.', getMetricForRef('stereo_correlation', 'stereoCorrelation'), ref.stereo_target, ref.tol_stereo, '');
+    
+    // Bandas detalhadas Fase 2: usar métricas centralizadas para bandas
+    const centralizedBands = analysis.metrics?.bands;
+    const legacyBandEnergies = tech.bandEnergies || null;
+    
+    // Priorizar bandas centralizadas se disponíveis
+    const bandsToUse = centralizedBands && Object.keys(centralizedBands).length > 0 ? centralizedBands : legacyBandEnergies;
+    
+    if (bandsToUse && ref.bands) {
         const normMap = (analysis?.technicalData?.refBandTargetsNormalized?.mapping) || null;
         const showNorm = (typeof window !== 'undefined' && window.SHOW_NORMALIZED_REF_TARGETS === true && normMap);
+        
         for (const [band, refBand] of Object.entries(ref.bands)) {
-            const bLocal = bandEnergies[band];
+            let bLocal;
+            
+            // Acessar dados da banda (centralizadas vs legado)
+            if (centralizedBands && centralizedBands[band]) {
+                bLocal = { rms_db: centralizedBands[band].energy_db };
+                
+                // Log temporário para validação
+                if (typeof window !== 'undefined' && window.METRICS_BANDS_VALIDATION !== false && legacyBandEnergies?.[band]) {
+                    const legacyValue = legacyBandEnergies[band].rms_db;
+                    if (Number.isFinite(legacyValue) && Math.abs(centralizedBands[band].energy_db - legacyValue) > 0.01) {
+                        console.warn(`🎯 BAND_DIFF: ${band} centralized=${centralizedBands[band].energy_db} vs legacy=${legacyValue}`);
+                    }
+                }
+            } else {
+                bLocal = legacyBandEnergies?.[band];
+            }
+            
             if (bLocal && Number.isFinite(bLocal.rms_db)) {
                 let tgt = null;
                 if (!refBand._target_na && Number.isFinite(refBand.target_db)) tgt = refBand.target_db;
@@ -3715,59 +3840,12 @@ function updateReferenceSuggestions(analysis) {
         if (!Number.isFinite(val) || !Number.isFinite(target) || !Number.isFinite(tol)) return;
         const diff = val - target;
         if (Math.abs(diff) <= tol) return; // dentro da tolerância
-        
-        // 🎯 LINGUAGEM ESPECÍFICA POR MÉTRICA
-        let message, action;
-        const absDiff = Math.abs(diff);
-        
-        if (type === 'reference_true_peak') {
-            // True Peak: valores mais altos = menos limitação, valores mais baixos = mais limitação
-            if (diff > 0) {
-                message = `True Peak muito alto (${val.toFixed(1)}${unit} vs ${target}${unit})`;
-                action = `Aumentar limitação para ${target}${unit}`;
-            } else {
-                message = `True Peak muito baixo (${val.toFixed(1)}${unit} vs ${target}${unit})`;
-                action = `Reduzir limitação para ${target}${unit}`;
-            }
-        } else if (type === 'reference_loudness') {
-            // LUFS: valores mais altos = mais alto, valores mais baixos = mais baixo
-            if (diff > 0) {
-                message = `Volume muito alto (+${absDiff.toFixed(1)} LUFS)`;
-                action = `DIMINUIR ${absDiff.toFixed(1)} LUFS`;
-            } else {
-                message = `Volume muito baixo (-${absDiff.toFixed(1)} LUFS)`;
-                action = `AUMENTAR ${absDiff.toFixed(1)} LUFS`;
-            }
-        } else if (type === 'reference_dynamics') {
-            // Dynamic Range: valores altos = muita dinâmica, valores baixos = pouca dinâmica
-            if (diff > 0) {
-                message = `Dinâmica excessiva (+${absDiff.toFixed(1)} dB)`;
-                action = `DIMINUIR ${absDiff.toFixed(1)} dB (mais compressão)`;
-            } else {
-                message = `Dinâmica insuficiente (-${absDiff.toFixed(1)} dB)`;
-                action = `AUMENTAR ${absDiff.toFixed(1)} dB (menos compressão)`;
-            }
-        } else if (type === 'reference_stereo') {
-            // Correlação Estéreo: valores altos = mais mono, valores baixos = mais estéreo
-            if (diff > 0) {
-                message = `Imagem estéreo muito estreita (+${absDiff.toFixed(2)})`;
-                action = `AUMENTAR ${absDiff.toFixed(2)} (mais estéreo)`;
-            } else {
-                message = `Imagem estéreo muito ampla (-${absDiff.toFixed(2)})`;
-                action = `DIMINUIR ${absDiff.toFixed(2)} (menos estéreo)`;
-            }
-        } else {
-            // Fallback genérico para outros tipos
-            const direction = diff > 0 ? 'acima' : 'abaixo';
-            message = `${label} ${direction} do alvo (${target}${unit})`;
-            action = `Ajustar ${label} ${direction==='acima'?'para baixo':'para cima'} ~${target}${unit}`;
-        }
-        
+        const direction = diff > 0 ? 'acima' : 'abaixo';
         sug.push({
             type,
-            message,
-            action,
-            details: `Diferença: ${diff.toFixed(2)}${unit} • tolerância ±${tol}${unit} • gênero: ${window.PROD_AI_REF_GENRE || 'default'}`
+            message: `${label} ${direction} do alvo (${target}${unit})`,
+            action: `Ajustar ${label} ${direction==='acima'?'para baixo':'para cima'} ~${target}${unit}`,
+            details: `Diferença: ${diff.toFixed(2)}${unit} • tolerância ±${tol}${unit} • gênero: ${window.PROD_AI_REF_GENRE}`
         });
     };
     // Aplicar checks principais

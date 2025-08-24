@@ -2638,6 +2638,30 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
       }
     } catch (invErr) { if (typeof window !== 'undefined' && window.DEBUG_ANALYZER) console.warn('Falha invariants', invErr); }
 
+    // 🎯 CENTRALIZAÇÃO DAS MÉTRICAS - Single Source of Truth
+    try {
+      baseAnalysis.metrics = buildCentralizedMetrics(baseAnalysis, v2Metrics);
+      
+      // Logs temporários de validação
+      if (typeof window !== 'undefined' && window.METRICS_VALIDATION_LOGS !== false) {
+        console.log('🎯 METRICS_SOURCE_VALIDATION:', {
+          source: 'centralized_metrics',
+          lufs_centralized: baseAnalysis.metrics?.lufs_integrated,
+          lufs_legacy: baseAnalysis.technicalData?.lufsIntegrated,
+          true_peak_centralized: baseAnalysis.metrics?.true_peak_dbtp,
+          true_peak_legacy: baseAnalysis.technicalData?.truePeakDbtp,
+          stereo_width_centralized: baseAnalysis.metrics?.stereo_width,
+          stereo_width_legacy: baseAnalysis.technicalData?.stereoWidth,
+          band_count_centralized: Object.keys(baseAnalysis.metrics?.bands || {}).length,
+          band_count_legacy: Object.keys(baseAnalysis.technicalData?.bandEnergies || {}).length,
+          match_lufs: Math.abs((baseAnalysis.metrics?.lufs_integrated || 0) - (baseAnalysis.technicalData?.lufsIntegrated || 0)) < 0.01,
+          match_tp: Math.abs((baseAnalysis.metrics?.true_peak_dbtp || 0) - (baseAnalysis.technicalData?.truePeakDbtp || 0)) < 0.01
+        });
+      }
+    } catch (metricsErr) {
+      console.warn('🚨 Erro na centralização de métricas:', metricsErr);
+    }
+
     return baseAnalysis;
   } catch (err) {
     if (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true) console.warn('⚠️ [ADV] Adapter geral falhou:', err?.message || err);
@@ -4286,6 +4310,233 @@ if (typeof window !== 'undefined') {
     window.DEBUG_ANALYZER_DETAILED = false;
     console.log('🐛 DEBUG DETALHADO DESATIVADO');
   };
+}
+
+// 🎯 CENTRALIZAÇÃO DAS MÉTRICAS - Single Source of Truth
+/**
+ * Constrói objeto centralizado de métricas coletando de todas as fontes
+ * @param {Object} baseAnalysis - Análise base com technicalData
+ * @param {Object} v2Metrics - Métricas do Audio Analyzer V2
+ * @returns {Object} Objeto centralizado com todas as métricas
+ */
+function buildCentralizedMetrics(baseAnalysis, v2Metrics) {
+  const td = baseAnalysis?.technicalData || {};
+  const v2 = v2Metrics || {};
+  
+  // Helper para pegar valor válido com prioridade
+  const getValid = (primary, secondary, fallback = null) => {
+    if (Number.isFinite(primary)) return primary;
+    if (Number.isFinite(secondary)) return secondary;
+    return fallback;
+  };
+  
+  // Helper para timestamp
+  const timestamp = new Date().toISOString();
+  
+  return {
+    // === LOUDNESS ===
+    lufs_integrated: getValid(
+      td.lufsIntegrated,
+      v2.loudness?.lufs_integrated
+    ),
+    lufs_short_term: getValid(
+      td.lufsShortTerm,
+      v2.loudness?.lufs_short_term
+    ),
+    lufs_momentary: getValid(
+      td.lufsMomentary,
+      v2.loudness?.lufs_momentary
+    ),
+    lra: getValid(
+      td.lra,
+      v2.loudness?.lra
+    ),
+    headroom_db: getValid(
+      td.headroomDb,
+      v2.loudness?.headroom_db
+    ),
+    
+    // === PEAKS & DYNAMICS ===
+    true_peak_dbtp: getValid(
+      td.truePeakDbtp,
+      v2.truePeak?.true_peak_dbtp
+    ),
+    sample_peak_left_db: getValid(
+      td.samplePeakLeftDb,
+      v2.truePeak?.sample_peak_left_db
+    ),
+    sample_peak_right_db: getValid(
+      td.samplePeakRightDb,
+      v2.truePeak?.sample_peak_right_db
+    ),
+    crest_factor: getValid(
+      td.crestFactor,
+      v2.core?.crestFactor
+    ),
+    dynamic_range: getValid(
+      td.dynamicRange,
+      baseAnalysis?.technicalData?.peak && baseAnalysis?.technicalData?.rms 
+        ? baseAnalysis.technicalData.peak - baseAnalysis.technicalData.rms 
+        : null
+    ),
+    peak_db: getValid(
+      td.peak,
+      v2.core?.peak_db
+    ),
+    rms_db: getValid(
+      td.rms,
+      v2.core?.rms_db
+    ),
+    
+    // === STEREO ===
+    stereo_width: getValid(
+      td.stereoWidth,
+      v2.stereo?.width
+    ),
+    stereo_correlation: getValid(
+      td.stereoCorrelation,
+      v2.stereo?.correlation
+    ),
+    balance_lr: getValid(
+      td.balanceLR,
+      v2.stereo?.balance
+    ),
+    mono_compatibility: td.monoCompatibility || v2.stereo?.mono_compatibility || null,
+    
+    // === CLIPPING & DISTORTION ===
+    clipping_samples: getValid(
+      td.clippingSamples,
+      v2.core?.clippingEvents,
+      0
+    ),
+    clipping_percentage: getValid(
+      td.clippingPct,
+      v2.core?.clippingPercentage,
+      0
+    ),
+    dc_offset: getValid(
+      td.dcOffset,
+      v2.core?.dcOffset,
+      0
+    ),
+    thd_percent: getValid(
+      td.thdPercent,
+      v2.core?.thdPercent,
+      0
+    ),
+    
+    // === SPECTRAL ===
+    spectral_centroid: getValid(
+      td.spectralCentroid,
+      v2.spectral?.centroid
+    ),
+    spectral_rolloff_85: getValid(
+      td.spectralRolloff85,
+      v2.spectral?.rolloff85
+    ),
+    spectral_rolloff_50: getValid(
+      td.spectralRolloff50,
+      v2.spectral?.rolloff50
+    ),
+    spectral_flatness: getValid(
+      td.spectralFlatness,
+      v2.spectral?.flatness
+    ),
+    spectral_flux: getValid(
+      td.spectralFlux,
+      v2.spectral?.flux
+    ),
+    
+    // === FREQUENCY BANDS ===
+    bands: buildFrequencyBands(td.bandEnergies, v2.bands),
+    
+    // === TONAL BALANCE ===
+    tonal_balance: td.tonalBalance || v2.tonalBalance || null,
+    
+    // === QUALITY SCORES ===
+    quality_overall: getValid(
+      baseAnalysis?.qualityOverall,
+      v2.qualityScores?.overall
+    ),
+    quality_breakdown: baseAnalysis?.qualityBreakdown || v2.qualityScores || null,
+    
+    // === METADATA ===
+    sample_rate: baseAnalysis?.sampleRate || v2.sampleRate || null,
+    duration_s: baseAnalysis?.duration || v2.duration || null,
+    processing_time_ms: getValid(
+      td.processingMs,
+      v2.processingTime || baseAnalysis?.processingTime
+    ),
+    source_engine: v2.core ? 'v2_primary' : 'v1_fallback',
+    timestamp: timestamp
+  };
+}
+
+/**
+ * Constrói objeto unificado de bandas de frequência
+ */
+function buildFrequencyBands(legacyBands, v2Bands) {
+  const bands = {};
+  
+  // Mapeamento de nomes conhecidos
+  const bandMapping = {
+    sub: { range_hz: [20, 60], alt_names: ['subBass', 'sub_bass'] },
+    bass: { range_hz: [60, 250], alt_names: ['low_bass', 'lowBass'] },
+    low_mid: { range_hz: [250, 500], alt_names: ['lowMid', 'lower_mid'] },
+    mid: { range_hz: [500, 2000], alt_names: ['middle', 'midrange'] },
+    high_mid: { range_hz: [2000, 6000], alt_names: ['highMid', 'upper_mid'] },
+    presence: { range_hz: [6000, 10000], alt_names: ['presenca', 'high'] },
+    brilliance: { range_hz: [10000, 20000], alt_names: ['brilho', 'air'] }
+  };
+  
+  // Processar bandas legadas
+  if (legacyBands && typeof legacyBands === 'object') {
+    Object.entries(legacyBands).forEach(([name, data]) => {
+      const standardName = findStandardBandName(name, bandMapping);
+      if (standardName && data && Number.isFinite(data.energy_db || data.rms_db)) {
+        bands[standardName] = {
+          energy_db: data.energy_db || data.rms_db,
+          range_hz: bandMapping[standardName].range_hz,
+          source: 'legacy'
+        };
+      }
+    });
+  }
+  
+  // Processar bandas V2 (sobrescrevem se existirem)
+  if (v2Bands && typeof v2Bands === 'object') {
+    Object.entries(v2Bands).forEach(([name, data]) => {
+      const standardName = findStandardBandName(name, bandMapping);
+      if (standardName && data && Number.isFinite(data.energy_db)) {
+        bands[standardName] = {
+          energy_db: data.energy_db,
+          range_hz: data.range_hz || bandMapping[standardName].range_hz,
+          source: 'v2'
+        };
+      }
+    });
+  }
+  
+  return bands;
+}
+
+/**
+ * Encontra nome padrão de banda baseado em mapeamentos
+ */
+function findStandardBandName(inputName, bandMapping) {
+  const input = inputName.toLowerCase();
+  
+  // Verificar nome direto
+  if (bandMapping[input]) return input;
+  
+  // Verificar nomes alternativos
+  for (const [standardName, config] of Object.entries(bandMapping)) {
+    if (config.alt_names.some(alt => alt.toLowerCase() === input)) {
+      return standardName;
+    }
+  }
+  
+  return null;
 }
 
 
