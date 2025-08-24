@@ -787,11 +787,37 @@ class AudioAnalyzer {
           const sr = audioBuffer.sampleRate; const binHz = sr / fftSize;
           const bands = { sub:[20,60], low:[60,250], mid:[250,4000], high:[4000,12000] };
           const out = {};
-          for (const [k,[a,b]] of Object.entries(bands)) {
-            let energy=0, count=0; const maxBin = spec.length;
-            for (let i=0;i<maxBin;i++) { const f=i*binHz; if (f>=a && f<b) { energy += spec[i]; count++; } }
-            if (count>0) { const rms = energy / count; out[k] = { rms_db: 20*Math.log10(rms || 1e-9) }; }
+          
+          // ✨ INTEGRAÇÃO SISTEMA ESPECTRAL: Usar energia FFT se disponível
+          const useSpectralBalance = (typeof window !== 'undefined' && 
+                                    window.spectralAdapter && 
+                                    window.spectralAdapter.isActive && 
+                                    baseAnalysis.spectralBalance);
+          
+          if (useSpectralBalance) {
+            // Usar resultados do sistema espectral avançado
+            console.log('✨ Usando sistema espectral para tonal balance');
+            const summary3Bands = baseAnalysis.spectralBalance.summary3Bands;
+            if (summary3Bands) {
+              out.low = { rms_db: summary3Bands.Low?.rmsDb || -80 };
+              out.mid = { rms_db: summary3Bands.Mid?.rmsDb || -80 };
+              out.high = { rms_db: summary3Bands.High?.rmsDb || -80 };
+              
+              // Sub bass adicional se disponível
+              const subBand = baseAnalysis.spectralBalance.bands?.find(b => b.name.includes('Sub'));
+              if (subBand) {
+                out.sub = { rms_db: subBand.rmsDb || -80 };
+              }
+            }
+          } else {
+            // Fallback para cálculo simples original
+            for (const [k,[a,b]] of Object.entries(bands)) {
+              let energy=0, count=0; const maxBin = spec.length;
+              for (let i=0;i<maxBin;i++) { const f=i*binHz; if (f>=a && f<b) { energy += spec[i]; count++; } }
+              if (count>0) { const rms = energy / count; out[k] = { rms_db: 20*Math.log10(rms || 1e-9) }; }
+            }
           }
+          
           td.tonalBalance = out;
         }
       }
@@ -2449,26 +2475,67 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
             const bins = specRes.freq_bins_compact;
             const mags = specRes.spectrum_avg;
             const bandEnergies = {};
-            const totalEnergy = mags.reduce((a,b)=>a + (b>0?b:0),0) || 1;
-            for (const [band,[fLow,fHigh]] of Object.entries(bandDefs)) {
-              let energy=0, count=0;
-              for (let i=0; i<bins.length; i++) {
-                const f = bins[i];
-                if (f >= fLow && f < fHigh) { energy += mags[i]; count++; }
+            
+            // ✨ INTEGRAÇÃO SISTEMA ESPECTRAL: Usar análise FFT avançada se disponível
+            const useSpectralBalance = (typeof window !== 'undefined' && 
+                                      window.spectralAdapter && 
+                                      window.spectralAdapter.isActive && 
+                                      baseAnalysis.spectralBalance);
+            
+            if (useSpectralBalance && baseAnalysis.spectralBalance.bands) {
+              console.log('✨ Usando sistema espectral para bandEnergies');
+              // Mapear bandas espectrais para formato bandEnergies
+              const spectralBands = baseAnalysis.spectralBalance.bands;
+              const bandMapping = {
+                'Sub Bass': 'sub',
+                'Bass': 'low_bass', 
+                'Low Mid': 'low_mid',
+                'Mid': 'mid',
+                'High Mid': 'high_mid',
+                'High': 'brilho',
+                'Presence': 'presenca'
+              };
+              
+              spectralBands.forEach(band => {
+                const mappedName = bandMapping[band.name] || band.name.toLowerCase().replace(' ', '_');
+                if (mappedName) {
+                  // Converter % energia para dB relativo
+                  const energyRatio = band.energyPct / 100; // Converter % para proporção
+                  const db = 10 * Math.log10(energyRatio || 1e-9);
+                  bandEnergies[mappedName] = { 
+                    energy: band.energy, 
+                    rms_db: db,
+                    energyPct: band.energyPct, // ✨ Novo campo!
+                    scale: 'spectral_balance_v2' 
+                  };
+                }
+              });
+              
+              td.bandEnergies = bandEnergies;
+              (td._sources = td._sources || {}).bandEnergies = 'spectral_balance_fft';
+            } else {
+              // Fallback para análise espectral padrão
+              const totalEnergy = mags.reduce((a,b)=>a + (b>0?b:0),0) || 1;
+              for (const [band,[fLow,fHigh]] of Object.entries(bandDefs)) {
+                let energy=0, count=0;
+                for (let i=0; i<bins.length; i++) {
+                  const f = bins[i];
+                  if (f >= fLow && f < fHigh) { energy += mags[i]; count++; }
+                }
+                if (count>0) {
+                  const lin = energy / count; // média simples
+                  // CORREÇÃO: Normalizar pela energia TOTAL, não pela média por bin
+                  // Isso garante valores relativos negativos (banda < total)
+                  const norm = energy / totalEnergy; // Proporção da energia total
+                  const db = 10 * Math.log10(norm || 1e-9);
+                  bandEnergies[band] = { energy: lin, rms_db: db, scale: 'log_ratio_db' };
+                } else {
+                  bandEnergies[band] = { energy: 0, rms_db: -Infinity, scale: 'log_ratio_db' };
+                }
               }
-              if (count>0) {
-                const lin = energy / count; // média simples
-                // CORREÇÃO: Normalizar pela energia TOTAL, não pela média por bin
-                // Isso garante valores relativos negativos (banda < total)
-                const norm = energy / totalEnergy; // Proporção da energia total
-                const db = 10 * Math.log10(norm || 1e-9);
-                bandEnergies[band] = { energy: lin, rms_db: db, scale: 'log_ratio_db' };
-              } else {
-                bandEnergies[band] = { energy: 0, rms_db: -Infinity, scale: 'log_ratio_db' };
-              }
+              td.bandEnergies = bandEnergies;
+              (td._sources = td._sources || {}).bandEnergies = 'advanced:spectrum';
             }
-            td.bandEnergies = bandEnergies;
-            (td._sources = td._sources || {}).bandEnergies = 'advanced:spectrum';
             // Alternativa segura: normalização log baseada na proporção da soma linear por banda
             try {
               const sumPerBand = {};
