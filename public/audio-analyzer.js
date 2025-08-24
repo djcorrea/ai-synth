@@ -1160,7 +1160,12 @@ class AudioAnalyzer {
     try {
       // Recalcular score ao final (todas bandas prontas) para garantir contagem correta de verdes/vermelhas
       // Removida exigência de baseAnalysis.mixScore prévio (bloco inicial está desativado)
+      console.log('[SCORE_DEBUG] 🔍 Iniciando recálculo de score final...');
+      console.log('[SCORE_DEBUG] window exists:', typeof window !== 'undefined');
+      console.log('[SCORE_DEBUG] technicalData exists:', !!baseAnalysis.technicalData);
+      
       if (typeof window !== 'undefined' && baseAnalysis.technicalData) {
+        console.log('[SCORE_DEBUG] ✅ Condições iniciais atendidas');
         const tdFinal = baseAnalysis.technicalData;
         console.log('[COLOR_RATIO_V2_DEBUG] tdFinal input:', tdFinal);
         console.log('[COLOR_RATIO_V2_DEBUG] tdFinal keys:', Object.keys(tdFinal || {}));
@@ -1177,8 +1182,16 @@ class AudioAnalyzer {
           }
         } catch {}
         try {
-          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
+          console.log('[SCORE_DEBUG] 🔍 Tentando carregar scoring.js...');
+          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch((err)=>{
+            console.error('[SCORE_DEBUG] ❌ Erro no import scoring.js:', err);
+            return null;
+          });
+          console.log('[SCORE_DEBUG] scoring.js carregado:', !!scorerMod);
+          console.log('[SCORE_DEBUG] computeMixScore disponível:', !!(scorerMod && typeof scorerMod.computeMixScore === 'function'));
+          
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
+            console.log('[SCORE_DEBUG] ✅ scoring.js válido, executando...');
             // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
             let genreSpecificRef = null;
             if (mode === 'genre' && activeRef) {
@@ -1194,6 +1207,7 @@ class AudioAnalyzer {
             
             const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
             console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
+            console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
             
             // TESTE MANUAL COM DADOS CONHECIDOS
             const testData = {
@@ -1225,10 +1239,15 @@ class AudioAnalyzer {
             baseAnalysis.mixClassification = finalScore.classification;
             
             // CRÍTICO: Atualizar qualityOverall usado pela UI
+            console.log('[SCORE_DEBUG] 💾 Atualizando qualityOverall...');
+            console.log('[SCORE_DEBUG] Valor anterior:', baseAnalysis.qualityOverall);
+            console.log('[SCORE_DEBUG] Novo valor:', finalScore.scorePct);
+            
             baseAnalysis._originalQualityOverall = baseAnalysis.qualityOverall;
             baseAnalysis.qualityOverall = finalScore.scorePct;
             console.log('[COLOR_RATIO_V2_FIX] ✅ NOVO SISTEMA ATIVO! Setting qualityOverall =', finalScore.scorePct, '(was:', baseAnalysis._originalQualityOverall, ')');
             console.log('[COLOR_RATIO_V2_FIX] 🎯 Método usado:', finalScore.method, 'Classificação:', finalScore.classification);
+            console.log('[SCORE_DEBUG] ✅ qualityOverall atualizado com sucesso');
             // Logging para debug (sem override)
             try {
               const cc = finalScore.colorCounts || {};
@@ -1249,7 +1268,56 @@ class AudioAnalyzer {
         } catch (reScoreErr) { if (window.DEBUG_SCORE) console.warn('[RECALC_SCORE_ERROR]', reScoreErr); }
       }
     } catch {}
+    
+    // 🎯 GARANTIR QUE SEMPRE TEMOS UM SCORE VÁLIDO
+    if (!Number.isFinite(baseAnalysis.qualityOverall)) {
+      console.log('[SCORE_DEBUG] ⚠️ qualityOverall inválido, aplicando fallback final');
+      this._applyWeightedScoreFallback(baseAnalysis);
+    }
+    
+    console.log('[SCORE_DEBUG] 🎯 Score final definido:', baseAnalysis.qualityOverall);
     return baseAnalysis;
+  }
+
+  // 🔧 MÉTODO DE FALLBACK PARA SCORE
+  _applyWeightedScoreFallback(baseAnalysis) {
+    console.log('[SCORE_DEBUG] 📊 Aplicando fallback de score ponderado...');
+    
+    try {
+      // Usar sistema de agregação ponderada existente
+      if (!Number.isFinite(baseAnalysis.qualityOverall)) {
+        console.log('[WEIGHTED_AGGREGATE] Triggered - qualityOverall was:', baseAnalysis.qualityOverall);
+        
+        // Coletar sub-scores válidos
+        const subScores = [];
+        const breakdown = baseAnalysis.qualityBreakdown || {};
+        
+        if (Number.isFinite(breakdown.dynamics)) subScores.push({ value: breakdown.dynamics, weight: 0.25 });
+        if (Number.isFinite(breakdown.technical)) subScores.push({ value: breakdown.technical, weight: 0.25 });
+        if (Number.isFinite(breakdown.stereo)) subScores.push({ value: breakdown.stereo, weight: 0.20 });
+        if (Number.isFinite(breakdown.loudness)) subScores.push({ value: breakdown.loudness, weight: 0.15 });
+        if (Number.isFinite(breakdown.frequency)) subScores.push({ value: breakdown.frequency, weight: 0.15 });
+        
+        if (subScores.length > 0) {
+          const totalWeight = subScores.reduce((sum, s) => sum + s.weight, 0);
+          const weightedScore = subScores.reduce((sum, s) => sum + (s.value * s.weight), 0) / totalWeight;
+          const clamp = (v) => Math.max(0, Math.min(100, v));
+          
+          baseAnalysis.qualityOverall = clamp(weightedScore);
+          console.log('[WEIGHTED_AGGREGATE] Set qualityOverall =', baseAnalysis.qualityOverall, 
+                     'from', subScores.length, 'sub-scores');
+        } else {
+          // Último recurso: score padrão conservador
+          baseAnalysis.qualityOverall = 50;
+          console.log('[WEIGHTED_AGGREGATE] No sub-scores available, using default 50');
+        }
+      }
+    } catch (fallbackError) {
+      console.error('[SCORE_DEBUG] ❌ Erro no fallback:', fallbackError);
+      baseAnalysis.qualityOverall = 50; // Último recurso
+    }
+    
+    console.log('[SCORE_DEBUG] ✅ Fallback concluído - score:', baseAnalysis.qualityOverall);
   }
 
   // (remoção do conversor WAV — não é mais necessário)
