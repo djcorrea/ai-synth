@@ -649,7 +649,8 @@ class AudioAnalyzer {
   // ===== FASE 1 AUDITORIA: UNIFICAÇÃO E OBSERVAÇÃO (ZERO RISCO) =====
   try {
     if (baseAnalysis && td && typeof getUnifiedAnalysisData === 'function') {
-      const unifiedData = getUnifiedAnalysisData(baseAnalysis, td, metrics);
+      const v2Metrics = baseAnalysis.v2Metrics || null; // Definir v2Metrics
+      const unifiedData = getUnifiedAnalysisData(baseAnalysis, td, v2Metrics);
       if (typeof performConsistencyAudit === 'function') {
         performConsistencyAudit(unifiedData, baseAnalysis);
       }
@@ -661,12 +662,12 @@ class AudioAnalyzer {
       
       // ===== FASE 3: ALINHAMENTO LÓGICO (RISCO MÉDIO) =====
       if (typeof applyLogicAlignmentCorrections === 'function') {
-        applyLogicAlignmentCorrections(baseAnalysis, td, unifiedData, metrics);
+        applyLogicAlignmentCorrections(baseAnalysis, td, unifiedData, v2Metrics);
       }
       
       // ===== FASE 4: AUDITORIA FINAL COMPLETA (BAIXO RISCO) =====
       if (typeof applyFinalAuditCorrections === 'function') {
-        applyFinalAuditCorrections(baseAnalysis, td, unifiedData, metrics);
+        applyFinalAuditCorrections(baseAnalysis, td, unifiedData, v2Metrics);
       }
       
       // ===== FASE 5: CORREÇÕES CRÍTICAS ESPECÍFICAS (SEGURO) =====
@@ -2949,6 +2950,8 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
 
     // 🎯 CENTRALIZAÇÃO DAS MÉTRICAS - Single Source of Truth
     try {
+      // Definir v2Metrics se não existir (compatibilidade)
+      const v2Metrics = baseAnalysis.v2Metrics || null;
       baseAnalysis.metrics = buildCentralizedMetrics(baseAnalysis, v2Metrics);
       
       // Logs temporários de validação
