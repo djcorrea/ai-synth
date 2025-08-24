@@ -361,7 +361,9 @@ class AudioAnalyzer {
   
   // ✨ SISTEMA ESPECTRAL: Executar ANTES do V2 para afetar o scoring
   try {
-    const spectralResult = this.calculateSpectralBalance(left, audioBuffer.sampleRate);
+    // Extrair canal esquerdo do audioBuffer para análise espectral
+    const leftChannel = audioBuffer.getChannelData(0);
+    const spectralResult = this.calculateSpectralBalance(leftChannel, audioBuffer.sampleRate);
     if (spectralResult && spectralResult.summary3Bands) {
       console.log('✨ Sistema espectral ATIVADO ANTES do scoring V2');
       baseAnalysis.spectralBalance = spectralResult;
