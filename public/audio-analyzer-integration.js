@@ -4101,12 +4101,19 @@ function displayModalResults(analysis) {
         `;
     
     // 🎼 EXIBIR SEÇÃO ESPECTRAL se disponível
-    if (analysis.spectralBalance && SPECTRAL_INTERNAL_MODE === 'percent') {
+    const currentSpectralMode = window.SPECTRAL_INTERNAL_MODE || 'percent';
+    console.log('🎼 DEBUG: spectralBalance existe?', !!analysis.spectralBalance);
+    console.log('🎼 DEBUG: modo atual:', currentSpectralMode);
+    
+    if (analysis.spectralBalance && currentSpectralMode === 'percent') {
         try {
+            console.log('🎼 Renderizando seção espectral...');
             renderSpectralBalanceSection(analysis.spectralBalance, analysis);
         } catch(spectralRenderError) {
             console.warn('Erro ao renderizar seção espectral:', spectralRenderError);
         }
+    } else if (analysis.spectralBalance) {
+        console.log('🎼 SpectralBalance existe mas modo não é percent:', currentSpectralMode);
     }
     
     try { renderReferenceComparisons(analysis); } catch(e){ console.warn('ref compare fail', e);}    
@@ -4116,8 +4123,20 @@ function displayModalResults(analysis) {
 
 // 🎼 RENDERIZAR SEÇÃO DE BALANÇO ESPECTRAL
 function renderSpectralBalanceSection(spectralData, analysis) {
+    console.log('🎼 renderSpectralBalanceSection INICIADA');
+    console.log('🎼 spectralData:', spectralData);
+    
     const technicalData = document.getElementById('modalTechnicalData');
-    if (!technicalData || !spectralData) return;
+    if (!technicalData) {
+        console.error('🎼 modalTechnicalData não encontrado!');
+        return;
+    }
+    if (!spectralData) {
+        console.error('🎼 spectralData não fornecido!');
+        return;
+    }
+    
+    console.log('🎼 Criando seção espectral...');
     
     // Crear seção espectral
     const spectralSection = document.createElement('div');
@@ -4233,6 +4252,7 @@ function renderSpectralBalanceSection(spectralData, analysis) {
     // Adicionar à interface
     technicalData.appendChild(spectralSection);
     
+    console.log('🎼 Seção espectral renderizada na interface - SUCESSO!');
     __dbg('🎼 Seção espectral renderizada na interface');
 }
 
