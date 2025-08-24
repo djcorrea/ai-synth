@@ -2272,13 +2272,10 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
         console.warn(`🔍 PRESENCE DEBUG: energia muito baixa - ${energyPct.toFixed(6)}% (${band.totalEnergy}/${validTotalEnergy})`);
       }
       
-      // 🔧 CORREÇÃO CRÍTICA: Fórmula matemática correta para conversão % → dB
-      // Para energia espectral: usar 10 * log10 (não 20 * log10)
-      const proportion = band.totalEnergy / validTotalEnergy;
-      const energyDb = proportion > 0 ? 10 * Math.log10(proportion) : -80;
-      
-      // Para compatibilidade com sistema legado, manter nome rmsDb mas usar fórmula correta
-      const rmsDb = energyDb;
+      // 🔧 CORREÇÃO CRÍTICA: Calcular RMS real da banda, não energia relativa
+      // RMS = sqrt(energia_média_por_sample)
+      const rmsLinear = Math.sqrt(band.totalEnergy / (processedFrames * fftSize / 2));
+      const rmsDb = rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
       
       return {
         name: band.name,
@@ -2298,27 +2295,27 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     const summary3Bands = {
       Low: {
         energyPct: lowBands.reduce((sum, b) => sum + b.energyPct, 0),
-        // 🔧 CORREÇÃO CRÍTICA: Somar energias e reconverter para dB
+        // 🔧 CORREÇÃO CRÍTICA: Calcular RMS real das bandas baixas
         rmsDb: (() => {
           const totalEnergy = lowBands.reduce((sum, b) => sum + b.energy, 0);
-          const proportion = totalEnergy / validTotalEnergy;
-          return proportion > 0 ? 10 * Math.log10(proportion) : -80;
+          const rmsLinear = Math.sqrt(totalEnergy / (processedFrames * fftSize / 2));
+          return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
         })()
       },
       Mid: {
         energyPct: midBands.reduce((sum, b) => sum + b.energyPct, 0),
         rmsDb: (() => {
           const totalEnergy = midBands.reduce((sum, b) => sum + b.energy, 0);
-          const proportion = totalEnergy / validTotalEnergy;
-          return proportion > 0 ? 10 * Math.log10(proportion) : -80;
+          const rmsLinear = Math.sqrt(totalEnergy / (processedFrames * fftSize / 2));
+          return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
         })()
       },
       High: {
         energyPct: highBands.reduce((sum, b) => sum + b.energyPct, 0),
         rmsDb: (() => {
           const totalEnergy = highBands.reduce((sum, b) => sum + b.energy, 0);
-          const proportion = totalEnergy / validTotalEnergy;
-          return proportion > 0 ? 10 * Math.log10(proportion) : -80;
+          const rmsLinear = Math.sqrt(totalEnergy / (processedFrames * fftSize / 2));
+          return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
         })()
       }
     };
@@ -2705,15 +2702,11 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               spectralBands.forEach(band => {
                 const mappedName = bandMapping[band.name];
                 if (mappedName) {
-                  // 🔧 CORREÇÃO CRÍTICA: Usar fórmula matemática correta
-                  // Para energia espectral: 10 * log10, não 20 * log10
-                  const proportion = band.energyPct / 100; // Converter % para proporção
-                  const energyDb = proportion > 0 ? 10 * Math.log10(proportion) : -80;
-                  
+                  // 🔧 CORREÇÃO CRÍTICA: Usar valor RMS real calculado corretamente
                   bandEnergies[mappedName] = { 
                     energy: band.energy, 
-                    rms_db: energyDb, // Usar fórmula correta
-                    energyPct: band.energyPct, // ✨ Novo campo!
+                    rms_db: band.rmsDb, // Usar RMS real, não energia relativa
+                    energyPct: band.energyPct,
                     scale: 'spectral_balance_auto' 
                   };
                 }
@@ -2737,11 +2730,9 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                       // Tentar pegar de Sub Bass
                       const subBand = spectralBands.find(b => b.name === 'Sub Bass');
                       if (subBand) {
-                        const proportion = subBand.energyPct / 100;
-                        const energyDb = proportion > 0 ? 10 * Math.log10(proportion) : -80;
                         sourceValue = { 
                           energy: subBand.energy, 
-                          rms_db: energyDb,
+                          rms_db: subBand.rmsDb, // Usar RMS real
                           energyPct: subBand.energyPct,
                           scale: 'spectral_balance_auto' 
                         };
