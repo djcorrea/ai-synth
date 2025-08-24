@@ -777,19 +777,21 @@ async function fetchRefJsonWithFallback(paths) {
             // Cache-busting para evitar CDN retornar 404 ou versões antigas
             const hasQ = p.includes('?');
             const url = p + (hasQ ? '&' : '?') + 'v=' + Date.now();
-            if (__DEBUG_ANALYZER__) console.log('[refs] tentando fetch:', url);
+            console.log('[refs] tentando fetch:', url); // SEMPRE logar
             const res = await fetch(url, {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
             });
             if (res.ok) {
-                if (__DEBUG_ANALYZER__) console.log('[refs] OK:', p);
+                console.log('[refs] ✅ SUCESSO:', url); // SEMPRE logar sucesso
                 
                 // Verificar se a resposta tem conteúdo JSON válido
                 const text = await res.text();
                 if (text.trim()) {
                     try {
-                        return JSON.parse(text);
+                        const parsed = JSON.parse(text);
+                        console.log('[refs] ✅ JSON VÁLIDO:', url, 'keys:', Object.keys(parsed));
+                        return parsed;
                     } catch (jsonError) {
                         console.warn('[refs] JSON inválido em', p, ':', text.substring(0, 100));
                         throw new Error(`JSON inválido em ${p}`);
@@ -799,14 +801,15 @@ async function fetchRefJsonWithFallback(paths) {
                     throw new Error(`Resposta vazia em ${p}`);
                 }
             } else {
-                if (__DEBUG_ANALYZER__) console.warn('[refs] Falha', res.status, 'em', p);
+                console.warn('[refs] ❌ FALHA HTTP', res.status, 'em', url); // SEMPRE logar erro
                 lastErr = new Error(`HTTP ${res.status} @ ${p}`);
             }
         } catch (e) {
-            if (__DEBUG_ANALYZER__) console.warn('[refs] Erro fetch', p, e?.message || e);
+            console.warn('[refs] ❌ ERRO FETCH', url, ':', e?.message || e); // SEMPRE logar erro
             lastErr = e;
         }
     }
+    console.error('[refs] ❌ FALHA TOTAL - todas as rotas falharam. Último erro:', lastErr?.message);
     throw lastErr || new Error('Falha ao carregar JSON de referência (todas as rotas testadas)');
 }
 
