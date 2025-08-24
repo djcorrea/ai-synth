@@ -1967,19 +1967,86 @@ async function performReferenceComparison() {
         const referenceSuggestions = [];
         const THRESHOLD = 0.2; // Ignorar diferenças menores que 0.2dB
         
-        // Loudness (LUFS)
+        // Loudness (LUFS) - 🚨 COM VERIFICAÇÃO DE HEADROOM SEGURO
         if (Math.abs(differences.lufs) > THRESHOLD) {
             const action = differences.lufs > 0 ? 'Diminuir' : 'Aumentar';
             const direction = differences.lufs > 0 ? 'decrease' : 'increase';
-            referenceSuggestions.push({
-                type: 'reference_loudness',
-                message: `${action} volume em ${Math.abs(differences.lufs).toFixed(1)}dB para igualar à música de referência`,
-                action: `${action} volume em ${Math.abs(differences.lufs).toFixed(1)}dB`,
-                frequency_range: 'N/A',
-                adjustment_db: Math.abs(differences.lufs),
-                direction: direction,
-                baseline_source: 'reference_audio'
-            });
+            const adjustmentDb = Math.abs(differences.lufs);
+            
+            // 🔒 Verificar headroom se sugerindo aumento
+            if (direction === 'increase') {
+                const userTruePeak = userMetrics.truePeak;
+                const clippingSamples = userAnalysis.technical?.clippingSamples || 0;
+                const isClipped = clippingSamples > 0;
+                const headroomSafetyMargin = -0.6; // Target true peak seguro
+                
+                // 🚨 REGRA 1: Se CLIPPED, não sugerir aumento
+                if (isClipped) {
+                    console.log(`[REF-HEADROOM] 🚨 Clipping detectado - não sugerindo aumento de ${adjustmentDb.toFixed(1)}dB`);
+                    referenceSuggestions.push({
+                        type: 'reference_loudness_blocked_clipping',
+                        message: `Impossível igualar referência - áudio tem clipping`,
+                        action: `Primeiro resolver clipping, depois ajustar para referência`,
+                        frequency_range: 'N/A',
+                        adjustment_db: 0,
+                        direction: 'blocked',
+                        baseline_source: 'reference_audio',
+                        warning: `Clipping detectado (${clippingSamples} samples)`
+                    });
+                } 
+                // 🚨 REGRA 2: Verificar headroom disponível
+                else if (Number.isFinite(userTruePeak)) {
+                    const availableHeadroom = headroomSafetyMargin - userTruePeak;
+                    
+                    if (adjustmentDb <= availableHeadroom) {
+                        referenceSuggestions.push({
+                            type: 'reference_loudness',
+                            message: `${action} volume em ${adjustmentDb.toFixed(1)}dB para igualar à música de referência`,
+                            action: `${action} volume em ${adjustmentDb.toFixed(1)}dB`,
+                            frequency_range: 'N/A',
+                            adjustment_db: adjustmentDb,
+                            direction: direction,
+                            baseline_source: 'reference_audio',
+                            headroom_check: `Seguro: ${availableHeadroom.toFixed(1)}dB disponível`
+                        });
+                    } else {
+                        console.log(`[REF-HEADROOM] ⚠️ Ganho ${adjustmentDb.toFixed(1)}dB > headroom ${availableHeadroom.toFixed(1)}dB - bloqueando`);
+                        referenceSuggestions.push({
+                            type: 'reference_loudness_blocked_headroom',
+                            message: `Impossível igualar referência - sem headroom suficiente`,
+                            action: `True Peak ${userTruePeak.toFixed(1)}dBTP permite apenas +${availableHeadroom.toFixed(1)}dB`,
+                            frequency_range: 'N/A',
+                            adjustment_db: availableHeadroom > 0 ? availableHeadroom : 0,
+                            direction: 'limited',
+                            baseline_source: 'reference_audio',
+                            warning: `Necessário ${adjustmentDb.toFixed(1)}dB mas só ${availableHeadroom.toFixed(1)}dB seguro`
+                        });
+                    }
+                } else {
+                    // Sem True Peak, modo conservador
+                    referenceSuggestions.push({
+                        type: 'reference_loudness_conservative',
+                        message: `${action} volume em ${adjustmentDb.toFixed(1)}dB para igualar referência (verificar clipping)`,
+                        action: `${action} volume CUIDADOSAMENTE em ${adjustmentDb.toFixed(1)}dB`,
+                        frequency_range: 'N/A',
+                        adjustment_db: adjustmentDb,
+                        direction: direction,
+                        baseline_source: 'reference_audio',
+                        warning: 'Sem dados True Peak - verifique clipping após ajuste'
+                    });
+                }
+            } else {
+                // Diminuir é sempre seguro
+                referenceSuggestions.push({
+                    type: 'reference_loudness',
+                    message: `${action} volume em ${adjustmentDb.toFixed(1)}dB para igualar à música de referência`,
+                    action: `${action} volume em ${adjustmentDb.toFixed(1)}dB`,
+                    frequency_range: 'N/A',
+                    adjustment_db: adjustmentDb,
+                    direction: direction,
+                    baseline_source: 'reference_audio'
+                });
+            }
         }
         
         // Dynamic Range
@@ -2223,24 +2290,91 @@ function generateReferenceSuggestions(comparison) {
     
     const suggestions = [];
     
-    // Sugestões de loudness
+    // Sugestões de loudness - 🚨 COM VERIFICAÇÃO DE HEADROOM SEGURO
     if (comparison.loudness.difference !== null) {
         const diff = comparison.loudness.difference;
         console.log('🔍 [DIAGNÓSTICO] Loudness difference:', diff);
         
         if (Math.abs(diff) > 1) {
-            const suggestion = {
-                type: 'reference_loudness',
-                message: diff > 0 ? 'Sua música está mais alta que a referência' : 'Sua música está mais baixa que a referência',
-                action: diff > 0 ? `Diminuir volume em ${Math.abs(diff).toFixed(1)}dB` : `Aumentar volume em ${Math.abs(diff).toFixed(1)}dB`,
-                explanation: 'Para match de loudness com a referência',
-                frequency_range: 'N/A',
-                adjustment_db: Math.abs(diff),
-                direction: diff > 0 ? 'decrease' : 'increase'
-            };
+            const adjustmentDb = Math.abs(diff);
+            const direction = diff > 0 ? 'decrease' : 'increase';
             
-            console.log('🔍 [DIAGNÓSTICO] Adicionando sugestão de loudness:', suggestion);
-            suggestions.push(suggestion);
+            // 🔒 Verificar headroom se sugerindo aumento
+            if (direction === 'increase') {
+                // Tentar acessar dados do usuário para verificação de headroom
+                const userTruePeak = comparison.userTruePeak || null;
+                const userClipping = comparison.userClipping || 0;
+                const isClipped = userClipping > 0;
+                const headroomSafetyMargin = -0.6;
+                
+                if (isClipped) {
+                    console.log(`[REF-HEADROOM] 🚨 Clipping detectado - bloqueando aumento de ${adjustmentDb.toFixed(1)}dB`);
+                    suggestions.push({
+                        type: 'reference_loudness_blocked_clipping',
+                        message: 'Impossível igualar referência - áudio tem clipping',
+                        action: 'Primeiro resolver clipping, depois ajustar para referência',
+                        explanation: 'Clipping detectado impede aumento seguro',
+                        frequency_range: 'N/A',
+                        adjustment_db: 0,
+                        direction: 'blocked',
+                        warning: `Clipping detectado (${userClipping} samples)`
+                    });
+                } else if (Number.isFinite(userTruePeak)) {
+                    const availableHeadroom = headroomSafetyMargin - userTruePeak;
+                    
+                    if (adjustmentDb <= availableHeadroom) {
+                        const suggestion = {
+                            type: 'reference_loudness',
+                            message: 'Sua música está mais baixa que a referência',
+                            action: `Aumentar volume em ${adjustmentDb.toFixed(1)}dB`,
+                            explanation: 'Para match de loudness com a referência',
+                            frequency_range: 'N/A',
+                            adjustment_db: adjustmentDb,
+                            direction: direction,
+                            headroom_check: `Seguro: ${availableHeadroom.toFixed(1)}dB disponível`
+                        };
+                        suggestions.push(suggestion);
+                    } else {
+                        console.log(`[REF-HEADROOM] ⚠️ Ganho ${adjustmentDb.toFixed(1)}dB > headroom ${availableHeadroom.toFixed(1)}dB`);
+                        suggestions.push({
+                            type: 'reference_loudness_blocked_headroom',
+                            message: 'Impossível igualar referência - sem headroom suficiente',
+                            action: `True Peak permite apenas +${availableHeadroom.toFixed(1)}dB (necessário ${adjustmentDb.toFixed(1)}dB)`,
+                            explanation: 'Aumentar mais causaria clipping (True Peak > -0.6 dBTP)',
+                            frequency_range: 'N/A',
+                            adjustment_db: availableHeadroom > 0 ? availableHeadroom : 0,
+                            direction: 'limited',
+                            warning: `Necessário ${adjustmentDb.toFixed(1)}dB mas só ${availableHeadroom.toFixed(1)}dB seguro`
+                        });
+                    }
+                } else {
+                    // Sem True Peak, modo conservador
+                    suggestions.push({
+                        type: 'reference_loudness_conservative',
+                        message: 'Sua música está mais baixa que a referência (verificar clipping)',
+                        action: `Aumentar CUIDADOSAMENTE volume em ${adjustmentDb.toFixed(1)}dB`,
+                        explanation: 'Sem dados True Peak - risco de clipping',
+                        frequency_range: 'N/A',
+                        adjustment_db: adjustmentDb,
+                        direction: direction,
+                        warning: 'Verifique clipping após ajuste'
+                    });
+                }
+            } else {
+                // Diminuir é sempre seguro
+                const suggestion = {
+                    type: 'reference_loudness',
+                    message: 'Sua música está mais alta que a referência',
+                    action: `Diminuir volume em ${adjustmentDb.toFixed(1)}dB`,
+                    explanation: 'Para match de loudness com a referência',
+                    frequency_range: 'N/A',
+                    adjustment_db: adjustmentDb,
+                    direction: direction
+                };
+                suggestions.push(suggestion);
+            }
+            
+            console.log('🔍 [DIAGNÓSTICO] Sugestão de loudness processada com headroom check');
         }
     }
     

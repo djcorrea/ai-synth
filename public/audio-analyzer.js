@@ -1438,37 +1438,124 @@ class AudioAnalyzer {
     const { peak, rms, dominantFrequencies, spectralCentroid, lufsIntegrated } = analysis.technicalData;
 
     // Sugestões baseadas no LUFS integrado real (quando disponível)
+    // 🚨 IMPLEMENTAÇÃO HEADROOM SEGURO - só sugerir aumentar loudness se há headroom suficiente
     if (lufsIntegrated !== null && Number.isFinite(lufsIntegrated)) {
-      if (lufsIntegrated >= -16 && lufsIntegrated <= -13) {
-        analysis.suggestions.push({
-          type: 'mastering_optimal',
-          message: `Volume ideal para streaming`,
-          action: `Seu áudio está no volume ideal para plataformas digitais`,
-          explanation: "LUFS entre -14 e -16 é o padrão para Spotify, YouTube e Apple Music",
-          impact: "Mantém dinâmica e evita limitação excessiva das plataformas",
-          frequency_range: "N/A",
-          adjustment_db: 0
-        });
-      } else if (lufsIntegrated < -16) {
-        analysis.suggestions.push({
-          type: 'mastering_volume_low',
-          message: `Volume baixo para streaming`,
-          action: `Aumentar volume para -14 LUFS`,
-          explanation: "Áudio muito baixo pode soar fraco comparado a outras músicas",
-          impact: "Usuários vão precisar aumentar o volume manualmente",
-          frequency_range: "N/A",
-          adjustment_db: Math.abs(lufsIntegrated + 14)
-        });
-      } else if (lufsIntegrated > -13) {
-        analysis.suggestions.push({
-          type: 'mastering_volume_high',
-          message: `Volume alto demais`,
-          action: `Reduzir volume para -14 LUFS`,
-          explanation: "Plataformas irão reduzir o volume automaticamente",
-          impact: "Perda de dinâmica e compressão adicional das plataformas",
-          frequency_range: "N/A",
-          adjustment_db: -(lufsIntegrated + 14)
-        });
+      console.log(`[generateTechnicalSuggestions] 🎚️ LUFS detectado: ${lufsIntegrated.toFixed(1)} dB`);
+      
+      // 🔒 Verificar headroom disponível antes de sugestões
+      const truePeakDbTP = analysis.technical?.truePeakDbtp;
+      const clippingSamples = analysis.technical?.clippingSamples || 0;
+      const isClipped = clippingSamples > 0;
+      const headroomSafetyMargin = -0.6; // Target true peak seguro (-0.6 dBTP)
+      
+      // 🚨 REGRA 1: Se CLIPPED, não sugerir aumento de loudness
+      if (isClipped) {
+        console.log(`[HEADROOM-SAFE] 🚨 Clipping detectado (${clippingSamples} samples) - bloqueando sugestões de aumento`);
+        
+        // Só adicionar sugestão de redução se volume muito alto
+        if (lufsIntegrated > -13) {
+          analysis.suggestions.push({
+            type: 'mastering_volume_high_clipped',
+            message: `Volume alto + clipping detectado`,
+            action: `URGENTE: Reduzir volume para -14 LUFS`,
+            explanation: "Clipping compromete qualidade - redução obrigatória",
+            impact: "Clipping causa distorção irreversível",
+            frequency_range: "N/A",
+            adjustment_db: -(lufsIntegrated + 14),
+            severity: 'critical'
+          });
+        }
+      }
+      // 🚨 REGRA 2: Calcular headroom disponível para aumento seguro
+      else if (Number.isFinite(truePeakDbTP)) {
+        const availableHeadroom = headroomSafetyMargin - truePeakDbTP; // Quanto pode aumentar sem passar de -0.6 dBTP
+        console.log(`[HEADROOM-SAFE] 📊 True Peak: ${truePeakDbTP.toFixed(2)} dBTP, Headroom disponível: ${availableHeadroom.toFixed(2)} dB`);
+        
+        if (lufsIntegrated >= -16 && lufsIntegrated <= -13) {
+          analysis.suggestions.push({
+            type: 'mastering_optimal',
+            message: `Volume ideal para streaming`,
+            action: `Seu áudio está no volume ideal para plataformas digitais`,
+            explanation: "LUFS entre -14 e -16 é o padrão para Spotify, YouTube e Apple Music",
+            impact: "Mantém dinâmica e evita limitação excessiva das plataformas",
+            frequency_range: "N/A",
+            adjustment_db: 0
+          });
+        } else if (lufsIntegrated < -16) {
+          // 🎯 CÁLCULO SEGURO: verificar se ganho proposto é possível
+          const gainProposto = Math.abs(lufsIntegrated + 14); // Quanto precisa aumentar
+          
+          if (gainProposto <= availableHeadroom) {
+            analysis.suggestions.push({
+              type: 'mastering_volume_low',
+              message: `Volume baixo para streaming`,
+              action: `Aumentar volume para -14 LUFS (+${gainProposto.toFixed(1)}dB)`,
+              explanation: "Áudio muito baixo pode soar fraco comparado a outras músicas",
+              impact: "Usuários vão precisar aumentar o volume manualmente",
+              frequency_range: "N/A",
+              adjustment_db: gainProposto,
+              headroom_check: `Seguro: ${availableHeadroom.toFixed(1)}dB disponível`
+            });
+          } else {
+            console.log(`[HEADROOM-SAFE] ⚠️ Ganho ${gainProposto.toFixed(1)}dB > headroom ${availableHeadroom.toFixed(1)}dB - bloqueando sugestão`);
+            analysis.suggestions.push({
+              type: 'mastering_volume_limited_headroom',
+              message: `Volume baixo mas sem headroom para correção`,
+              action: `True Peak ${truePeakDbTP.toFixed(1)}dBTP limita aumento a +${availableHeadroom.toFixed(1)}dB`,
+              explanation: "Aumentar mais que isso causaria clipping (True Peak > -0.6 dBTP)",
+              impact: "Considere reduzir limitação ou remastering",
+              frequency_range: "N/A",
+              adjustment_db: 0,
+              headroom_check: `Limitado: apenas ${availableHeadroom.toFixed(1)}dB seguro`
+            });
+          }
+        } else if (lufsIntegrated > -13) {
+          analysis.suggestions.push({
+            type: 'mastering_volume_high',
+            message: `Volume alto demais`,
+            action: `Reduzir volume para -14 LUFS`,
+            explanation: "Plataformas irão reduzir o volume automaticamente",
+            impact: "Perda de dinâmica e compressão adicional das plataformas",
+            frequency_range: "N/A",
+            adjustment_db: -(lufsIntegrated + 14)
+          });
+        }
+      }
+      // FALLBACK: Se não há True Peak, usar comportamento original mas conservador
+      else {
+        console.log(`[HEADROOM-SAFE] ⚠️ True Peak não disponível - usando modo conservador`);
+        
+        if (lufsIntegrated >= -16 && lufsIntegrated <= -13) {
+          analysis.suggestions.push({
+            type: 'mastering_optimal',
+            message: `Volume ideal para streaming`,
+            action: `Seu áudio está no volume ideal para plataformas digitais`,
+            explanation: "LUFS entre -14 e -16 é o padrão para Spotify, YouTube e Apple Music",
+            impact: "Mantém dinâmica e evita limitação excessiva das plataformas",
+            frequency_range: "N/A",
+            adjustment_db: 0
+          });
+        } else if (lufsIntegrated < -18) { // Mais conservador sem True Peak
+          analysis.suggestions.push({
+            type: 'mastering_volume_low_conservative',
+            message: `Volume baixo (análise conservadora)`,
+            action: `Considere aumentar cuidadosamente para -14 LUFS`,
+            explanation: "Sem dados de True Peak, sugestão conservadora",
+            impact: "Verifique clipping antes de aplicar ajuste",
+            frequency_range: "N/A",
+            adjustment_db: Math.abs(lufsIntegrated + 14)
+          });
+        } else if (lufsIntegrated > -13) {
+          analysis.suggestions.push({
+            type: 'mastering_volume_high',
+            message: `Volume alto demais`,
+            action: `Reduzir volume para -14 LUFS`,
+            explanation: "Plataformas irão reduzir o volume automaticamente",
+            impact: "Perda de dinâmica e compressão adicional das plataformas",
+            frequency_range: "N/A",
+            adjustment_db: -(lufsIntegrated + 14)
+          });
+        }
       }
     } else if (rms > -16 && rms < -12) {
       // Fallback para RMS quando LUFS não disponível 
