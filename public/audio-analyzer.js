@@ -376,6 +376,36 @@ class AudioAnalyzer {
         Mid: spectralResult.summary3Bands.Mid,
         High: spectralResult.summary3Bands.High
       }, null, 2));
+
+      // 🎯 TARGETS ESPECTRAIS HARDCODED para garantir comparação
+      const spectralTargets = {
+        Low: 45.44,   // grave (sub + bass)
+        Mid: 41.02,   // médio (low_mid + mid)  
+        High: 13.54   // agudo (high_mid + presence + air)
+      };
+      
+      // Calcular desvios e penalidades
+      const spectralDeviations = {
+        Low: Math.abs(spectralResult.summary3Bands.Low.energyPct - spectralTargets.Low),
+        Mid: Math.abs(spectralResult.summary3Bands.Mid.energyPct - spectralTargets.Mid),
+        High: Math.abs(spectralResult.summary3Bands.High.energyPct - spectralTargets.High)
+      };
+      
+      const avgDeviation = (spectralDeviations.Low + spectralDeviations.Mid + spectralDeviations.High) / 3;
+      const spectralPenalty = Math.min(50, avgDeviation * 2); // Max 50 pontos de penalidade
+      
+      console.log('🎯 SPECTRAL TARGETS vs ATUAL:', {
+        Low: `Target: ${spectralTargets.Low}% | Atual: ${spectralResult.summary3Bands.Low.energyPct.toFixed(2)}% | Desvio: ${spectralDeviations.Low.toFixed(2)}%`,
+        Mid: `Target: ${spectralTargets.Mid}% | Atual: ${spectralResult.summary3Bands.Mid.energyPct.toFixed(2)}% | Desvio: ${spectralDeviations.Mid.toFixed(2)}%`,
+        High: `Target: ${spectralTargets.High}% | Atual: ${spectralResult.summary3Bands.High.energyPct.toFixed(2)}% | Desvio: ${spectralDeviations.High.toFixed(2)}%`,
+        avgDeviation: avgDeviation.toFixed(2) + '%',
+        spectralPenalty: spectralPenalty.toFixed(1) + ' pontos'
+      });
+      
+      // Adicionar penalidade espectral aos dados para o V2
+      spectralResult.spectralPenalty = spectralPenalty;
+      spectralResult.deviations = spectralDeviations;
+      spectralResult.targets = spectralTargets;
       baseAnalysis.spectralBalance = spectralResult;
       
       // Preparar dados para o V2 usar no scoring
