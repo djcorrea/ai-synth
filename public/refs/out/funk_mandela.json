@@ -1,7 +1,7 @@
 {
   "funk_mandela": {
-    "version": "2025-08-fixed-flex.2.1.1",
-    "generated_at": "2025-08-23T17:33:17.297Z",
+    "version": "2025-08-updated-targets.2.1.2",
+    "generated_at": "2025-08-24T13:39:47.661Z",
     "num_tracks": 17,
     "aggregation_method": "hybrid_fixed_flexible",
     "fixed": {
@@ -15,13 +15,13 @@
         "policy": "deriveFromLUFS"
       },
       "truePeak": {
-        "streamingMax": -10.9,
+        "streamingMax": -8,
         "baileMax": 0
       },
       "dynamicRange": {
         "dr": {
           "target": 8,
-          "tolerance": 1
+          "tolerance": 1.5
         }
       },
       "lowEnd": {
@@ -43,8 +43,8 @@
         "samplePctMax": 0.02
       },
       "lra": {
-        "min": 7.6000000000000005,
-        "max": 12.2
+        "min": 7,
+        "max": 11
       },
       "stereo": {
         "width": {
@@ -128,24 +128,24 @@
         ]
       }
     },
-    "notes": "Manter demais métricas como estão; este gênero aceita clipping controlado e abertura estéreo mais agressiva em médios/agudos. Estéreo: correlação (-1..+1) calculada como 1-2*largura; largura exibível = (1-correlação)/2.",
+    "notes": "Manter demais métricas como estão; este gênero aceita clipping controlado e abertura estéreo mais agressiva em médios/agudos. Estéreo: correlação (-1..+1) calculada como 1-2*largura; largura exibível = (1-correlação)/2. Estéreo: correlação (-1..+1) calculada como 1-2*largura; largura exibível = (1-correlação)/2.",
     "legacy_compatibility": {
       "lufs_target": -8,
       "tol_lufs": 1,
       "tol_lufs_min": 1,
       "tol_lufs_max": 1,
-      "true_peak_target": -10.9,
-      "tol_true_peak": 2,
+      "true_peak_target": -8,
+      "tol_true_peak": 2.5,
       "true_peak_streaming_max": -0.3,
       "true_peak_baile_max": 0,
       "dr_target": 8,
-      "tol_dr": 1,
-      "lra_target": 9.9,
+      "tol_dr": 1.5,
+      "lra_target": 9,
       "lra_min": 1,
       "lra_max": 4,
-      "tol_lra": 2.3,
+      "tol_lra": 2,
       "stereo_target": 0.6,
-      "tol_stereo": 0.19,
+      "tol_stereo": 0.15,
       "stereo_width_mids_highs_tolerance": "wide",
       "low_end_mono_cutoff": 100,
       "clipping_sample_pct_max": 0.02,
