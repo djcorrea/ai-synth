@@ -777,21 +777,19 @@ async function fetchRefJsonWithFallback(paths) {
             // Cache-busting para evitar CDN retornar 404 ou versões antigas
             const hasQ = p.includes('?');
             const url = p + (hasQ ? '&' : '?') + 'v=' + Date.now();
-            console.log('[refs] tentando fetch:', url); // SEMPRE logar
+            if (__DEBUG_ANALYZER__) console.log('[refs] tentando fetch:', url);
             const res = await fetch(url, {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
             });
             if (res.ok) {
-                console.log('[refs] ✅ SUCESSO:', url); // SEMPRE logar sucesso
+                if (__DEBUG_ANALYZER__) console.log('[refs] OK:', p);
                 
                 // Verificar se a resposta tem conteúdo JSON válido
                 const text = await res.text();
                 if (text.trim()) {
                     try {
-                        const parsed = JSON.parse(text);
-                        console.log('[refs] ✅ JSON VÁLIDO:', url, 'keys:', Object.keys(parsed));
-                        return parsed;
+                        return JSON.parse(text);
                     } catch (jsonError) {
                         console.warn('[refs] JSON inválido em', p, ':', text.substring(0, 100));
                         throw new Error(`JSON inválido em ${p}`);
@@ -801,17 +799,14 @@ async function fetchRefJsonWithFallback(paths) {
                     throw new Error(`Resposta vazia em ${p}`);
                 }
             } else {
-                console.warn('[refs] ❌ FALHA HTTP', res.status, 'em', url); // SEMPRE logar erro
+                if (__DEBUG_ANALYZER__) console.warn('[refs] Falha', res.status, 'em', p);
                 lastErr = new Error(`HTTP ${res.status} @ ${p}`);
             }
         } catch (e) {
-            // 🔧 FIX: Usar p ao invés de url que pode não estar definida
-            const urlAttempted = p + (p.includes('?') ? '&' : '?') + 'v=' + Date.now();
-            console.warn('[refs] ❌ ERRO FETCH', urlAttempted, ':', e?.message || e); // SEMPRE logar erro
+            if (__DEBUG_ANALYZER__) console.warn('[refs] Erro fetch', p, e?.message || e);
             lastErr = e;
         }
     }
-    console.error('[refs] ❌ FALHA TOTAL - todas as rotas falharam. Último erro:', lastErr?.message);
     throw lastErr || new Error('Falha ao carregar JSON de referência (todas as rotas testadas)');
 }
 
@@ -908,31 +903,17 @@ async function loadReferenceData(genre) {
         
         console.log('🔍 DEBUG loadReferenceData início:', { genre, bypassCache });
         
-        // 🔧 CORREÇÃO CRÍTICA: Declarar version ANTES de qualquer uso
-        const version = Date.now(); // Force cache bust
-        
         // PRIORIDADE CORRIGIDA: external > embedded > fallback
         // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
         console.log('🌐 Tentando carregar JSON externo primeiro...');
         try {
-            // 🔧 FIX: Detectar se está rodando via Vercel e usar servidor local
-            const isVercel = window.location.hostname.includes('vercel.app');
-            const baseUrls = isVercel ? [
-                `./public/refs/out/${genre}.json?v=${version}`,
-                `./refs/out/${genre}.json?v=${version}`,
-                `/public/refs/out/${genre}.json?v=${version}`,
-                `/refs/out/${genre}.json?v=${version}`
-            ] : [
-                `http://localhost:3000/public/refs/out/${genre}.json?v=${version}`,
-                `http://localhost:3000/refs/out/${genre}.json?v=${version}`,
+            const version = Date.now(); // Force cache bust
+            const json = await fetchRefJsonWithFallback([
                 `/public/refs/out/${genre}.json?v=${version}`,
                 `/refs/out/${genre}.json?v=${version}`,
                 `refs/out/${genre}.json?v=${version}`,
                 `../refs/out/${genre}.json?v=${version}`
-            ];
-            
-            console.log('🌐 [REFS] Detectado ambiente:', isVercel ? 'Vercel (usando caminhos relativos)' : 'Local (usando localhost:3000)');
-            const json = await fetchRefJsonWithFallback(baseUrls);
+            ]);
             const rootKey = Object.keys(json)[0];
             const data = json[rootKey];
             if (data && typeof data === 'object' && data.version) {
@@ -3963,9 +3944,6 @@ function renderReferenceComparisons(analysis) {
             }
             
             if (bLocal && Number.isFinite(bLocal.rms_db)) {
-                // 🔧 DEBUG: Verificar qual fonte está sendo usada
-                console.log(`🔍 BANDA ${band}: rms_db=${bLocal.rms_db.toFixed(2)}, scale=${bLocal.scale || 'unknown'}`);
-                
                 let tgt = null;
                 if (!refBand._target_na && Number.isFinite(refBand.target_db)) tgt = refBand.target_db;
                 if (showNorm && normMap && Number.isFinite(normMap[band])) tgt = normMap[band];

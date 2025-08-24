@@ -361,51 +361,9 @@ class AudioAnalyzer {
   
   // ✨ SISTEMA ESPECTRAL: Executar ANTES do V2 para afetar o scoring
   try {
-    // Extrair canal esquerdo do audioBuffer para análise espectral
-    const leftChannel = audioBuffer.getChannelData(0);
-    const spectralResult = this.calculateSpectralBalance(leftChannel, audioBuffer.sampleRate);
+    const spectralResult = this.calculateSpectralBalance(left, audioBuffer.sampleRate);
     if (spectralResult && spectralResult.summary3Bands) {
       console.log('✨ Sistema espectral ATIVADO ANTES do scoring V2');
-      console.log('🎯 SPECTRAL DEBUG - Porcentagens calculadas:', {
-        Low: spectralResult.summary3Bands.Low.energyPct.toFixed(2) + '%',
-        Mid: spectralResult.summary3Bands.Mid.energyPct.toFixed(2) + '%', 
-        High: spectralResult.summary3Bands.High.energyPct.toFixed(2) + '%'
-      });
-      console.log('🔍 SPECTRAL RAW - Dados completos:', JSON.stringify({
-        Low: spectralResult.summary3Bands.Low,
-        Mid: spectralResult.summary3Bands.Mid,
-        High: spectralResult.summary3Bands.High
-      }, null, 2));
-
-      // 🎯 TARGETS ESPECTRAIS HARDCODED para garantir comparação
-      const spectralTargets = {
-        Low: 45.44,   // grave (sub + bass)
-        Mid: 41.02,   // médio (low_mid + mid)  
-        High: 13.54   // agudo (high_mid + presence + air)
-      };
-      
-      // Calcular desvios e penalidades
-      const spectralDeviations = {
-        Low: Math.abs(spectralResult.summary3Bands.Low.energyPct - spectralTargets.Low),
-        Mid: Math.abs(spectralResult.summary3Bands.Mid.energyPct - spectralTargets.Mid),
-        High: Math.abs(spectralResult.summary3Bands.High.energyPct - spectralTargets.High)
-      };
-      
-      const avgDeviation = (spectralDeviations.Low + spectralDeviations.Mid + spectralDeviations.High) / 3;
-      const spectralPenalty = Math.min(50, avgDeviation * 2); // Max 50 pontos de penalidade
-      
-      console.log('🎯 SPECTRAL TARGETS vs ATUAL:', {
-        Low: `Target: ${spectralTargets.Low}% | Atual: ${spectralResult.summary3Bands.Low.energyPct.toFixed(2)}% | Desvio: ${spectralDeviations.Low.toFixed(2)}%`,
-        Mid: `Target: ${spectralTargets.Mid}% | Atual: ${spectralResult.summary3Bands.Mid.energyPct.toFixed(2)}% | Desvio: ${spectralDeviations.Mid.toFixed(2)}%`,
-        High: `Target: ${spectralTargets.High}% | Atual: ${spectralResult.summary3Bands.High.energyPct.toFixed(2)}% | Desvio: ${spectralDeviations.High.toFixed(2)}%`,
-        avgDeviation: avgDeviation.toFixed(2) + '%',
-        spectralPenalty: spectralPenalty.toFixed(1) + ' pontos'
-      });
-      
-      // Adicionar penalidade espectral aos dados para o V2
-      spectralResult.spectralPenalty = spectralPenalty;
-      spectralResult.deviations = spectralDeviations;
-      spectralResult.targets = spectralTargets;
       baseAnalysis.spectralBalance = spectralResult;
       
       // Preparar dados para o V2 usar no scoring
@@ -1407,9 +1365,8 @@ class AudioAnalyzer {
     const N = samples.length;
     const spectrum = new Array(N);
     
-    // 🔧 CORREÇÃO CRÍTICA: Usar N completo, não limitado a 512
-    // Para análise espectral precisa, processar todos os bins
-    const maxN = N; // Remover limitação artificial
+    // Limitar N para evitar travamento
+    const maxN = Math.min(N, 512);
     
     for (let k = 0; k < maxN; k++) {
       let real = 0;
@@ -1422,6 +1379,11 @@ class AudioAnalyzer {
       }
       
       spectrum[k] = Math.sqrt(real * real + imag * imag);
+    }
+    
+    // Preencher o resto com zeros
+    for (let k = maxN; k < N; k++) {
+      spectrum[k] = 0;
     }
     
     return spectrum;
@@ -2195,15 +2157,15 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     const hopSize = fftSize / 4;
     const maxFrames = 50;
     
-    // Definir bandas de frequência - OTIMIZADO PARA FUNK MANDELA
+    // Definir bandas de frequência
     const bandDefinitions = [
       { name: 'Sub Bass', hzLow: 20, hzHigh: 60 },
       { name: 'Bass', hzLow: 60, hzHigh: 120 },
       { name: 'Low Mid', hzLow: 120, hzHigh: 250 },
       { name: 'Mid', hzLow: 250, hzHigh: 1000 },
       { name: 'High Mid', hzLow: 1000, hzHigh: 4000 },
-      { name: 'High', hzLow: 4000, hzHigh: 8000 }, // 🔧 AJUSTADO para funk
-      { name: 'Presence', hzLow: 8000, hzHigh: 20000 } // 🔧 EXPANDIDO para capturar toda energia aguda
+      { name: 'High', hzLow: 4000, hzHigh: 8000 },
+      { name: 'Presence', hzLow: 8000, hzHigh: 16000 }
     ];
     
     const nyquist = sampleRate / 2;
@@ -2259,21 +2221,10 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
       throw new Error('Energia total zero - áudio silencioso ou erro');
     }
     
-    // Calcular porcentagens e dB compatíveis com sistema original
+    // Calcular porcentagens e dB
     const bands = bandEnergies.map(band => {
       const energyPct = (band.totalEnergy / validTotalEnergy) * 100;
-      
-      // 🔧 DEBUG: Verificar se alguma banda tem energia muito baixa
-      if (band.name === 'Presence' && energyPct < 0.01) {
-        console.warn(`🔍 PRESENCE DEBUG: energia muito baixa - ${energyPct.toFixed(6)}% (${band.totalEnergy}/${validTotalEnergy})`);
-      }
-      
-      // 🔧 CORREÇÃO SIMPLES: RMS normalizado pela energia da banda
-      // Energia da banda / energia total * referência típica de funk
-      const proportion = band.totalEnergy / validTotalEnergy;
-      const referenceRms = 0.1; // Referência típica para funk (ajustável)
-      const rmsLinear = proportion * referenceRms;
-      const rmsDb = rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
+      const rmsDb = band.totalEnergy > 0 ? 10 * Math.log10(band.totalEnergy / validTotalEnergy) : -80;
       
       return {
         name: band.name,
@@ -2285,42 +2236,19 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
       };
     });
     
-    // Resumo 3 bandas - calculado CORRETAMENTE (não média aritmética de dB!)
-    const lowBands = bands.filter(b => b.hzLow < 250);
-    const midBands = bands.filter(b => b.hzLow >= 250 && b.hzLow < 4000);
-    const highBands = bands.filter(b => b.hzLow >= 4000);
-    
+    // Resumo 3 bandas
     const summary3Bands = {
       Low: {
-        energyPct: lowBands.reduce((sum, b) => sum + b.energyPct, 0),
-        // 🔧 CORREÇÃO SIMPLES: RMS proporcional à energia
-        rmsDb: (() => {
-          const totalEnergy = lowBands.reduce((sum, b) => sum + b.energy, 0);
-          const proportion = totalEnergy / validTotalEnergy;
-          const referenceRms = 0.1;
-          const rmsLinear = proportion * referenceRms;
-          return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
-        })()
+        energyPct: bands.filter(b => b.hzLow < 250).reduce((sum, b) => sum + b.energyPct, 0),
+        rmsDb: -6.2 // Placeholder - pode ser calculado
       },
       Mid: {
-        energyPct: midBands.reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: (() => {
-          const totalEnergy = midBands.reduce((sum, b) => sum + b.energy, 0);
-          const proportion = totalEnergy / validTotalEnergy;
-          const referenceRms = 0.1;
-          const rmsLinear = proportion * referenceRms;
-          return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
-        })()
+        energyPct: bands.filter(b => b.hzLow >= 250 && b.hzLow < 4000).reduce((sum, b) => sum + b.energyPct, 0),
+        rmsDb: -7.6
       },
       High: {
-        energyPct: highBands.reduce((sum, b) => sum + b.energyPct, 0),
-        rmsDb: (() => {
-          const totalEnergy = highBands.reduce((sum, b) => sum + b.energy, 0);
-          const proportion = totalEnergy / validTotalEnergy;
-          const referenceRms = 0.1;
-          const rmsLinear = proportion * referenceRms;
-          return rmsLinear > 0 ? 20 * Math.log10(rmsLinear) : -80;
-        })()
+        energyPct: bands.filter(b => b.hzLow >= 4000).reduce((sum, b) => sum + b.energyPct, 0),
+        rmsDb: -12.3
       }
     };
     
@@ -2675,8 +2603,8 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               low_mid: [250, 500],
               mid: [500, 2000],
               high_mid: [2000, 6000],
-              brilho: [6000, 8000], // 🔧 ALINHADO com sistema espectral
-              presenca: [8000, 20000] // 🔧 EXPANDIDO para capturar energia aguda
+              brilho: [6000, 12000],
+              presenca: [12000, 18000]
             };
             const bins = specRes.freq_bins_compact;
             const mags = specRes.spectrum_avg;
@@ -2689,96 +2617,28 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               const spectralBands = baseAnalysis.spectralBalance.bands;
               const bandMapping = {
                 'Sub Bass': 'sub',
-                'Bass': 'low_bass',
-                'Low Mid': 'low_mid', 
+                'Bass': 'low_bass', 
+                'Low Mid': 'low_mid',
                 'Mid': 'mid',
                 'High Mid': 'high_mid',
                 'High': 'brilho',
                 'Presence': 'presenca'
               };
               
-              // 🔧 MAPEAMENTO COMPLETO: Mapear também as bandas que faltam
-              const extraBandMappings = {
-                'upper_bass': 'Bass',      // 120-250 Hz -> mapear para Bass
-                'sub': 'Sub Bass'          // Garantir que sub está mapeado
-              };
-              
               spectralBands.forEach(band => {
-                const mappedName = bandMapping[band.name];
-                console.log(`🔍 SPECTRAL MAPPING: ${band.name} -> ${mappedName}, rmsDb: ${band.rmsDb}`);
+                const mappedName = bandMapping[band.name] || band.name.toLowerCase().replace(' ', '_');
                 if (mappedName) {
-                  // 🔧 CORREÇÃO CRÍTICA: Usar valor RMS real calculado corretamente
+                  // Converter % energia para dB relativo
+                  const energyRatio = band.energyPct / 100; // Converter % para proporção
+                  const db = 10 * Math.log10(energyRatio || 1e-9);
                   bandEnergies[mappedName] = { 
                     energy: band.energy, 
-                    rms_db: band.rmsDb, // Usar RMS real, não energia relativa
-                    energyPct: band.energyPct,
+                    rms_db: db,
+                    energyPct: band.energyPct, // ✨ Novo campo!
                     scale: 'spectral_balance_auto' 
                   };
-                  console.log(`✅ MAPPED: ${mappedName} = ${band.rmsDb.toFixed(2)} dB`);
                 }
               });
-              
-              // 🔧 PREENCHER BANDAS FALTANTES: Garantir que todas as bandas da interface tenham valores
-              const requiredBands = ['sub', 'low_bass', 'upper_bass', 'low_mid', 'mid', 'high_mid', 'brilho', 'presenca'];
-              
-              requiredBands.forEach(bandName => {
-                if (!bandEnergies[bandName]) {
-                  // Tentar encontrar uma banda espectral correspondente para interpolar
-                  let sourceValue = null;
-                  
-                  // Mapeamento reverso e interpolação para bandas faltantes
-                  switch(bandName) {
-                    case 'upper_bass':
-                      // Usar valor da banda Bass (60-120 Hz) como aproximação para upper_bass (120-250 Hz)
-                      sourceValue = bandEnergies['low_bass'];
-                      break;
-                    case 'sub':
-                      // Tentar pegar de Sub Bass
-                      const subBand = spectralBands.find(b => b.name === 'Sub Bass');
-                      if (subBand) {
-                        sourceValue = { 
-                          energy: subBand.energy, 
-                          rms_db: subBand.rmsDb, // Usar RMS real
-                          energyPct: subBand.energyPct,
-                          scale: 'spectral_balance_auto' 
-                        };
-                      }
-                      break;
-                  }
-                  
-                  if (sourceValue) {
-                    bandEnergies[bandName] = sourceValue;
-                  } else {
-                    // Valor padrão seguro para bandas não mapeadas
-                    bandEnergies[bandName] = { 
-                      energy: 0, 
-                      rms_db: -80, 
-                      energyPct: 0,
-                      scale: 'spectral_balance_auto_fallback' 
-                    };
-                  }
-                }
-              });
-              
-              // 🔧 CORREÇÃO FINAL: Garantir que brilho e presenca usem dados espectrais corretos
-              if (baseAnalysis.spectralBalance && baseAnalysis.spectralBalance.summary3Bands) {
-                const spectralSummary = baseAnalysis.spectralBalance.summary3Bands;
-                
-                // Usar dados espectrais diretos para brilho (High band)
-                if (spectralSummary.High && bandEnergies.brilho) {
-                  bandEnergies.brilho.rms_db = spectralSummary.High.rmsDb;
-                  bandEnergies.brilho.energyPct = spectralSummary.High.energyPct;
-                  console.log(`🔧 BRILHO CORRIGIDO: ${spectralSummary.High.rmsDb.toFixed(2)} dB (era ${bandEnergies.brilho.rms_db})`);
-                }
-                
-                // Para presenca, vamos usar a banda Presence específica se existir
-                const presenceBand = spectralBands.find(b => b.name === 'Presence');
-                if (presenceBand && bandEnergies.presenca) {
-                  bandEnergies.presenca.rms_db = presenceBand.rmsDb;
-                  bandEnergies.presenca.energyPct = presenceBand.energyPct;
-                  console.log(`🔧 PRESENÇA CORRIGIDA: ${presenceBand.rmsDb.toFixed(2)} dB (era ${bandEnergies.presenca.rms_db})`);
-                }
-              }
               
               td.bandEnergies = bandEnergies;
               (td._sources = td._sources || {}).bandEnergies = 'spectral_balance_auto_fft';
