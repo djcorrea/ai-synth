@@ -1,6 +1,6 @@
 {
   "funk_mandela": {
-    "version": "2025-08-mandela-targets.3",
+    "version": "2025-08-mandela-targets.4-tolerances-updated",
     "generated_at": "2025-08-24T13:39:47.661Z",
     "num_tracks": 17,
     "aggregation_method": "hybrid_fixed_flexible",
@@ -60,7 +60,7 @@
               60
             ],
             "target_db": -7.2,
-            "toleranceDb": 1.7
+            "toleranceDb": 2.5
           },
           {
             "name": "low_bass",
@@ -69,7 +69,7 @@
               100
             ],
             "target_db": -8.9,
-            "toleranceDb": 1.2
+            "toleranceDb": 2.5
           },
           {
             "name": "upper_bass",
@@ -78,7 +78,7 @@
               200
             ],
             "target_db": -12.8,
-            "toleranceDb": 1.5
+            "toleranceDb": 2.5
           },
           {
             "name": "low_mid",
@@ -87,7 +87,7 @@
               500
             ],
             "target_db": -9.2,
-            "toleranceDb": 1.2
+            "toleranceDb": 2
           },
           {
             "name": "mid",
@@ -96,7 +96,7 @@
               2000
             ],
             "target_db": -6.8,
-            "toleranceDb": 0.9
+            "toleranceDb": 1.5
           },
           {
             "name": "high_mid",
@@ -114,7 +114,7 @@
               12000
             ],
             "target_db": -16.2,
-            "toleranceDb": 1.7
+            "toleranceDb": 2
           },
           {
             "name": "presenca",
@@ -131,21 +131,21 @@
     "notes": "Manter demais métricas como estão; este gênero aceita clipping controlado e abertura estéreo mais agressiva em médios/agudos. Estéreo: correlação (-1..+1) calculada como 1-2*largura; largura exibível = (1-correlação)/2. Estéreo: correlação (-1..+1) calculada como 1-2*largura; largura exibível = (1-correlação)/2.",
     "legacy_compatibility": {
       "lufs_target": -8,
-      "tol_lufs": 1,
+      "tol_lufs": 2.5,
       "tol_lufs_min": 1,
       "tol_lufs_max": 1,
       "true_peak_target": -8,
-      "tol_true_peak": 2.5,
+      "tol_true_peak": 3.4,
       "true_peak_streaming_max": -0.3,
       "true_peak_baile_max": 0,
       "dr_target": 8,
-      "tol_dr": 1.5,
+      "tol_dr": 3,
       "lra_target": 9,
       "lra_min": 1,
       "lra_max": 4,
-      "tol_lra": 2,
+      "tol_lra": 2.5,
       "stereo_target": 0.6,
-      "tol_stereo": 0.15,
+      "tol_stereo": 0.25,
       "stereo_width_mids_highs_tolerance": "wide",
       "low_end_mono_cutoff": 100,
       "clipping_sample_pct_max": 0.02,
@@ -171,27 +171,27 @@
       "bands": {
         "sub": {
           "target_db": -7.2,
-          "tol_db": 1.7,
+          "tol_db": 2.5,
           "severity": "soft"
         },
         "low_bass": {
           "target_db": -8.9,
-          "tol_db": 1.2,
+          "tol_db": 2.5,
           "severity": "soft"
         },
         "upper_bass": {
           "target_db": -12.8,
-          "tol_db": 1.5,
+          "tol_db": 2.5,
           "severity": "soft"
         },
         "low_mid": {
           "target_db": -9.2,
-          "tol_db": 1.2,
+          "tol_db": 2,
           "severity": "soft"
         },
         "mid": {
           "target_db": -6.8,
-          "tol_db": 0.9,
+          "tol_db": 1.5,
           "severity": "hard",
           "vocal_presence_range": true
         },
@@ -202,7 +202,7 @@
         },
         "brilho": {
           "target_db": -16.2,
-          "tol_db": 1.7,
+          "tol_db": 2,
           "severity": "soft"
         },
         "presenca": {
@@ -213,6 +213,6 @@
         }
       }
     },
-    "last_updated": "2025-08-24T15:12:15.793Z"
+    "last_updated": "2025-08-24T15:54:07.433Z"
   }
 }

@@ -634,40 +634,40 @@ const __INLINE_EMBEDDED_REFS__ = {
     ]},
     byGenre: {
         trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:2.5}, low_bass:{target_db:-14.6,tol_db:4.3}, upper_bass:{target_db:-14.8,tol_db:2.5}, low_mid:{target_db:-12.6,tol_db:3.7}, mid:{target_db:-12,tol_db:4.0}, high_mid:{target_db:-20.2,tol_db:3.6}, brilho:{target_db:-24.7,tol_db:2.5}, presenca:{target_db:-32.1,tol_db:3.6} } },
-    // Perfil atualizado Funk Mandela 2025-08-mandela-targets.2 - TARGETS ATUALIZADOS COM MÉDIAS ARITMÉTICAS
+    // Perfil atualizado Funk Mandela 2025-08-mandela-targets.4-tolerances-updated - TOLERÂNCIAS BIDIRECIONAIS ATUALIZADAS
     funk_mandela:   { 
-        version: "2025-08-mandela-targets.2", 
-        lufs_target: -8.0, tol_lufs: 1.5, tol_lufs_min: 1.5, tol_lufs_max: 1.5, 
-        true_peak_target: -8.0, tol_true_peak: 3.4, true_peak_streaming_max: -1.2, true_peak_baile_max: -0.1, 
-        dr_target: 8.0, tol_dr: 2.0, // Atualizado para média aritmética: 8.0 ± 2.0
-        lra_target: 9.0, lra_min: 7.0, lra_max: 11.0, tol_lra: 2.0, 
-        stereo_target: 0.60, tol_stereo: 0.15, stereo_width_target: 0.20, stereo_width_tol: 0.15, // Correlação 0.60 ± 0.15
+        version: "2025-08-mandela-targets.4-tolerances-updated", 
+        lufs_target: -8.0, tol_lufs: 2.5, tol_lufs_min: 2.5, tol_lufs_max: 2.5, 
+        true_peak_target: -8.0, tol_true_peak: 3.40, true_peak_streaming_max: -1.2, true_peak_baile_max: -0.1, 
+        dr_target: 8.0, tol_dr: 3.0, // Atualizado para ±3.0 unidades
+        lra_target: 9.0, lra_min: 6.5, lra_max: 11.5, tol_lra: 2.5, 
+        stereo_target: 0.60, tol_stereo: 0.25, stereo_width_target: 0.20, stereo_width_tol: 0.25, // Correlação 0.60 ± 0.25
         low_end_mono_cutoff: 100, clipping_sample_pct_max: 0.02, vocal_band_min_delta: -1.5,
         fixed: {
-            lufs: { integrated: { target: -8.0, tolerance: 1.5 } },
+            lufs: { integrated: { target: -8.0, tolerance: 2.5 } },
             rms: { policy: "deriveFromLUFS" },
             truePeak: { streamingMax: -1.2, baileMax: -0.1, target: -8.0 },
-            dynamicRange: { crest: { target: 8.0, min: 6.0, max: 10.0 } },
+            dynamicRange: { crest: { target: 8.0, min: 5.0, max: 11.0 } },
             lowEnd: { mono: { cutoffHz: 100 } },
             vocalPresence: { bandHz: [1000, 4000], vocalBandMinDeltaDb: -1.5 }
         },
         flex: {
             clipping: { samplePctMax: 0.02 },
-            lra: { min: 7.0, max: 11.0, target: 9.0 },
-            stereo: { correlation: { min: 0.45, max: 0.75 }, width: { min: 0.125, max: 0.275 } }
+            lra: { min: 6.5, max: 11.5, target: 9.0 },
+            stereo: { correlation: { min: 0.35, max: 0.85 }, width: { min: 0.075, max: 0.325 } }
         },
         pattern_rules: { 
             hard_constraints: ["lufs", "truePeak", "dynamicRange", "lowEnd", "vocalPresence"], 
             soft_constraints: ["clipping", "lra", "stereo", "tonalCurve"] 
         }, 
         bands: { 
-            sub:{target_db:-7.2,tol_db:1.7,severity:"soft",range_hz:"60-120"}, 
-            low_bass:{target_db:-8.9,tol_db:1.2,severity:"soft",range_hz:"60-120"}, 
-            upper_bass:{target_db:-12.8,tol_db:1.5,severity:"soft",range_hz:"120-200"}, 
-            low_mid:{target_db:-9.2,tol_db:1.2,severity:"soft",range_hz:"200-500"}, 
-            mid:{target_db:-6.8,tol_db:0.9,severity:"hard",vocal_presence_range:true,range_hz:"500-2000"}, 
+            sub:{target_db:-7.2,tol_db:2.5,severity:"soft",range_hz:"60-120"}, 
+            low_bass:{target_db:-8.9,tol_db:2.5,severity:"soft",range_hz:"60-120"}, 
+            upper_bass:{target_db:-12.8,tol_db:2.5,severity:"soft",range_hz:"120-200"}, 
+            low_mid:{target_db:-9.2,tol_db:2.0,severity:"soft",range_hz:"200-500"}, 
+            mid:{target_db:-6.8,tol_db:1.5,severity:"hard",vocal_presence_range:true,range_hz:"500-2000"}, 
             high_mid:{target_db:-12.3,tol_db:1.5,severity:"soft",range_hz:"2000-4000"}, 
-            brilho:{target_db:-16.2,tol_db:1.7,severity:"soft",range_hz:"4000-8000"}, 
+            brilho:{target_db:-16.2,tol_db:2.0,severity:"soft",range_hz:"4000-8000"}, 
             presenca:{target_db:-19.1,tol_db:2.5,severity:"hard",vocal_presence_range:true,range_hz:"8000-12000"} 
         } 
     },
