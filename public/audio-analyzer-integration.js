@@ -2697,39 +2697,76 @@ function displayModalResults(analysis) {
                 // 1. Clipping - SEMPRE mostrar com valores reais
                 const clipVal = Number.isFinite(analysis.technicalData?.clippingSamples) ? analysis.technicalData.clippingSamples : 0;
                 const clipPct = Number.isFinite(analysis.technicalData?.clippingPct) ? analysis.technicalData.clippingPct : 0;
+                // 🎯 CLIPPING PRECEDENCE V2: Usar nova lógica de precedência
                 const peak = Number.isFinite(analysis.technicalData?.peak) ? analysis.technicalData.peak : -Infinity;
                 const truePeak = Number.isFinite(analysis.technicalData?.truePeakDbtp) ? analysis.technicalData.truePeakDbtp : null;
                 
-                // Critérios de problema de clipping mais rigorosos e realistas
-                const hasPeakClipping = peak > -0.1; // Mais rigoroso: -0.1dB ao invés de -0.5dB
-                const hasTruePeakClipping = truePeak !== null && truePeak > -0.1; // Pico Real acima de -0.1dBTP
-                const hasSampleClipping = clipVal > 0;
-                const hasPercentageClipping = clipPct > 0;
+                // Verificar se temos dados do novo sistema de precedência
+                const precedenceData = analysis.technicalData?._singleStage;
+                let hasClippingProblem, clipText, clipClass;
                 
-                const hasClippingProblem = hasPeakClipping || hasTruePeakClipping || hasSampleClipping || hasPercentageClipping;
-                
-                let clipText = '';
-                let clipClass = '';
-                
-                if (hasClippingProblem) {
-                    hasActualProblems = true;
-                    clipClass = 'warn';
+                if (precedenceData && precedenceData.source === 'enhanced-clipping-v2') {
+                    // 🚀 Usar novo sistema de precedência
+                    const isClipped = precedenceData.finalState === 'CLIPPED';
+                    const isTruePeakOnly = precedenceData.finalState === 'TRUE_PEAK_ONLY';
+                    hasClippingProblem = isClipped || isTruePeakOnly;
                     
-                    // Mostrar informação mais detalhada do problema
-                    const details = [];
-                    if (hasPeakClipping) details.push(`Peak: ${peak.toFixed(2)}dB`);
-                    if (hasTruePeakClipping) details.push(`TruePeak: ${truePeak.toFixed(2)}dBTP`);
-                    if (hasSampleClipping) details.push(`${clipVal} samples (${clipPct.toFixed(3)}%)`);
-                    
-                    clipText = details.join(' | ');
+                    if (hasClippingProblem) {
+                        hasActualProblems = true;
+                        clipClass = isClipped ? 'error' : 'warn'; // CLIPPED é mais severo que TRUE_PEAK_ONLY
+                        
+                        const details = [];
+                        if (isClipped) {
+                            details.push(`🔴 CLIPPED: ${precedenceData.samplePeakMaxDbFS.toFixed(2)}dBFS`);
+                            if (precedenceData.precedenceApplied) {
+                                details.push(`TP override: ${precedenceData.truePeakDbTP.toFixed(2)}dBTP`);
+                            }
+                        } else if (isTruePeakOnly) {
+                            details.push(`🟡 TruePeak: ${precedenceData.truePeakDbTP.toFixed(2)}dBTP`);
+                        }
+                        
+                        if (precedenceData.clippingSamples > 0) {
+                            details.push(`${precedenceData.clippingSamples} samples (${precedenceData.clippingPct.toFixed(3)}%)`);
+                        }
+                        
+                        clipText = details.join(' | ');
+                    } else {
+                        // Estado limpo com novo sistema
+                        const safeDetails = [];
+                        safeDetails.push(`✅ Sample: ${precedenceData.samplePeakMaxDbFS.toFixed(2)}dBFS`);
+                        safeDetails.push(`TP: ${precedenceData.truePeakDbTP.toFixed(2)}dBTP`);
+                        safeDetails.push(`${precedenceData.clippingSamples} samples`);
+                        clipText = safeDetails.join(' | ');
+                        clipClass = '';
+                    }
                 } else {
-                    // Mostrar valores mesmo quando não há problema
-                    const safeDetails = [];
-                    safeDetails.push(`${clipVal} samples`);
-                    if (peak > -Infinity) safeDetails.push(`Peak: ${peak.toFixed(2)}dB`);
-                    if (truePeak !== null) safeDetails.push(`TP: ${truePeak.toFixed(2)}dBTP`);
+                    // 🔄 Fallback para sistema legado
+                    const hasPeakClipping = peak > -0.1;
+                    const hasTruePeakClipping = truePeak !== null && truePeak > -0.1;
+                    const hasSampleClipping = clipVal > 0;
+                    const hasPercentageClipping = clipPct > 0;
                     
-                    clipText = safeDetails.join(' | ');
+                    hasClippingProblem = hasPeakClipping || hasTruePeakClipping || hasSampleClipping || hasPercentageClipping;
+                    
+                    if (hasClippingProblem) {
+                        hasActualProblems = true;
+                        clipClass = 'warn';
+                        
+                        const details = [];
+                        if (hasPeakClipping) details.push(`Peak: ${peak.toFixed(2)}dB`);
+                        if (hasTruePeakClipping) details.push(`TruePeak: ${truePeak.toFixed(2)}dBTP`);
+                        if (hasSampleClipping) details.push(`${clipVal} samples (${clipPct.toFixed(3)}%)`);
+                        
+                        clipText = details.join(' | ');
+                    } else {
+                        const safeDetails = [];
+                        safeDetails.push(`${clipVal} samples`);
+                        if (peak > -Infinity) safeDetails.push(`Peak: ${peak.toFixed(2)}dB`);
+                        if (truePeak !== null) safeDetails.push(`TP: ${truePeak.toFixed(2)}dBTP`);
+                        
+                        clipText = safeDetails.join(' | ');
+                        clipClass = '';
+                    }
                 }
                 rows.push(row('Clipping', `<span class="${clipClass}">${clipText}</span>`, 'clippingSamples'));
                 
@@ -3324,10 +3361,44 @@ function displayModalResults(analysis) {
 
         const breakdown = analysis.qualityBreakdown || {};
         
+        // 🎯 APLICAR CAPS EM ESTADO CLIPPED
+        const precedenceData = analysis.technicalData?._singleStage;
+        const isClippedState = precedenceData?.finalState === 'CLIPPED' && precedenceData?.scoreCapApplied === true;
+        
+        // Aplicar caps nos sub-scores se em estado CLIPPED
+        const applyClippingCaps = (originalBreakdown) => {
+            if (!isClippedState) return originalBreakdown;
+            
+            const capped = { ...originalBreakdown };
+            
+            // Caps específicos para estado CLIPPED
+            if (Number.isFinite(capped.loudness)) {
+                capped.loudness = Math.min(capped.loudness, 70); // Loudness ≤ 70
+            }
+            if (Number.isFinite(capped.technical)) {
+                capped.technical = Math.min(capped.technical, 60); // Técnico ≤ 60  
+            }
+            if (Number.isFinite(capped.dynamics)) {
+                capped.dynamics = Math.min(capped.dynamics, 50); // Dinâmica ≤ 50
+            }
+            
+            // Frequency e Stereo podem manter valores originais (não afetados diretamente pelo clipping)
+            
+            return capped;
+        };
+        
+        const finalBreakdown = applyClippingCaps(breakdown);
+        
         // Função para renderizar score com barra de progresso
         const renderScoreWithProgress = (label, value, color = '#00ffff') => {
             const numValue = parseFloat(value) || 0;
             const displayValue = value != null ? value : '—';
+            
+            // Indicar se o valor foi capeado (comparar com breakdown original)
+            const labelKey = label.toLowerCase().replace('faixa dinâmica', 'dynamics').replace('técnico', 'technical').replace('loudness', 'loudness').replace('frequência', 'frequency').replace('stereo', 'stereo');
+            const wasCapped = isClippedState && breakdown[labelKey] && Number.isFinite(breakdown[labelKey]) && 
+                             breakdown[labelKey] !== value;
+            const cappedIndicator = wasCapped ? ' 🔴' : '';
             
             if (value == null) {
                 return `<div class="data-row">
@@ -3337,7 +3408,7 @@ function displayModalResults(analysis) {
             }
             
             return `<div class="data-row metric-with-progress">
-                <span class="label">${label}:</span>
+                <span class="label">${label}${cappedIndicator}:</span>
                 <div class="metric-value-progress">
                     <span class="value">${displayValue}/100</span>
                     <div class="progress-bar-mini">
@@ -3347,12 +3418,12 @@ function displayModalResults(analysis) {
             </div>`;
         };
         
-        const scoreRows = breakdown ? `
-            ${renderScoreWithProgress('Faixa Dinâmica', breakdown.dynamics, '#ffd700')}
-            ${renderScoreWithProgress('Técnico', breakdown.technical, '#00ff92')}
-            ${renderScoreWithProgress('Stereo', breakdown.stereo, '#ff6b6b')}
-            ${renderScoreWithProgress('Loudness', breakdown.loudness, '#ff3366')}
-            ${renderScoreWithProgress('Frequência', breakdown.frequency, '#00ffff')}
+        const scoreRows = finalBreakdown ? `
+            ${renderScoreWithProgress('Faixa Dinâmica', finalBreakdown.dynamics, '#ffd700')}
+            ${renderScoreWithProgress('Técnico', finalBreakdown.technical, '#00ff92')}
+            ${renderScoreWithProgress('Stereo', finalBreakdown.stereo, '#ff6b6b')}
+            ${renderScoreWithProgress('Loudness', finalBreakdown.loudness, '#ff3366')}
+            ${renderScoreWithProgress('Frequência', finalBreakdown.frequency, '#00ffff')}
         ` : '';
 
         technicalData.innerHTML = `

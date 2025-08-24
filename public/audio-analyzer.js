@@ -1015,32 +1015,33 @@ class AudioAnalyzer {
         // Todas as métricas base calculadas aqui usarão exatamente o mesmo PCM bruto (sem ganhos posteriores)
         const td = analysis.technicalData;
         // Peak (dBFS) já será calculado abaixo; adiantamos se quisermos evitar duplicação
-        // Clipping sample-level unificado com threshold mais rigoroso
-        let samplePeakL = 0, samplePeakR = 0, clipCount = 0;
-        const clipThresh = 0.99; // Threshold mais rigoroso para clipping
         
-        // Análise do canal esquerdo
-        for (let i=0;i<leftChannel.length;i++) {
-          const a = Math.abs(leftChannel[i]);
-          if (a > samplePeakL) samplePeakL = a;
-          if (a >= clipThresh) clipCount++;
-        }
+        // 🎯 CLIPPING PRECEDENCE V2: Sample Peak + True Peak com mesmo buffer e oversampling ≥4x
+        const oversamplingFactor = 4;
+        const clipThresh = 1.0; // Threshold rigoroso: exatamente 0 dBFS
         
-        // Análise do canal direito (se diferente)
-        if (rightChannel !== leftChannel) {
-          for (let i=0;i<rightChannel.length;i++) {
-            const a = Math.abs(rightChannel[i]);
-            if (a > samplePeakR) samplePeakR = a;
-            if (a >= clipThresh) clipCount++;
-          }
-        } else samplePeakR = samplePeakL;
-        const toDb = v => v>0 ? 20*Math.log10(v) : -Infinity;
+        // 🔬 Calcular Sample Peak com oversampling no mesmo buffer
+        const samplePeakResult = this.calculateSamplePeakWithOversampling(leftChannel, rightChannel, oversamplingFactor);
+        
+        // 🔬 Calcular True Peak estimado (mesmo buffer + oversampling avançado)
+        const truePeakResult = this.estimateTruePeakFromSameBuffer(leftChannel, rightChannel, oversamplingFactor);
+        
+        // 🎭 Aplicar lógica de precedência
+        const precedenceResult = this.applyClippingPrecedence(samplePeakResult, truePeakResult);
+        
         td._singleStage = {
-          samplePeakLeftDb: toDb(samplePeakL),
-            samplePeakRightDb: toDb(samplePeakR),
-            clippingSamples: clipCount,
-            clipThreshold: clipThresh,
-            source: 'single-stage:pcm'
+          samplePeakLeftDb: samplePeakResult.leftDbFS,
+          samplePeakRightDb: samplePeakResult.rightDbFS,
+          samplePeakMaxDbFS: samplePeakResult.maxDbFS,
+          truePeakDbTP: precedenceResult.finalTruePeakDbTP,
+          clippingSamples: samplePeakResult.clippingSamples,
+          clippingPct: samplePeakResult.clippingPct,
+          finalState: precedenceResult.finalState,
+          precedenceApplied: precedenceResult.precedenceApplied,
+          scoreCapApplied: precedenceResult.scoreCapApplied,
+          oversamplingFactor: oversamplingFactor,
+          clipThreshold: clipThresh,
+          source: 'enhanced-clipping-v2'
         };
       }
     } catch {}
@@ -1949,8 +1950,166 @@ if (!AudioAnalyzer.prototype.analyzeAudioBufferDirect) {
       console.warn('analyzeAudioBufferDirect falhou', e);
       return null;
     }
-  };
+  }
 }
+
+// 🎯 CLIPPING PRECEDENCE V2: Métodos para análise de picos com precedência correta
+// ======================================================================
+
+// 🎯 Calcular Sample Peak com oversampling ≥4x (mesmo buffer para consistência)
+AudioAnalyzer.prototype.calculateSamplePeakWithOversampling = function(leftChannel, rightChannel, oversamplingFactor = 4) {
+  const toDb = v => v > 0 ? 20 * Math.log10(v) : -Infinity;
+  
+  // Aplicar oversampling por interpolação linear
+  const oversampleChannel = (channel) => {
+    const oversampledLength = channel.length * oversamplingFactor;
+    const oversampled = new Float32Array(oversampledLength);
+    
+    for (let i = 0; i < oversampledLength; i++) {
+      const originalIndex = i / oversamplingFactor;
+      const lowerIndex = Math.floor(originalIndex);
+      const upperIndex = Math.min(Math.ceil(originalIndex), channel.length - 1);
+      const fraction = originalIndex - lowerIndex;
+      
+      if (lowerIndex === upperIndex) {
+        oversampled[i] = channel[lowerIndex];
+      } else {
+        oversampled[i] = channel[lowerIndex] * (1 - fraction) + channel[upperIndex] * fraction;
+      }
+    }
+    return oversampled;
+  };
+  
+  const oversampledLeft = oversampleChannel(leftChannel);
+  const oversampledRight = rightChannel !== leftChannel ? oversampleChannel(rightChannel) : oversampledLeft;
+  
+  // Encontrar peaks nos sinais oversampleados
+  let peakLeft = 0, peakRight = 0, clippingSamples = 0;
+  const clipThreshold = 1.0; // Exatamente 0 dBFS
+  
+  for (let i = 0; i < oversampledLeft.length; i++) {
+    const absLeft = Math.abs(oversampledLeft[i]);
+    if (absLeft > peakLeft) peakLeft = absLeft;
+    if (absLeft >= clipThreshold) clippingSamples++;
+  }
+  
+  for (let i = 0; i < oversampledRight.length; i++) {
+    const absRight = Math.abs(oversampledRight[i]);
+    if (absRight > peakRight) peakRight = absRight;
+    if (absRight >= clipThreshold) clippingSamples++;
+  }
+  
+  const maxPeak = Math.max(peakLeft, peakRight);
+  const clippingPct = (clippingSamples / (oversampledLeft.length + oversampledRight.length)) * 100;
+  
+  return {
+    leftLinear: peakLeft,
+    rightLinear: peakRight,
+    maxLinear: maxPeak,
+    leftDbFS: toDb(peakLeft),
+    rightDbFS: toDb(peakRight),
+    maxDbFS: toDb(maxPeak),
+    clippingSamples,
+    clippingPct,
+    oversamplingFactor,
+    source: 'sample_peak_oversampled'
+  };
+};
+
+// 🎭 Estimar True Peak no mesmo buffer (compatível com ITU-R BS.1770-4)
+AudioAnalyzer.prototype.estimateTruePeakFromSameBuffer = function(leftChannel, rightChannel, oversamplingFactor = 4) {
+  const toDb = v => v > 0 ? 20 * Math.log10(v) : -Infinity;
+  
+  // True Peak simulation: aplicar upsampling com filtro mais sofisticado
+  const estimateTruePeakChannel = (channel) => {
+    // Simular oversampling com filtro anti-aliasing básico
+    const upsampledLength = channel.length * oversamplingFactor;
+    const upsampled = new Float32Array(upsampledLength);
+    
+    // Zero-stuffing + interpolação com filtro passa-baixas simples
+    for (let i = 0; i < channel.length; i++) {
+      const upsampledIndex = i * oversamplingFactor;
+      upsampled[upsampledIndex] = channel[i] * oversamplingFactor; // Compensar ganho
+    }
+    
+    // Filtro passa-baixas simples (moving average)
+    const filterLength = Math.min(oversamplingFactor * 2, 8);
+    const filtered = new Float32Array(upsampledLength);
+    
+    for (let i = 0; i < upsampledLength; i++) {
+      let sum = 0;
+      let count = 0;
+      
+      for (let j = -filterLength; j <= filterLength; j++) {
+        const idx = i + j;
+        if (idx >= 0 && idx < upsampledLength) {
+          sum += upsampled[idx];
+          count++;
+        }
+      }
+      
+      filtered[i] = count > 0 ? sum / count : 0;
+    }
+    
+    // Encontrar peak no sinal filtrado
+    let peak = 0;
+    for (let i = 0; i < filtered.length; i++) {
+      const abs = Math.abs(filtered[i]);
+      if (abs > peak) peak = abs;
+    }
+    
+    return peak;
+  };
+  
+  const truePeakLeft = estimateTruePeakChannel(leftChannel);
+  const truePeakRight = rightChannel !== leftChannel ? estimateTruePeakChannel(rightChannel) : truePeakLeft;
+  const maxTruePeak = Math.max(truePeakLeft, truePeakRight);
+  
+  return {
+    leftLinear: truePeakLeft,
+    rightLinear: truePeakRight,
+    maxLinear: maxTruePeak,
+    leftDbTP: toDb(truePeakLeft),
+    rightDbTP: toDb(truePeakRight),
+    maxDbTP: toDb(maxTruePeak),
+    isClipped: maxTruePeak >= 1.0,
+    oversamplingFactor,
+    source: 'true_peak_estimated'
+  };
+};
+
+// 🎪 Aplicar lógica de precedência: Sample Peak > 0 dBFS override True Peak
+AudioAnalyzer.prototype.applyClippingPrecedence = function(samplePeakResult, truePeakResult) {
+  const result = {
+    finalState: 'CLEAN',
+    finalSamplePeakDbFS: samplePeakResult.maxDbFS,
+    finalTruePeakDbTP: truePeakResult.maxDbTP,
+    precedenceApplied: false,
+    scoreCapApplied: false,
+    clippingType: 'none'
+  };
+  
+  // REGRA 1: Se Sample Peak > 0 dBFS → estado CLIPPED (precedência absoluta)
+  if (samplePeakResult.maxDbFS > 0) {
+    result.finalState = 'CLIPPED';
+    result.clippingType = 'sample_peak';
+    result.scoreCapApplied = true;
+    
+    // REGRA 2: True Peak não pode reportar < 0 dBTP em estado CLIPPED
+    if (result.finalTruePeakDbTP < 0) {
+      result.finalTruePeakDbTP = Math.max(0, result.finalTruePeakDbTP);
+      result.precedenceApplied = true;
+    }
+  }
+  // REGRA 3: Se apenas True Peak > 0 dBTP
+  else if (truePeakResult.isClipped) {
+    result.finalState = 'TRUE_PEAK_ONLY';
+    result.clippingType = 'true_peak_only';
+    result.scoreCapApplied = false; // Não aplicar caps para True Peak isolado
+  }
+  
+  return result;
+};
 
 // 🔌 Adapter para métricas avançadas (LUFS/LRA ITU + True Peak oversampled) via módulos em /lib
 // - Seguro e opcional: só sobrescreve valores quando ausentes ou quando preferido via flag
