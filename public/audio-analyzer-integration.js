@@ -413,7 +413,7 @@ function generateAudioAnalysisCard(analysis) {
                 <span class="value">${analysis.fundamentalFreq} Hz</span>
             </div>
             <div class="info-item">
-                <span class="label">Dinâmica:</span>
+                <span class="label">Faixa Dinâmica:</span>
                 <span class="value">${analysis.dynamicRange} dB</span>
             </div>
             <div class="info-item">
@@ -2307,7 +2307,7 @@ function addReferenceComparisonSection(analysis) {
         <div class="comparison-content">
             <div class="comparison-grid">
                 ${generateComparisonRow('Loudness', comparison.loudness, 'LUFS')}
-                ${generateComparisonRow('Dinâmica', comparison.dynamics, 'dB')}
+                ${generateComparisonRow('Faixa Dinâmica', comparison.dynamics, 'dB')}
                 ${generateComparisonRow('Correlação Estéreo', comparison.stereo, '')}
             </div>
             
@@ -2605,13 +2605,13 @@ function displayModalResults(analysis) {
         };
 
         const col1 = [
-            row('Peak', `${safeFixed(getMetric('peak_db', 'peak'))} dB`, 'peak'),
+            row('Peak (máximo)', `${safeFixed(getMetric('peak_db', 'peak'))} dB`, 'peak'),
             row('RMS', `${safeFixed(getMetric('rms_db', 'rms'))} dB`, 'rms'),
             row('DR', `${safeFixed(getMetric('dynamic_range', 'dynamicRange'))} dB`, 'dynamicRange'),
-            row('Crest Factor', `${safeFixed(getMetric('crest_factor', 'crestFactor'))}`, 'crestFactor'),
-            row('True Peak', (advancedReady && Number.isFinite(getMetric('true_peak_dbtp', 'truePeakDbtp'))) ? `${safeFixed(getMetric('true_peak_dbtp', 'truePeakDbtp'))} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
-            row('Volume Integrado (padrão streaming)', (advancedReady && Number.isFinite(getLufsIntegratedValue())) ? `${safeFixed(getLufsIntegratedValue())} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
-            row('LRA', (advancedReady && Number.isFinite(getMetric('lra'))) ? `${safeFixed(getMetric('lra'))} dB` : (advancedReady? '—':'⏳'), 'lra')
+            row('Fator de Crista', `${safeFixed(getMetric('crest_factor', 'crestFactor'))} dB`, 'crestFactor'),
+            row('Pico Real (dBTP)', (advancedReady && Number.isFinite(getMetric('true_peak_dbtp', 'truePeakDbtp'))) ? `${safeFixed(getMetric('true_peak_dbtp', 'truePeakDbtp'))} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
+            row('Loudness Integrado (LUFS)', (advancedReady && Number.isFinite(getLufsIntegratedValue())) ? `${safeFixed(getLufsIntegratedValue())} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
+            row('Faixa de Loudness – LRA (LU)', (advancedReady && Number.isFinite(getMetric('lra'))) ? `${safeFixed(getMetric('lra'))} LU` : (advancedReady? '—':'⏳'), 'lra')
             ].join('');
 
         const col2 = [
@@ -2666,10 +2666,10 @@ function displayModalResults(analysis) {
                 }
                 // Picos por canal
                 if (Number.isFinite(analysis.technicalData?.samplePeakLeftDb)) {
-                    rows.push(row('Sample Peak (L)', `${safeFixed(analysis.technicalData.samplePeakLeftDb, 1)} dB`, 'samplePeakLeftDb'));
+                    rows.push(row('Pico de Amostra L (dBFS)', `${safeFixed(analysis.technicalData.samplePeakLeftDb, 1)} dBFS`, 'samplePeakLeftDb'));
                 }
                 if (Number.isFinite(analysis.technicalData?.samplePeakRightDb)) {
-                    rows.push(row('Sample Peak (R)', `${safeFixed(analysis.technicalData.samplePeakRightDb, 1)} dB`, 'samplePeakRightDb'));
+                    rows.push(row('Pico de Amostra R (dBFS)', `${safeFixed(analysis.technicalData.samplePeakRightDb, 1)} dBFS`, 'samplePeakRightDb'));
                 }
                 // Clipping (%)
                 if (Number.isFinite(analysis.technicalData?.clippingPct)) {
@@ -2764,7 +2764,7 @@ function displayModalResults(analysis) {
                 const hasCrestProblem = crestVal < 6 || crestVal > 20; // Valores normais: 6-20dB
                 if (hasCrestProblem) hasActualProblems = true;
                 const crestClass = hasCrestProblem ? 'warn' : '';
-                rows.push(row('Crest Factor', `<span class="${crestClass}">${safeFixed(crestVal, 1)}dB</span>`, 'crestFactor'));
+                rows.push(row('Fator de Crista', `<span class="${crestClass}">${safeFixed(crestVal, 1)} dB</span>`, 'crestFactor'));
                 
                 // Consistência (se disponível) - mas sempre tentar mostrar
                 if (analysis.metricsValidation && Object.keys(analysis.metricsValidation).length) {
@@ -3348,7 +3348,7 @@ function displayModalResults(analysis) {
         };
         
         const scoreRows = breakdown ? `
-            ${renderScoreWithProgress('Dinâmica', breakdown.dynamics, '#ffd700')}
+            ${renderScoreWithProgress('Faixa Dinâmica', breakdown.dynamics, '#ffd700')}
             ${renderScoreWithProgress('Técnico', breakdown.technical, '#00ff92')}
             ${renderScoreWithProgress('Stereo', breakdown.stereo, '#ff6b6b')}
             ${renderScoreWithProgress('Loudness', breakdown.loudness, '#ff3366')}
@@ -3703,10 +3703,10 @@ function renderReferenceComparisons(analysis) {
         return getMetricForRef('lufs_integrated', 'lufsIntegrated');
     };
     
-    pushRow('Volume Integrado (padrão streaming)', getLufsIntegratedValue(), ref.lufs_target, ref.tol_lufs, ' LUFS');
-    pushRow('True Peak', getMetricForRef('true_peak_dbtp', 'truePeakDbtp'), ref.true_peak_target, ref.tol_true_peak, ' dBTP');
+    pushRow('Loudness Integrado (LUFS)', getLufsIntegratedValue(), ref.lufs_target, ref.tol_lufs, ' LUFS');
+    pushRow('Pico Real (dBTP)', getMetricForRef('true_peak_dbtp', 'truePeakDbtp'), ref.true_peak_target, ref.tol_true_peak, ' dBTP');
     pushRow('DR', getMetricForRef('dynamic_range', 'dynamicRange'), ref.dr_target, ref.tol_dr, '');
-    pushRow('LRA', getMetricForRef('lra'), ref.lra_target, ref.tol_lra, '');
+    pushRow('Faixa de Loudness – LRA (LU)', getMetricForRef('lra'), ref.lra_target, ref.tol_lra, ' LU');
     pushRow('Stereo Corr.', getMetricForRef('stereo_correlation', 'stereoCorrelation'), ref.stereo_target, ref.tol_stereo, '');
     
     // Bandas detalhadas Fase 2: usar métricas centralizadas para bandas
