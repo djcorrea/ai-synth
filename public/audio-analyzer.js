@@ -475,51 +475,8 @@ class AudioAnalyzer {
                   }
                 }
               } catch {}
-              
-              // 🔧 FUNÇÃO PARA CARREGAR SCORING V1 COMO FALLBACK
-              async function loadScoringV1() {
-                try {
-                  const script = document.createElement('script');
-                  script.src = '/lib/audio/features/scoring.js?v=' + Date.now();
-                  script.type = 'text/javascript';
-                  
-                  return new Promise((resolve, reject) => {
-                    script.onload = () => {
-                      console.log('✅ [FALLBACK] Scoring V1 carregado');
-                      resolve();
-                    };
-                    script.onerror = () => {
-                      console.error('❌ [FALLBACK] Erro ao carregar Scoring V1');
-                      reject(new Error('Falha no carregamento V1'));
-                    };
-                    document.head.appendChild(script);
-                  });
-                } catch (error) {
-                  console.error('❌ [FALLBACK] Erro na função loadScoringV1:', error);
-                }
-              }
-              
               let scorerMod = null;
-              // 🚀 SCORING V2 COMPLETE - Sistema simplificado
-              try {
-                // Verificar se sistema V2 completo está carregado
-                if (window.ScoringV2Complete && window.ScoringV2Complete.computeMixScore) {
-                  scorerMod = window.ScoringV2Complete;
-                  console.log('✅ [ANALYZER] Usando ScoringV2Complete');
-                } else if (window.computeMixScore) {
-                  scorerMod = { computeMixScore: window.computeMixScore };
-                  console.log('✅ [ANALYZER] Usando função global computeMixScore');
-                } else {
-                  console.warn('⚠️ [ANALYZER] Carregando scoring V1 como fallback...');
-                  // Último recurso: carregar V1 original diretamente
-                  await loadScoringV1();
-                  if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
-                    scorerMod = window.ScoringV1;
-                  }
-                }
-              } catch (error) {
-                console.error('❌ [ANALYZER] Erro ao carregar scoring:', error);
-              }
+              try { scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null); } catch {}
               if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
                 // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo
                 let genreSpecificRef = null;
@@ -948,32 +905,7 @@ class AudioAnalyzer {
           }
         } catch {}
         try {
-          // 🚀 SCORING V2 COMPLETE - Sistema simplificado (segunda ocorrência)
-          let scorerMod = null;
-          
-          // Verificar se sistema V2 completo está carregado
-          if (window.ScoringV2Complete && window.ScoringV2Complete.computeMixScore) {
-            scorerMod = window.ScoringV2Complete;
-            console.log('✅ [ANALYZER_2] Usando ScoringV2Complete');
-          } else if (window.computeMixScore) {
-            scorerMod = { computeMixScore: window.computeMixScore };
-            console.log('✅ [ANALYZER_2] Usando função global computeMixScore');
-          } else if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
-            scorerMod = window.ScoringV1;
-            console.log('⚠️ [ANALYZER_2] Fallback para ScoringV1 global');
-          } else {
-            console.warn('⚠️ [ANALYZER_2] Carregando scoring como fallback...');
-            // Último recurso: usar scoring V1 se disponível ou carregar
-            if (window.ScoringV1 && window.ScoringV1.computeMixScore) {
-              scorerMod = window.ScoringV1;
-            } else {
-              try {
-                scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
-              } catch (e) {
-                console.error('❌ [ANALYZER_2] Falha ao carregar scoring:', e);
-              }
-            }
-          }
+          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch(()=>null);
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
             // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
             let genreSpecificRef = null;

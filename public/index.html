@@ -317,22 +317,9 @@
     <!-- 🎵 AUDIO ANALYZER - Carregar os scripts -->
     <script src="audio-analyzer.js?v=20250823a" defer></script>
     <!-- Opcional: o integrador possui fallback inline; permita rede setando window.REFS_ALLOW_NETWORK=true antes do load -->
-    <script src="refs/embedded-refs-new.js?v=20250823j&timestamp=1724440300&sugest_fix=1" defer></script>
+    <script src="refs/embedded-refs-new.js?v=20250823j&timestamp=1724440300" defer></script>
     <script src="suggestion-text-generator.js?v=20250815" defer></script>
-    
-    <!-- 🎯 SISTEMA DE SUGESTÕES MELHORADO -->
-    <script src="suggestion-scorer.js?v=20250823-peak-fix-final" defer></script>
-    <script src="enhanced-suggestion-engine.js?v=20250823-peak-fix-final" defer></script>
-    
-    <script src="audio-analyzer-integration.js?v=20250823k&final_fix=1724440500&sugest_fix=1" defer></script>
-    
-    <!-- 🚀 SCORING V2 SISTEMA COMPLETO (carregado por último) -->
-    <script src="scoring-v2-complete.js?v=20250823-tolerancia-fix" defer></script>
-    <script src="auto-enable-v2.js?v=20250823-tolerancia-fix" defer></script>
-    <script src="v2-status-check.js?v=20250823" defer></script>
-    
-    <!-- 🚀 AUTO ATIVAÇÃO DO V2 -->
-    <script src="auto-enable-v2.js?v=20250823" defer></script>
+    <script src="audio-analyzer-integration.js?v=20250823k&final_fix=1724440500" defer></script>
     
     <!-- Inicializar Audio Analyzer -->
     <script>
@@ -341,16 +328,6 @@
             window.REFS_ALLOW_NETWORK = true;
             window.DEBUG_ANALYZER = true;
             window.REFS_BYPASS_CACHE = true;
-            
-            // 🎯 Inicializar Enhanced Suggestion Engine
-            if (typeof SuggestionScorer !== 'undefined' && typeof EnhancedSuggestionEngine !== 'undefined') {
-                window.suggestionScorer = new SuggestionScorer();
-                window.enhancedSuggestionEngine = new EnhancedSuggestionEngine();
-                window.USE_ENHANCED_SUGGESTIONS = true;
-                console.log('🎯 Enhanced Suggestion Engine inicializado');
-            } else {
-                console.warn('⚠️ Enhanced Suggestion Engine não disponível, usando sistema legado');
-            }
             
             console.log('🔧 INIT: Forçando carregamento de refs externas');
             
