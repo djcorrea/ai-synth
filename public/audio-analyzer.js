@@ -2266,10 +2266,14 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     // Calcular porcentagens e dB compatíveis com sistema original
     const bands = bandEnergies.map(band => {
       const energyPct = (band.totalEnergy / validTotalEnergy) * 100;
-      // 🔧 CORREÇÃO: Manter compatibilidade com valores originais
-      // Calcular como proporção normalizada para ficar na faixa -5 a -25 dB
+      
+      // 🔧 CORREÇÃO CRÍTICA: Fórmula matemática correta para conversão % → dB
+      // Para energia espectral: usar 10 * log10 (não 20 * log10)
       const proportion = band.totalEnergy / validTotalEnergy;
-      const rmsDb = proportion > 0 ? 20 * Math.log10(proportion) : -80; // Similar ao original
+      const energyDb = proportion > 0 ? 10 * Math.log10(proportion) : -80;
+      
+      // Para compatibilidade com sistema legado, manter nome rmsDb mas usar fórmula correta
+      const rmsDb = energyDb;
       
       return {
         name: band.name,
@@ -2677,13 +2681,14 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               spectralBands.forEach(band => {
                 const mappedName = bandMapping[band.name] || band.name.toLowerCase().replace(' ', '_');
                 if (mappedName) {
-                  // 🔧 CORREÇÃO: Usar proporção normalizada para manter compatibilidade
-                  // Em vez de RMS absoluto, calcular como proporção (similar ao sistema original)
+                  // 🔧 CORREÇÃO CRÍTICA: Usar fórmula matemática correta
+                  // Para energia espectral: 10 * log10, não 20 * log10
                   const proportion = band.energyPct / 100; // Converter % para proporção
-                  const db = proportion > 0 ? 20 * Math.log10(proportion) : -80; // Compatível com original
+                  const energyDb = proportion > 0 ? 10 * Math.log10(proportion) : -80;
+                  
                   bandEnergies[mappedName] = { 
                     energy: band.energy, 
-                    rms_db: db,
+                    rms_db: energyDb, // Usar fórmula correta
                     energyPct: band.energyPct, // ✨ Novo campo!
                     scale: 'spectral_balance_auto' 
                   };
