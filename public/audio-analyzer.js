@@ -1704,6 +1704,56 @@ class AudioAnalyzer {
         action: `Optimize a faixa ${Math.round(funkKickRange[0].frequency)}Hz para mais punch`
       });
     }
+    
+    // ===== ANÁLISE DE ESTÉREO COM ALERTAS VISUAIS =====
+    // 🚨 Mantém alertas visuais independente do score capped
+    const correlation = analysis.technical?.stereoCorrelation ?? analysis.technicalData?.stereoCorrelation;
+    if (Number.isFinite(correlation)) {
+      console.log(`[generateTechnicalSuggestions] 🎧 Correlação estéreo: ${correlation.toFixed(3)}`);
+      
+      // 🚨 ALERTA VISUAL CRÍTICO: Correlação < 0.10
+      if (correlation < 0.10) {
+        analysis.suggestions.push({
+          type: 'stereo_correlation_critical',
+          message: `⚠️ ALERTA: Correlação estéreo muito baixa (${correlation.toFixed(3)})`,
+          action: `Verificar problemas de fase e cancelamentos`,
+          explanation: "Correlação < 0.10 indica problemas sérios de compatibilidade mono",
+          impact: "Som pode desaparecer em sistemas mono (celulares, alguns sistemas)",
+          frequency_range: "Imagem estéreo geral",
+          adjustment_db: 0,
+          severity: 'critical',
+          visual_alert: true
+        });
+      }
+      // 🚨 ALERTA VISUAL MODERADO: Correlação < 0.30
+      else if (correlation < 0.30) {
+        analysis.suggestions.push({
+          type: 'stereo_correlation_warning',
+          message: `⚠️ Correlação estéreo baixa (${correlation.toFixed(3)})`,
+          action: `Verificar compatibilidade mono e ajustar width`,
+          explanation: "Correlação baixa pode causar problemas em reprodução mono",
+          impact: "Possíveis cancelamentos parciais em sistemas mono",
+          frequency_range: "Imagem estéreo geral", 
+          adjustment_db: 0,
+          severity: 'moderate',
+          visual_alert: true
+        });
+      }
+      // 💡 Correlação muito alta (possível mono)
+      else if (correlation > 0.90) {
+        analysis.suggestions.push({
+          type: 'stereo_width_narrow',
+          message: `💡 Imagem estéreo muito estreita (correlação: ${correlation.toFixed(3)})`,
+          action: `Considere expandir a imagem estéreo com cuidado`,
+          explanation: "Alta correlação indica imagem estéreo limitada",
+          impact: "Som pode parecer mono demais, perdendo espacialidade",
+          frequency_range: "Imagem estéreo geral",
+          adjustment_db: 0,
+          severity: 'info'
+        });
+      }
+    }
+    
     // Tag de origem v1 se ainda não marcada
     try {
       analysis.suggestions = (analysis.suggestions||[]).map(s=> (s && typeof s==='object' && !s.source) ? ({...s, source:'v1:rules'}) : s);
@@ -3476,10 +3526,33 @@ function calculateDynamicsScore(lra) {
 
 function calculateStereoScore(correlation) {
   if (!Number.isFinite(correlation)) return 50;
-  if (correlation < -0.3) return 10; // Problemas sérios
-  if (correlation < 0) return 40; // Problemas leves
-  if (correlation < 0.5) return 70; // OK
-  return 90; // Bom
+  
+  // 🛡️ IMPLEMENTAÇÃO TETO DE PENALIDADE DE ESTÉREO
+  // Máximo de penalidade: não tirar mais que 20 pontos do sub-score Stereo
+  const STEREO_PENALTY_CAP = 20; // Máximo de penalidade em pontos
+  const BASELINE_SCORE = 90; // Score máximo possível
+  const MIN_STEREO_SCORE = BASELINE_SCORE - STEREO_PENALTY_CAP; // 70 pontos mínimo
+  
+  let rawScore;
+  if (correlation < -0.3) {
+    rawScore = 10; // Problemas sérios - ANTES
+  } else if (correlation < 0) {
+    rawScore = 40; // Problemas leves - ANTES  
+  } else if (correlation < 0.5) {
+    rawScore = 70; // OK
+  } else {
+    rawScore = 90; // Bom
+  }
+  
+  // 🚨 APLICAR TETO: não permitir score menor que MIN_STEREO_SCORE (70)
+  const cappedScore = Math.max(MIN_STEREO_SCORE, rawScore);
+  
+  // 🔍 Log para auditoria (apenas se score foi limitado)
+  if (cappedScore > rawScore) {
+    console.log(`[STEREO-CAP] 🛡️ Score limitado: ${rawScore} → ${cappedScore} (correlação: ${correlation.toFixed(3)})`);
+  }
+  
+  return cappedScore;
 }
 
 function calculateClippingScore(samples, truePeak) {
