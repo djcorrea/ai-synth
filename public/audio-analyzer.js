@@ -843,13 +843,26 @@ class AudioAnalyzer {
           loudness: clamp(scoreLoud),
           frequency: clamp(scoreFreq)
         };
-        // 🎯 FALLBACK MELHORADO: Se Color Ratio V2 falhar, usar pesos rebalanceados
-        // Alinhado com os novos pesos: mais peso para loudness/dynamics, menos para technical
+        // 🎯 AGREGADOR COM PESOS V2: Sistema balanceado conforme auditoria
+        // Novos pesos: Loudness 25%, Dinâmica 20%, Frequência 25%, Técnico 15%, Stereo 15%
         if (!Number.isFinite(baseAnalysis.qualityOverall)) {
-          console.log('[FALLBACK_BALANCED] Triggered - qualityOverall was:', baseAnalysis.qualityOverall);
-          // Novos pesos mais balanceados: loudness↑, dynamics=, technical↓, frequency=
-          baseAnalysis.qualityOverall = clamp((scoreDyn*0.30 + scoreTech*0.20 + scoreLoud*0.35 + scoreFreq*0.15));
-          console.log('[FALLBACK_BALANCED] Set qualityOverall =', baseAnalysis.qualityOverall, 'using balanced weights');
+          console.log('[WEIGHTED_AGGREGATE] Triggered - qualityOverall was:', baseAnalysis.qualityOverall);
+          
+          // Calcular score de stereo corretamente
+          const scoreStereo = Number.isFinite(corr) ? calculateStereoScore(corr) : 75;
+          
+          // Calcular score agregado com novos pesos
+          const weightedScore = calculateWeightedOverallScore({
+            loudness: scoreLoud,
+            dynamics: scoreDyn, 
+            frequency: scoreFreq,
+            technical: scoreTech,
+            stereo: scoreStereo
+          });
+          
+          baseAnalysis.qualityOverall = clamp(weightedScore);
+          console.log('[WEIGHTED_AGGREGATE] Set qualityOverall =', baseAnalysis.qualityOverall, 
+                     'components:', { scoreLoud, scoreDyn, scoreFreq, scoreTech, scoreStereo });
         }
       }
     } catch(e){ if (window.DEBUG_ANALYZER) console.warn('Fallback quality breakdown falhou', e); }
@@ -3560,6 +3573,34 @@ function calculateClippingScore(samples, truePeak) {
   if (truePeak > -0.1) return 20; // Muito próximo do clipping
   if (truePeak > -1.0) return 80; // Headroom limitado
   return 100; // Bom headroom
+}
+
+// 🎯 AGREGADOR COM PESOS V2: Sistema balanceado
+function calculateWeightedOverallScore(scores) {
+  // Configuração dos pesos conforme auditoria
+  const WEIGHTS = {
+    loudness: 0.25,    // 25% - Importância alta (LUFS, headroom)  
+    dynamics: 0.20,    // 20% - Dinâmica (LRA, crest factor)
+    frequency: 0.25,   // 25% - Importância alta (balanço tonal)
+    technical: 0.15,   // 15% - Qualidade técnica (clipping, distorção)
+    stereo: 0.15       // 15% - Imagem estéreo
+  };
+  
+  const { loudness, dynamics, frequency, technical, stereo } = scores;
+  
+  // Validar que todos os scores estão presentes
+  const validScores = [loudness, dynamics, frequency, technical, stereo].filter(s => Number.isFinite(s));
+  if (validScores.length === 0) return 0;
+  
+  // Calcular score ponderado
+  const weightedSum = 
+    (loudness || 0) * WEIGHTS.loudness +
+    (dynamics || 0) * WEIGHTS.dynamics +
+    (frequency || 0) * WEIGHTS.frequency +
+    (technical || 0) * WEIGHTS.technical +
+    (stereo || 0) * WEIGHTS.stereo;
+    
+  return Math.round(weightedSum);
 }
 
 // 🔒 Validação e Rollback Safety
