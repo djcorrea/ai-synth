@@ -659,14 +659,17 @@ class AudioAnalyzer {
         applyUnifiedCorrections(baseAnalysis, td, unifiedData);
       }
       
+      // 🎯 Definir v2Metrics para compatibilidade com funções de correção
+      const v2Metrics = null; // placeholder para compatibilidade futura
+      
       // ===== FASE 3: ALINHAMENTO LÓGICO (RISCO MÉDIO) =====
       if (typeof applyLogicAlignmentCorrections === 'function') {
-        applyLogicAlignmentCorrections(baseAnalysis, td, unifiedData, metrics);
+        applyLogicAlignmentCorrections(baseAnalysis, td, unifiedData, v2Metrics);
       }
       
       // ===== FASE 4: AUDITORIA FINAL COMPLETA (BAIXO RISCO) =====
       if (typeof applyFinalAuditCorrections === 'function') {
-        applyFinalAuditCorrections(baseAnalysis, td, unifiedData, metrics);
+        applyFinalAuditCorrections(baseAnalysis, td, unifiedData, v2Metrics);
       }
       
       // ===== FASE 5: CORREÇÕES CRÍTICAS ESPECÍFICAS (SEGURO) =====
@@ -2946,6 +2949,9 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
         Object.entries(tdv).forEach(([k,v])=>{ if (typeof v==='number' && !Number.isFinite(v)) { delete tdv[k]; logWarn('Removed non-finite', {k}); }});
       }
     } catch (invErr) { if (typeof window !== 'undefined' && window.DEBUG_ANALYZER) console.warn('Falha invariants', invErr); }
+
+    // 🎯 Definir v2Metrics como objeto vazio se não existir
+    const v2Metrics = null; // placeholder para compatibilidade futura
 
     // 🎯 CENTRALIZAÇÃO DAS MÉTRICAS - Single Source of Truth
     try {
