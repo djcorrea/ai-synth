@@ -2199,15 +2199,15 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     const hopSize = fftSize / 4;
     const maxFrames = 50;
     
-    // Definir bandas de frequência
+    // Definir bandas de frequência - COBERTURA COMPLETA sem gaps
     const bandDefinitions = [
       { name: 'Sub Bass', hzLow: 20, hzHigh: 60 },
       { name: 'Bass', hzLow: 60, hzHigh: 120 },
       { name: 'Low Mid', hzLow: 120, hzHigh: 250 },
       { name: 'Mid', hzLow: 250, hzHigh: 1000 },
       { name: 'High Mid', hzLow: 1000, hzHigh: 4000 },
-      { name: 'High', hzLow: 4000, hzHigh: 8000 },
-      { name: 'Presence', hzLow: 8000, hzHigh: 16000 }
+      { name: 'High', hzLow: 4000, hzHigh: 12000 }, // 🔧 ESTENDIDO para cobrir até presença
+      { name: 'Presence', hzLow: 12000, hzHigh: 18000 } // 🔧 ALINHADO com sistema legado
     ];
     
     const nyquist = sampleRate / 2;

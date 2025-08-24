@@ -3959,6 +3959,9 @@ function renderReferenceComparisons(analysis) {
             }
             
             if (bLocal && Number.isFinite(bLocal.rms_db)) {
+                // 🔧 DEBUG: Verificar qual fonte está sendo usada
+                console.log(`🔍 BANDA ${band}: rms_db=${bLocal.rms_db.toFixed(2)}, scale=${bLocal.scale || 'unknown'}`);
+                
                 let tgt = null;
                 if (!refBand._target_na && Number.isFinite(refBand.target_db)) tgt = refBand.target_db;
                 if (showNorm && normMap && Number.isFinite(normMap[band])) tgt = normMap[band];
