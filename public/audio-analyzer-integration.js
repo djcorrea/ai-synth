@@ -413,7 +413,7 @@ function generateAudioAnalysisCard(analysis) {
                 <span class="value">${analysis.fundamentalFreq} Hz</span>
             </div>
             <div class="info-item">
-                <span class="label">Dinâmica:</span>
+                <span class="label">Faixa Dinâmica:</span>
                 <span class="value">${analysis.dynamicRange} dB</span>
             </div>
             <div class="info-item">
@@ -2007,7 +2007,7 @@ async function performReferenceComparison() {
             });
         }
         
-        // True Peak
+        // Pico Real
         if (Math.abs(differences.truePeak) > THRESHOLD) {
             const action = differences.truePeak > 0 ? 'Reduzir' : 'Aumentar';
             referenceSuggestions.push({
@@ -2307,7 +2307,7 @@ function addReferenceComparisonSection(analysis) {
         <div class="comparison-content">
             <div class="comparison-grid">
                 ${generateComparisonRow('Loudness', comparison.loudness, 'LUFS')}
-                ${generateComparisonRow('Dinâmica', comparison.dynamics, 'dB')}
+                ${generateComparisonRow('Faixa Dinâmica', comparison.dynamics, 'dB')}
                 ${generateComparisonRow('Correlação Estéreo', comparison.stereo, '')}
             </div>
             
@@ -2527,7 +2527,7 @@ function displayModalResults(analysis) {
         addReferenceComparisonSection(analysis);
     }
     
-    // Marcar se pacote avançado chegou (LUFS integrado + True Peak + LRA)
+    // Marcar se pacote avançado chegou (LUFS integrado + Pico Real + LRA)
     const advancedReady = (
         Number.isFinite(analysis?.technicalData?.lufsIntegrated) &&
         Number.isFinite(analysis?.technicalData?.truePeakDbtp)
@@ -2605,13 +2605,13 @@ function displayModalResults(analysis) {
         };
 
         const col1 = [
-            row('Peak', `${safeFixed(getMetric('peak_db', 'peak'))} dB`, 'peak'),
+            row('Peak (máximo)', `${safeFixed(getMetric('peak_db', 'peak'))} dB`, 'peak'),
             row('RMS', `${safeFixed(getMetric('rms_db', 'rms'))} dB`, 'rms'),
             row('DR', `${safeFixed(getMetric('dynamic_range', 'dynamicRange'))} dB`, 'dynamicRange'),
-            row('Crest Factor', `${safeFixed(getMetric('crest_factor', 'crestFactor'))}`, 'crestFactor'),
-            row('True Peak', (advancedReady && Number.isFinite(getMetric('true_peak_dbtp', 'truePeakDbtp'))) ? `${safeFixed(getMetric('true_peak_dbtp', 'truePeakDbtp'))} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
-            row('Volume Integrado (padrão streaming)', (advancedReady && Number.isFinite(getLufsIntegratedValue())) ? `${safeFixed(getLufsIntegratedValue())} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
-            row('LRA', (advancedReady && Number.isFinite(getMetric('lra'))) ? `${safeFixed(getMetric('lra'))} dB` : (advancedReady? '—':'⏳'), 'lra')
+            row('Fator de Crista', `${safeFixed(getMetric('crest_factor', 'crestFactor'))} dB`, 'crestFactor'),
+            row('Pico Real (dBTP)', (advancedReady && Number.isFinite(getMetric('true_peak_dbtp', 'truePeakDbtp'))) ? `${safeFixed(getMetric('true_peak_dbtp', 'truePeakDbtp'))} dBTP` : (advancedReady? '—':'⏳'), 'truePeakDbtp'),
+            row('Loudness Integrado (LUFS)', (advancedReady && Number.isFinite(getLufsIntegratedValue())) ? `${safeFixed(getLufsIntegratedValue())} LUFS` : (advancedReady? '—':'⏳'), 'lufsIntegrated'),
+            row('Faixa de Loudness – LRA (LU)', (advancedReady && Number.isFinite(getMetric('lra'))) ? `${safeFixed(getMetric('lra'))} LU` : (advancedReady? '—':'⏳'), 'lra')
             ].join('');
 
         const col2 = [
@@ -2666,10 +2666,10 @@ function displayModalResults(analysis) {
                 }
                 // Picos por canal
                 if (Number.isFinite(analysis.technicalData?.samplePeakLeftDb)) {
-                    rows.push(row('Sample Peak (L)', `${safeFixed(analysis.technicalData.samplePeakLeftDb, 1)} dB`, 'samplePeakLeftDb'));
+                    rows.push(row('Pico de Amostra L (dBFS)', `${safeFixed(analysis.technicalData.samplePeakLeftDb, 1)} dBFS`, 'samplePeakLeftDb'));
                 }
                 if (Number.isFinite(analysis.technicalData?.samplePeakRightDb)) {
-                    rows.push(row('Sample Peak (R)', `${safeFixed(analysis.technicalData.samplePeakRightDb, 1)} dB`, 'samplePeakRightDb'));
+                    rows.push(row('Pico de Amostra R (dBFS)', `${safeFixed(analysis.technicalData.samplePeakRightDb, 1)} dBFS`, 'samplePeakRightDb'));
                 }
                 // Clipping (%)
                 if (Number.isFinite(analysis.technicalData?.clippingPct)) {
@@ -2702,7 +2702,7 @@ function displayModalResults(analysis) {
                 
                 // Critérios de problema de clipping mais rigorosos e realistas
                 const hasPeakClipping = peak > -0.1; // Mais rigoroso: -0.1dB ao invés de -0.5dB
-                const hasTruePeakClipping = truePeak !== null && truePeak > -0.1; // True Peak acima de -0.1dBTP
+                const hasTruePeakClipping = truePeak !== null && truePeak > -0.1; // Pico Real acima de -0.1dBTP
                 const hasSampleClipping = clipVal > 0;
                 const hasPercentageClipping = clipPct > 0;
                 
@@ -2759,12 +2759,12 @@ function displayModalResults(analysis) {
                 }
                 rows.push(row('Stereo Corr.', `<span class="${stereoClass}">${stereoText}</span>`, 'stereoCorrelation'));
                 
-                // 5. Crest Factor - SEMPRE mostrar  
+                // 5. Fator de Crista - SEMPRE mostrar  
                 const crestVal = Number.isFinite(analysis.technicalData?.crestFactor) ? analysis.technicalData.crestFactor : 0;
                 const hasCrestProblem = crestVal < 6 || crestVal > 20; // Valores normais: 6-20dB
                 if (hasCrestProblem) hasActualProblems = true;
                 const crestClass = hasCrestProblem ? 'warn' : '';
-                rows.push(row('Crest Factor', `<span class="${crestClass}">${safeFixed(crestVal, 1)}dB</span>`, 'crestFactor'));
+                rows.push(row('Fator de Crista', `<span class="${crestClass}">${safeFixed(crestVal, 1)} dB</span>`, 'crestFactor'));
                 
                 // Consistência (se disponível) - mas sempre tentar mostrar
                 if (analysis.metricsValidation && Object.keys(analysis.metricsValidation).length) {
@@ -3348,7 +3348,7 @@ function displayModalResults(analysis) {
         };
         
         const scoreRows = breakdown ? `
-            ${renderScoreWithProgress('Dinâmica', breakdown.dynamics, '#ffd700')}
+            ${renderScoreWithProgress('Faixa Dinâmica', breakdown.dynamics, '#ffd700')}
             ${renderScoreWithProgress('Técnico', breakdown.technical, '#00ff92')}
             ${renderScoreWithProgress('Stereo', breakdown.stereo, '#ff6b6b')}
             ${renderScoreWithProgress('Loudness', breakdown.loudness, '#ff3366')}
@@ -3703,10 +3703,10 @@ function renderReferenceComparisons(analysis) {
         return getMetricForRef('lufs_integrated', 'lufsIntegrated');
     };
     
-    pushRow('Volume Integrado (padrão streaming)', getLufsIntegratedValue(), ref.lufs_target, ref.tol_lufs, ' LUFS');
-    pushRow('True Peak', getMetricForRef('true_peak_dbtp', 'truePeakDbtp'), ref.true_peak_target, ref.tol_true_peak, ' dBTP');
+    pushRow('Loudness Integrado (LUFS)', getLufsIntegratedValue(), ref.lufs_target, ref.tol_lufs, ' LUFS');
+    pushRow('Pico Real (dBTP)', getMetricForRef('true_peak_dbtp', 'truePeakDbtp'), ref.true_peak_target, ref.tol_true_peak, ' dBTP');
     pushRow('DR', getMetricForRef('dynamic_range', 'dynamicRange'), ref.dr_target, ref.tol_dr, '');
-    pushRow('LRA', getMetricForRef('lra'), ref.lra_target, ref.tol_lra, '');
+    pushRow('Faixa de Loudness – LRA (LU)', getMetricForRef('lra'), ref.lra_target, ref.tol_lra, ' LU');
     pushRow('Stereo Corr.', getMetricForRef('stereo_correlation', 'stereoCorrelation'), ref.stereo_target, ref.tol_stereo, '');
     
     // Bandas detalhadas Fase 2: usar métricas centralizadas para bandas
@@ -3852,9 +3852,9 @@ function updateReferenceSuggestions(analysis) {
     const lufsVal = Number.isFinite(tech.lufsIntegrated) ? tech.lufsIntegrated : null;
     addRefSug(lufsVal, ref.lufs_target, ref.tol_lufs, 'reference_loudness', 'LUFS', '');
     const tpVal = Number.isFinite(tech.truePeakDbtp) ? tech.truePeakDbtp : null;
-    addRefSug(tpVal, ref.true_peak_target, ref.tol_true_peak, 'reference_true_peak', 'True Peak', ' dBTP');
+    addRefSug(tpVal, ref.true_peak_target, ref.tol_true_peak, 'reference_true_peak', 'Pico Real', ' dBTP');
     addRefSug(tech.dynamicRange, ref.dr_target, ref.tol_dr, 'reference_dynamics', 'DR', ' dB');
-    if (Number.isFinite(tech.lra)) addRefSug(tech.lra, ref.lra_target, ref.tol_lra, 'reference_lra', 'LRA', ' dB');
+    if (Number.isFinite(tech.lra)) addRefSug(tech.lra, ref.lra_target, ref.tol_lra, 'reference_lra', 'LRA', ' LU');
     if (Number.isFinite(tech.stereoCorrelation)) addRefSug(tech.stereoCorrelation, ref.stereo_target, ref.tol_stereo, 'reference_stereo', 'Stereo Corr', '');
 }
 
