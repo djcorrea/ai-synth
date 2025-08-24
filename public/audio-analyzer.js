@@ -924,7 +924,10 @@ class AudioAnalyzer {
   } catch {}
 
   // Scores de qualidade e tempo total de processamento
-  baseAnalysis.qualityOverall = isFinite(metrics?.quality?.overall) ? metrics.quality.overall : null;
+  // DESABILITADO: deixar null para que o sistema scoring.js tenha precedência
+  // baseAnalysis.qualityOverall = isFinite(metrics?.quality?.overall) ? metrics.quality.overall : null;
+  baseAnalysis.qualityOverall = null; // ⭐ FORÇAR NULL para que scoring.js seja a única fonte
+  console.log('[SCORING_FIX] 🎯 qualityOverall forçado para null - sistema scoring.js terá precedência');
   baseAnalysis.qualityBreakdown = metrics?.quality?.breakdown || null;
   baseAnalysis.processingMs = Number.isFinite(v2res?.processingTime) ? v2res.processingTime : null;
 
@@ -1224,7 +1227,8 @@ class AudioAnalyzer {
             // CRÍTICO: Atualizar qualityOverall usado pela UI
             baseAnalysis._originalQualityOverall = baseAnalysis.qualityOverall;
             baseAnalysis.qualityOverall = finalScore.scorePct;
-            console.log('[COLOR_RATIO_V2_FIX] Setting qualityOverall =', finalScore.scorePct, '(was:', baseAnalysis._originalQualityOverall, ')');
+            console.log('[COLOR_RATIO_V2_FIX] ✅ NOVO SISTEMA ATIVO! Setting qualityOverall =', finalScore.scorePct, '(was:', baseAnalysis._originalQualityOverall, ')');
+            console.log('[COLOR_RATIO_V2_FIX] 🎯 Método usado:', finalScore.method, 'Classificação:', finalScore.classification);
             // Logging para debug (sem override)
             try {
               const cc = finalScore.colorCounts || {};
