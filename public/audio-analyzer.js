@@ -366,6 +366,11 @@ class AudioAnalyzer {
     const spectralResult = this.calculateSpectralBalance(leftChannel, audioBuffer.sampleRate);
     if (spectralResult && spectralResult.summary3Bands) {
       console.log('✨ Sistema espectral ATIVADO ANTES do scoring V2');
+      console.log('🎯 SPECTRAL DEBUG - Porcentagens calculadas:', {
+        Low: spectralResult.summary3Bands.Low.energyPct.toFixed(2) + '%',
+        Mid: spectralResult.summary3Bands.Mid.energyPct.toFixed(2) + '%', 
+        High: spectralResult.summary3Bands.High.energyPct.toFixed(2) + '%'
+      });
       baseAnalysis.spectralBalance = spectralResult;
       
       // Preparar dados para o V2 usar no scoring
