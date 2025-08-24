@@ -2081,7 +2081,7 @@ class AudioAnalyzer {
           const stWindows = series.slice(-3);
           const stMean = stWindows.length? (stWindows.reduce((a,b)=>a+b,0)/stWindows.length): null;
           outBands[band] = {
-            rmsDb: Number.isFinite(rmsDb)? parseFloat(rmsDb.toFixed(2)) : null,
+            rmsDb: (Number.isFinite(rmsDb) && rmsDb > -60) ? parseFloat(rmsDb.toFixed(2)) : null,
             truePeakDbtpApprox: Number.isFinite(peakDb)? parseFloat(peakDb.toFixed(2)) : null,
             crestFactor: crest,
             lraApprox,
