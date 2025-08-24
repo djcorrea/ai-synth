@@ -2407,13 +2407,7 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
     try {
       const t0Spec = performance.now();
       const ref = (typeof window !== 'undefined') ? window.PROD_AI_REF_DATA : null;
-      
-      // 🎛️ FEATURE FLAG: Modo interno de balanço espectral
-      const SPECTRAL_INTERNAL_MODE = (typeof window !== 'undefined' && window.SPECTRAL_INTERNAL_MODE) || "percent";
-      const useSpectralV2 = SPECTRAL_INTERNAL_MODE === "percent";
-      
       const doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
-      
       if (doBands) {
         // Evitar reprocessar se já existe (idempotente)
         if (!td.bandEnergies) {
@@ -2421,7 +2415,6 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
           if (!ref) {
             await new Promise(r => setTimeout(r, 50));
           }
-          
           // Fonte espectral: por padrão usa canal esquerdo (compatibilidade). Opcionalmente mix estéreo
           const useStereoMix = (typeof window !== 'undefined' && window.USE_STEREO_MIX_SPECTRUM === true);
           const srcBuffer = (useStereoMix && right) ? (function(){
@@ -2436,39 +2429,6 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
             return left.subarray(0, maxSamples);
           })();
           const slice = srcBuffer;
-          
-          // 🎵 NOVO SISTEMA V2: Balanço espectral em porcentagem
-          if (useSpectralV2 && typeof window !== 'undefined' && window.SpectralIntegration) {
-            try {
-              if (debug) console.log('🎵 [SPECTRAL_V2] Executando análise espectral V2');
-              const spectralResult = await window.SpectralIntegration.performAnalysis(slice, sr, ref);
-              
-              // Integrar resultados
-              td.spectralBalanceV2 = spectralResult.newSystem;
-              td.bandEnergies = spectralResult.legacyCompat.bandEnergies;
-              td.tonalBalance = spectralResult.legacyCompat.tonalBalance;
-              td.bandScale = spectralResult.legacyCompat.bandScale;
-              
-              // Marcar fonte
-              (td._sources = td._sources || {}).spectralBalanceV2 = 'spectral:v2';
-              (td._sources = td._sources || {}).bandEnergies = 'spectral:v2:compat';
-              
-              if (debug) console.log('✅ [SPECTRAL_V2] Análise concluída:', {
-                mode: spectralResult.newSystem.mode,
-                bandsCount: spectralResult.newSystem.bands.length,
-                processingTime: spectralResult.newSystem.processingTimeMs
-              });
-              
-              // Pular para o final da seção espectral
-              return;
-              
-            } catch (spectralError) {
-              if (debug) console.warn('⚠️ [SPECTRAL_V2] Falha, voltando para sistema legado:', spectralError);
-              // Continuar com sistema legado
-            }
-          }
-          
-          // 📊 SISTEMA LEGADO: Manter compatibilidade
           let specRes = null;
           try {
             specRes = cache.specMod.analyzeSpectralFeatures(slice, sr, 'fast');
@@ -4849,9 +4809,6 @@ function buildCentralizedMetrics(baseAnalysis, v2Metrics) {
     
     // === FREQUENCY BANDS ===
     bands: buildFrequencyBands(td.bandEnergies, v2.bands),
-    
-    // === SPECTRAL BALANCE V2 ===
-    spectral_balance_v2: td.spectralBalanceV2 || null,
     
     // === TONAL BALANCE ===
     tonal_balance: td.tonalBalance || v2.tonalBalance || null,

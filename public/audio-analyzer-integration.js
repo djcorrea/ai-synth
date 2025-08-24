@@ -3962,54 +3962,6 @@ function renderReferenceComparisons(analysis) {
             }
         });
     }
-    
-    // 🎵 NOVO: Renderizar dados espectrais V2 se disponível
-    const spectralV2 = tech.spectralBalanceV2;
-    if (spectralV2 && spectralV2.mode === 'percent' && spectralV2.bands) {
-        rows.push('<tr style="border-top: 2px solid rgba(255,255,255,.2);"><td colspan="4" style="padding:8px 6px; font-weight:600; color:#7c4dff;">🎵 Balanço Espectral V2 (dB)</td></tr>');
-        
-        for (const bandData of spectralV2.bands) {
-            if (bandData.deltaDB !== null && Number.isFinite(bandData.deltaDB)) {
-                const deltaText = bandData.deltaDB > 0 ? `+${bandData.deltaDB.toFixed(1)}` : bandData.deltaDB.toFixed(1);
-                const statusClass = bandData.status === 'OK' ? 'ok' : 
-                                  bandData.status === 'HIGH' ? 'warn' : 
-                                  bandData.status === 'LOW' ? 'yellow' : '';
-                
-                const enhancedLabel = `${bandData.band.toUpperCase()} (${bandData.hz})`;
-                const toleranceText = bandData.pctRef ? ` (±${(DEFAULT_CONFIG?.defaultTolerancePP || 2.5).toFixed(1)}pp)` : '';
-                
-                rows.push(`<tr>
-                    <td>${enhancedLabel}</td>
-                    <td>${bandData.pctUser.toFixed(1)}%</td>
-                    <td>${bandData.pctRef ? bandData.pctRef.toFixed(1) + '%' : 'N/A'}</td>
-                    <td class="${statusClass}">${deltaText} dB<span class="tol">${toleranceText}</span></td>
-                </tr>`);
-            }
-        }
-        
-        // Adicionar resumo de 3 bandas
-        if (spectralV2.summary3) {
-            const summary = spectralV2.summary3;
-            rows.push('<tr style="border-top: 1px solid rgba(255,255,255,.1);"><td colspan="4" style="padding:4px 6px; font-size:10px; opacity:.8;">Resumo 3 Bandas:</td></tr>');
-            
-            if (summary.lowDB !== null) {
-                const deltaText = summary.lowDB > 0 ? `+${summary.lowDB.toFixed(1)}` : summary.lowDB.toFixed(1);
-                const statusClass = Math.abs(summary.lowDB) <= 3 ? 'ok' : 'warn';
-                rows.push(`<tr><td>GRAVES (Sub+Bass)</td><td>${summary.lowPct.toFixed(1)}%</td><td>—</td><td class="${statusClass}">${deltaText} dB</td></tr>`);
-            }
-            if (summary.midDB !== null) {
-                const deltaText = summary.midDB > 0 ? `+${summary.midDB.toFixed(1)}` : summary.midDB.toFixed(1);
-                const statusClass = Math.abs(summary.midDB) <= 3 ? 'ok' : 'warn';
-                rows.push(`<tr><td>MÉDIOS (Low-Mid+Mid)</td><td>${summary.midPct.toFixed(1)}%</td><td>—</td><td class="${statusClass}">${deltaText} dB</td></tr>`);
-            }
-            if (summary.highDB !== null) {
-                const deltaText = summary.highDB > 0 ? `+${summary.highDB.toFixed(1)}` : summary.highDB.toFixed(1);
-                const statusClass = Math.abs(summary.highDB) <= 3 ? 'ok' : 'warn';
-                rows.push(`<tr><td>AGUDOS (High-Mid+Presence)</td><td>${summary.highPct.toFixed(1)}%</td><td>—</td><td class="${statusClass}">${deltaText} dB</td></tr>`);
-            }
-        }
-    }
-    
     container.innerHTML = `<div class="card" style="margin-top:12px;">
         <div class="card-title">📌 Comparação de Referência (${titleText})</div>
         <table class="ref-compare-table">

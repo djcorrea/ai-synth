@@ -33,9 +33,6 @@
             DEBUG_REFERENCE_MODE: false       // Debug logs para desenvolvimento
         };
         
-        // 🎵 Feature Flag: Sistema Espectral V2 - REATIVADO COM OTIMIZAÇÕES
-        window.SPECTRAL_INTERNAL_MODE = "percent";  // "percent" ou "legacy"
-        
         // Logs mínimos para monitoramento
         window.logReferenceEvent = function(event, data = {}) {
             if (window.FEATURE_FLAGS.DEBUG_REFERENCE_MODE) {
@@ -318,11 +315,6 @@
     <script src="voice-clean.js?v=20250810" defer></script>
     
     <!-- 🎵 AUDIO ANALYZER - Carregar os scripts -->
-    <!-- 🎯 SPECTRAL BALANCE V2 - Sistema de análise espectral com cálculo percentual -->
-        <!-- Spectral V2 System - OPTIMIZED VERSION -->
-    <script src="spectral-balance-v2.js?v=20250824-spectral-v2-optimized"></script>
-    
-    <!-- Feature Flags -->
     <script src="audio-analyzer.js?v=20250823a" defer></script>
     <!-- Opcional: o integrador possui fallback inline; permita rede setando window.REFS_ALLOW_NETWORK=true antes do load -->
     <script src="refs/embedded-refs-new.js?v=20250823j&timestamp=1724440300" defer></script>
