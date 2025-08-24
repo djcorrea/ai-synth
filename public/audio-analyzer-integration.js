@@ -28,7 +28,36 @@ const SPECTRAL_LOGGING = window.SPECTRAL_LOGGING !== false; // logging habilitad
 let __spectralBalanceCache = {}; // cache de resultados espectrais
 let __spectralReferenceTargets = {}; // alvos de referência por gênero
 
-// 🎼 SPECTRAL BALANCE - Configuração das bandas
+// �️ ENERGY TO DB CONVERTER - Conversor para sugestões DAW
+function convertEnergyToDbSuggestion(energyPercentCurrent, energyPercentTarget, bandName) {
+    const energyRatio = energyPercentCurrent / energyPercentTarget;
+    const dbDifference = 10 * Math.log10(energyRatio);
+    
+    const freqRanges = {
+        'sub': { center: 40, range: '20-60 Hz', q: 0.7 },
+        'bass': { center: 80, range: '60-120 Hz', q: 1.0 },
+        'low_mid': { center: 180, range: '120-250 Hz', q: 1.2 },
+        'mid': { center: 500, range: '250-1000 Hz', q: 1.0 },
+        'high_mid': { center: 2000, range: '1k-4k Hz', q: 1.2 },
+        'presence': { center: 5000, range: '4k-8k Hz', q: 1.0 },
+        'air': { center: 12000, range: '8k-16k Hz', q: 0.8 }
+    };
+    
+    const bandInfo = freqRanges[bandName] || freqRanges['mid'];
+    const absDiff = Math.abs(dbDifference);
+    const actionVerb = dbDifference > 0 ? 'Corte' : 'Boost';
+    
+    return {
+        band: bandName,
+        energy_current: energyPercentCurrent.toFixed(1) + '%',
+        energy_target: energyPercentTarget.toFixed(1) + '%',
+        db_adjustment: dbDifference.toFixed(1) + 'dB',
+        daw_instruction: `${actionVerb} ${absDiff.toFixed(1)}dB @ ${bandInfo.center}Hz (Q=${bandInfo.q})`,
+        urgency: absDiff > 6 ? 'high' : absDiff > 3 ? 'medium' : 'low'
+    };
+}
+
+// �🎼 SPECTRAL BALANCE - Configuração das bandas
 const SPECTRAL_BANDS_CONFIG = [
     { name: 'sub', freqRange: [20, 60], displayName: 'Sub Bass', category: 'grave' },
     { name: 'bass', freqRange: [60, 120], displayName: 'Bass', category: 'grave' },
@@ -4071,9 +4100,140 @@ function displayModalResults(analysis) {
             </div>
         `;
     
+    // 🎼 EXIBIR SEÇÃO ESPECTRAL se disponível
+    if (analysis.spectralBalance && SPECTRAL_INTERNAL_MODE === 'percent') {
+        try {
+            renderSpectralBalanceSection(analysis.spectralBalance, analysis);
+        } catch(spectralRenderError) {
+            console.warn('Erro ao renderizar seção espectral:', spectralRenderError);
+        }
+    }
+    
     try { renderReferenceComparisons(analysis); } catch(e){ console.warn('ref compare fail', e);}    
         try { if (window.CAIAR_ENABLED) injectValidationControls(); } catch(e){ console.warn('validation controls fail', e); }
     __dbg('📊 Resultados exibidos no modal');
+}
+
+// 🎼 RENDERIZAR SEÇÃO DE BALANÇO ESPECTRAL
+function renderSpectralBalanceSection(spectralData, analysis) {
+    const technicalData = document.getElementById('modalTechnicalData');
+    if (!technicalData || !spectralData) return;
+    
+    // Crear seção espectral
+    const spectralSection = document.createElement('div');
+    spectralSection.id = 'spectralBalanceSection';
+    spectralSection.className = 'card card-span-2';
+    spectralSection.style.marginTop = '16px';
+    
+    // Gerar HTML das bandas
+    const bandsHtml = spectralData.bands.map(band => {
+        const deltaPercent = ((band.energyPercent / band.targetPercent) - 1) * 100;
+        const deltaDb = band.deltaDb || 0;
+        
+        // Determinar cor baseada no status
+        let statusColor = '#4ade80'; // verde
+        let statusText = 'Ideal';
+        let statusIcon = '✅';
+        
+        if (Math.abs(deltaDb) > 3) {
+            statusColor = '#ef4444'; // vermelho
+            statusText = 'Corrigir';
+            statusIcon = '🔴';
+        } else if (Math.abs(deltaDb) > 1.5) {
+            statusColor = '#f59e0b'; // amarelo
+            statusText = 'Ajustar';
+            statusIcon = '⚠️';
+        }
+        
+        // Gerar sugestão DAW
+        const dawSuggestion = convertEnergyToDbSuggestion(
+            band.energyPercent, 
+            band.targetPercent, 
+            band.name
+        );
+        
+        return `
+            <div class="spectral-band" style="
+                background: rgba(255,255,255,0.02);
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 8px;
+            ">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: ${statusColor}; font-size: 16px;">${statusIcon}</span>
+                        <strong style="color: #fff; font-size: 14px;">${band.displayName || band.name}</strong>
+                        <span style="color: #666; font-size: 12px;">${band.freqRange}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: ${statusColor}; font-weight: 600; font-size: 12px;">${statusText}</div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 12px;">
+                    <div>
+                        <div style="color: #888; margin-bottom: 2px;">Energia Atual</div>
+                        <div style="color: #fff; font-weight: 600;">${band.energyPercent.toFixed(1)}%</div>
+                        <div style="color: #666; font-size: 10px;">(${band.rmsDb.toFixed(1)}dB)</div>
+                    </div>
+                    
+                    <div>
+                        <div style="color: #888; margin-bottom: 2px;">Target</div>
+                        <div style="color: #fff;">${band.targetPercent.toFixed(1)}%</div>
+                        <div style="color: #666; font-size: 10px;">Diferença: ${deltaDb > 0 ? '+' : ''}${deltaDb.toFixed(1)}dB</div>
+                    </div>
+                    
+                    <div>
+                        <div style="color: #888; margin-bottom: 2px;">Sugestão DAW</div>
+                        <div style="color: ${statusColor}; font-weight: 600;">${dawSuggestion.daw_instruction}</div>
+                        <div style="color: #666; font-size: 10px;">Urgência: ${dawSuggestion.urgency}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Calcular estatísticas resumo
+    const bandsOutOfRange = spectralData.bands.filter(b => Math.abs(b.deltaDb || 0) > 1.5).length;
+    const totalBands = spectralData.bands.length;
+    const balanceScore = ((totalBands - bandsOutOfRange) / totalBands * 100).toFixed(0);
+    
+    spectralSection.innerHTML = `
+        <div class="card-title">🎼 Balanço Espectral (Análise em % Energia)</div>
+        
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="color: #3b82f6; font-weight: 600; margin-bottom: 4px;">Score de Balanço: ${balanceScore}%</div>
+                    <div style="color: #888; font-size: 12px;">
+                        ${totalBands - bandsOutOfRange} de ${totalBands} bandas no alvo 
+                        ${bandsOutOfRange > 0 ? `• ${bandsOutOfRange} bandas precisam ajuste` : '• Mixagem equilibrada!'}
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="color: #3b82f6; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Modo: ${SPECTRAL_INTERNAL_MODE}
+                    </div>
+                    <div style="color: #666; font-size: 10px;">
+                        Cálculo: % energia real
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        ${bandsHtml}
+        
+        <div style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; font-size: 11px; color: #888;">
+            💡 <strong>Como usar:</strong> Valores em dB são aplicáveis diretamente no EQ da sua DAW. 
+            Análise baseada em energia real (%) para precisão máxima.
+        </div>
+    `;
+    
+    // Adicionar à interface
+    technicalData.appendChild(spectralSection);
+    
+    __dbg('🎼 Seção espectral renderizada na interface');
 }
 
     // === Controles de Validação (Suite Objetiva + Subjetiva) ===
