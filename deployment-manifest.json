@@ -1,0 +1,37 @@
+{
+  "deployment": {
+    "name": "Centralized Audio Metrics",
+    "version": "2.0.0-metrics-centralized",
+    "timestamp": "2025-08-24T01:04:03.627Z",
+    "environment": "production"
+  },
+  "features": {
+    "centralizedMetrics": true,
+    "unifiedAccess": true,
+    "validationLogging": true,
+    "testInterface": true,
+    "backwardCompatibility": true
+  },
+  "metrics": {
+    "totalCentralized": 31,
+    "categories": [
+      "Loudness (4 metrics): LUFS Integrated/Short/Momentary + LRA",
+      "Peaks & Dynamics (7 metrics): True Peak, Sample Peaks, Crest Factor, DR",
+      "Stereo (4 metrics): Width, Correlation, Balance, Mono Compatibility",
+      "Spectral (5 metrics): Centroid, Rolloff, Flatness, Flux",
+      "Quality (4 metrics): Clipping, DC Offset, THD",
+      "Frequency Bands (7 bands): Sub → Brilliance"
+    ]
+  },
+  "validation": {
+    "coreFiles": "validated",
+    "centralization": "validated",
+    "testInterface": "validated",
+    "compatibility": "maintained"
+  },
+  "testUrl": "http://localhost:3000/test-metrics-centralization.html",
+  "documentation": [
+    "AUDITORIA_METRICAS_AUDIO.md",
+    "RELATORIO_IMPLEMENTACAO_METRICAS_CENTRALIZADAS.md"
+  ]
+}
