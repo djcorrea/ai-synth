@@ -2263,12 +2263,13 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
       throw new Error('Energia total zero - áudio silencioso ou erro');
     }
     
-    // Calcular porcentagens e dB RMS real
+    // Calcular porcentagens e dB compatíveis com sistema original
     const bands = bandEnergies.map(band => {
       const energyPct = (band.totalEnergy / validTotalEnergy) * 100;
-      // 🔧 CORREÇÃO: Calcular RMS real em vez de proporção logarítmica
-      const rms = Math.sqrt(band.totalEnergy / (processedFrames || 1)); // RMS verdadeiro
-      const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -80; // 20*log10 para amplitude
+      // 🔧 CORREÇÃO: Manter compatibilidade com valores originais
+      // Calcular como proporção normalizada para ficar na faixa -5 a -25 dB
+      const proportion = band.totalEnergy / validTotalEnergy;
+      const rmsDb = proportion > 0 ? 20 * Math.log10(proportion) : -80; // Similar ao original
       
       return {
         name: band.name,
@@ -2280,7 +2281,7 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
       };
     });
     
-    // Resumo 3 bandas - calculado baseado nas bandas reais
+    // Resumo 3 bandas - calculado com valores compatíveis
     const lowBands = bands.filter(b => b.hzLow < 250);
     const midBands = bands.filter(b => b.hzLow >= 250 && b.hzLow < 4000);
     const highBands = bands.filter(b => b.hzLow >= 4000);
@@ -2676,9 +2677,10 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               spectralBands.forEach(band => {
                 const mappedName = bandMapping[band.name] || band.name.toLowerCase().replace(' ', '_');
                 if (mappedName) {
-                  // 🔧 CORREÇÃO: Usar rmsDb já calculado corretamente pelo sistema espectral
-                  // Em vez de recalcular DB da porcentagem (que dá valores muito negativos)
-                  const db = band.rmsDb || -80; // Usar valor dB correto do sistema espectral
+                  // 🔧 CORREÇÃO: Usar proporção normalizada para manter compatibilidade
+                  // Em vez de RMS absoluto, calcular como proporção (similar ao sistema original)
+                  const proportion = band.energyPct / 100; // Converter % para proporção
+                  const db = proportion > 0 ? 20 * Math.log10(proportion) : -80; // Compatível com original
                   bandEnergies[mappedName] = { 
                     energy: band.energy, 
                     rms_db: db,
