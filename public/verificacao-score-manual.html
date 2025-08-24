@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Verificação Manual do Score V2</title>
+    <style>
+        body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
+        .metric { margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 5px; }
+        .calculation { background: #333; padding: 5px; margin: 5px 0; }
+        .score { font-weight: bold; color: #4CAF50; }
+        .problem { color: #f44336; }
+        .warning { color: #ff9800; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Verificação Manual do Score V2</h1>
+    
+    <div id="results"></div>
+
+    <script src="scoring-v2-complete.js"></script>
+    
+    <script>
+        const log = (msg, className = '') => {
+            const div = document.createElement('div');
+            div.innerHTML = msg;
+            if (className) div.className = className;
+            document.getElementById('results').appendChild(div);
+        };
+
+        // Métricas do áudio analisado (das imagens)
+        const audioData = {
+            lufs_integrated: -6.10,
+            true_peak_dbtp: -1.26,
+            dynamic_range: 11.38,
+            lra: 4.91,
+            stereo_correlation: 0.16,
+            dc_offset: -0.0039,
+            clipping_percent: 7.223,
+            
+            // Bandas (das imagens)
+            bands: {
+                sub_bass: -10.50,      // 60-120Hz  
+                bass: -11.50,          // 120-200Hz
+                low_mid: -8.07,        // 200-500Hz
+                mid: -6.61,            // 500-2kHz  
+                high_mid: -10.67,      // 2-4kHz
+                treble: -15.76         // 4-8kHz
+            }
+        };
+
+        const genre = 'funk_mandela';
+
+        log('<h2>📊 DADOS DO ÁUDIO ANALISADO</h2>');
+        log(`Gênero: ${genre}`);
+        log(`LUFS: ${audioData.lufs_integrated} LUFS`);
+        log(`True Peak: ${audioData.true_peak_dbtp} dBTP`);
+        log(`DR: ${audioData.dynamic_range} dB`);
+        log(`LRA: ${audioData.lra} dB`);
+        log(`Correlação: ${audioData.stereo_correlation}`);
+        log(`Clipping: ${audioData.clipping_percent}%`);
+
+        // Targets V2
+        const targets = window.GENRE_TARGETS_V2[genre];
+        const tolerances = window.GENRE_TOLERANCES_V2[genre];
+        const weights = window.GENRE_WEIGHTS_V2[genre];
+
+        log('<h2>🎯 TARGETS E TOLERÂNCIAS V2</h2>');
+        log(`LUFS Target: ${targets.lufsIntegrated} (±${tolerances.loudness})`);
+        log(`Peak Target: ${targets.truePeakDbtp} (±${tolerances.peak})`);
+        log(`DR Target: ${targets.dynamicRange} (±${tolerances.dynamics})`);
+        log(`LRA Target: ${targets.lra} (±${tolerances.lra || 1.0})`);
+
+        log('<h2>🧮 CÁLCULO MANUAL DOS SCORES</h2>');
+
+        // Função gaussian
+        function scoreGaussian(value, target, tolerance) {
+            const diff = Math.abs(value - target);
+            const score = Math.exp(-0.5 * Math.pow(diff / tolerance, 2));
+            return Math.max(0, Math.min(1, score)) * 100;
+        }
+
+        // 1. LOUDNESS
+        const loudnessScore = scoreGaussian(audioData.lufs_integrated, targets.lufsIntegrated, tolerances.loudness);
+        const loudnessDiff = audioData.lufs_integrated - targets.lufsIntegrated;
+        log(`<div class="metric">
+            <strong>LOUDNESS:</strong><br>
+            Valor: ${audioData.lufs_integrated} LUFS<br>
+            Target: ${targets.lufsIntegrated} LUFS<br>
+            Diferença: ${loudnessDiff.toFixed(2)} LUFS<br>
+            Tolerância: ±${tolerances.loudness} LUFS<br>
+            <span class="score">Score: ${loudnessScore.toFixed(1)}%</span>
+            ${Math.abs(loudnessDiff) > tolerances.loudness ? '<span class="problem"> ⚠️ FORA DA TOLERÂNCIA</span>' : ''}
+        </div>`);
+
+        // 2. PEAK
+        const peakScore = scoreGaussian(audioData.true_peak_dbtp, targets.truePeakDbtp, tolerances.peak);
+        const peakDiff = audioData.true_peak_dbtp - targets.truePeakDbtp;
+        log(`<div class="metric">
+            <strong>TRUE PEAK:</strong><br>
+            Valor: ${audioData.true_peak_dbtp} dBTP<br>
+            Target: ${targets.truePeakDbtp} dBTP<br>
+            Diferença: ${peakDiff.toFixed(2)} dBTP<br>
+            Tolerância: ±${tolerances.peak} dBTP<br>
+            <span class="score">Score: ${peakScore.toFixed(1)}%</span>
+            ${Math.abs(peakDiff) < tolerances.peak ? ' ✅ DENTRO DA TOLERÂNCIA' : '<span class="problem"> ⚠️ FORA DA TOLERÂNCIA</span>'}
+        </div>`);
+
+        // 3. DYNAMICS  
+        const dynamicsScore = scoreGaussian(audioData.dynamic_range, targets.dynamicRange, tolerances.dynamics);
+        const dynamicsDiff = audioData.dynamic_range - targets.dynamicRange;
+        log(`<div class="metric">
+            <strong>DYNAMIC RANGE:</strong><br>
+            Valor: ${audioData.dynamic_range} dB<br>
+            Target: ${targets.dynamicRange} dB<br>
+            Diferença: ${dynamicsDiff.toFixed(2)} dB<br>
+            Tolerância: ±${tolerances.dynamics} dB<br>
+            <span class="score">Score: ${dynamicsScore.toFixed(1)}%</span>
+            ${Math.abs(dynamicsDiff) > tolerances.dynamics ? '<span class="problem"> ⚠️ FORA DA TOLERÂNCIA</span>' : ''}
+        </div>`);
+
+        // 4. CLIPPING
+        const clippingPenalty = audioData.clipping_percent > targets.clippingPercent ? 
+            (audioData.clipping_percent - targets.clippingPercent) * 10 : 0;
+        log(`<div class="metric">
+            <strong>CLIPPING:</strong><br>
+            Valor: ${audioData.clipping_percent}%<br>
+            Target: ≤${targets.clippingPercent}%<br>
+            <span class="problem">Penalidade: -${clippingPenalty.toFixed(1)}%</span>
+        </div>`);
+
+        // 5. BANDAS
+        log('<h3>🎵 ANÁLISE DE BANDAS</h3>');
+        let bandsTotal = 0;
+        let bandsCount = 0;
+        
+        const bandMapping = {
+            sub_bass: 'sub_bass',
+            bass: 'bass', 
+            low_mid: 'low_mid',
+            mid: 'mid',
+            high_mid: 'high_mid',
+            treble: 'treble'
+        };
+
+        Object.entries(bandMapping).forEach(([audioKey, targetKey]) => {
+            if (audioData.bands[audioKey] !== undefined && targets.bandTargets[targetKey]) {
+                const bandScore = scoreGaussian(
+                    audioData.bands[audioKey], 
+                    targets.bandTargets[targetKey].rms_db, 
+                    tolerances.tonal
+                );
+                const diff = audioData.bands[audioKey] - targets.bandTargets[targetKey].rms_db;
+                
+                log(`<div class="calculation">
+                    ${targetKey}: ${audioData.bands[audioKey]} dB (target: ${targets.bandTargets[targetKey].rms_db} dB) 
+                    → ${bandScore.toFixed(1)}%
+                    ${Math.abs(diff) > tolerances.tonal ? ' ⚠️' : ' ✅'}
+                </div>`);
+                
+                bandsTotal += bandScore;
+                bandsCount++;
+            }
+        });
+
+        const bandsAverage = bandsCount > 0 ? bandsTotal / bandsCount : 0;
+
+        log('<h2>📈 SCORE FINAL CALCULADO</h2>');
+        
+        const finalScore = (
+            loudnessScore * weights.loudness +
+            dynamicsScore * weights.dynamics +  
+            peakScore * weights.peak +
+            bandsAverage * weights.tonal +
+            (audioData.stereo_correlation * 100) * weights.stereo
+        ) - clippingPenalty;
+
+        log(`<div class="metric">
+            <strong>COMPONENTES DO SCORE:</strong><br>
+            Loudness: ${loudnessScore.toFixed(1)}% × ${weights.loudness} = ${(loudnessScore * weights.loudness).toFixed(1)}<br>
+            Dynamics: ${dynamicsScore.toFixed(1)}% × ${weights.dynamics} = ${(dynamicsScore * weights.dynamics).toFixed(1)}<br>
+            Peak: ${peakScore.toFixed(1)}% × ${weights.peak} = ${(peakScore * weights.peak).toFixed(1)}<br>
+            Bandas: ${bandsAverage.toFixed(1)}% × ${weights.tonal} = ${(bandsAverage * weights.tonal).toFixed(1)}<br>
+            Estéreo: ${(audioData.stereo_correlation * 100).toFixed(1)}% × ${weights.stereo} = ${(audioData.stereo_correlation * 100 * weights.stereo).toFixed(1)}<br>
+            Clipping: -${clippingPenalty.toFixed(1)}%<br>
+            <br>
+            <span class="score">SCORE CALCULADO: ${finalScore.toFixed(1)}%</span><br>
+            <span class="warning">SCORE NA INTERFACE: 48%</span>
+        </div>`);
+
+        // Usar o score V2 real
+        log('<h2>🔄 VERIFICAÇÃO COM FUNÇÃO V2 REAL</h2>');
+        if (typeof calculateScoreV2 === 'function') {
+            const realScore = calculateScoreV2(audioData, genre);
+            log(`<div class="metric">
+                <span class="score">Score V2 Real: ${realScore.toFixed(1)}%</span><br>
+                Diferença: ${(realScore - 48).toFixed(1)}%
+            </div>`);
+        }
+    </script>
+</body>
+</html>

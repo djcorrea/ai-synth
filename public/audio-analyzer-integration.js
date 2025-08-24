@@ -3771,12 +3771,59 @@ function updateReferenceSuggestions(analysis) {
         if (!Number.isFinite(val) || !Number.isFinite(target) || !Number.isFinite(tol)) return;
         const diff = val - target;
         if (Math.abs(diff) <= tol) return; // dentro da tolerância
-        const direction = diff > 0 ? 'acima' : 'abaixo';
+        
+        // 🎯 LINGUAGEM ESPECÍFICA POR MÉTRICA
+        let message, action;
+        const absDiff = Math.abs(diff);
+        
+        if (type === 'reference_true_peak') {
+            // True Peak: valores mais altos = menos limitação, valores mais baixos = mais limitação
+            if (diff > 0) {
+                message = `True Peak muito alto (${val.toFixed(1)}${unit} vs ${target}${unit})`;
+                action = `Aumentar limitação para ${target}${unit}`;
+            } else {
+                message = `True Peak muito baixo (${val.toFixed(1)}${unit} vs ${target}${unit})`;
+                action = `Reduzir limitação para ${target}${unit}`;
+            }
+        } else if (type === 'reference_loudness') {
+            // LUFS: valores mais altos = mais alto, valores mais baixos = mais baixo
+            if (diff > 0) {
+                message = `Volume muito alto (+${absDiff.toFixed(1)} LUFS)`;
+                action = `DIMINUIR ${absDiff.toFixed(1)} LUFS`;
+            } else {
+                message = `Volume muito baixo (-${absDiff.toFixed(1)} LUFS)`;
+                action = `AUMENTAR ${absDiff.toFixed(1)} LUFS`;
+            }
+        } else if (type === 'reference_dynamics') {
+            // Dynamic Range: valores altos = muita dinâmica, valores baixos = pouca dinâmica
+            if (diff > 0) {
+                message = `Dinâmica excessiva (+${absDiff.toFixed(1)} dB)`;
+                action = `DIMINUIR ${absDiff.toFixed(1)} dB (mais compressão)`;
+            } else {
+                message = `Dinâmica insuficiente (-${absDiff.toFixed(1)} dB)`;
+                action = `AUMENTAR ${absDiff.toFixed(1)} dB (menos compressão)`;
+            }
+        } else if (type === 'reference_stereo') {
+            // Correlação Estéreo: valores altos = mais mono, valores baixos = mais estéreo
+            if (diff > 0) {
+                message = `Imagem estéreo muito estreita (+${absDiff.toFixed(2)})`;
+                action = `AUMENTAR ${absDiff.toFixed(2)} (mais estéreo)`;
+            } else {
+                message = `Imagem estéreo muito ampla (-${absDiff.toFixed(2)})`;
+                action = `DIMINUIR ${absDiff.toFixed(2)} (menos estéreo)`;
+            }
+        } else {
+            // Fallback genérico para outros tipos
+            const direction = diff > 0 ? 'acima' : 'abaixo';
+            message = `${label} ${direction} do alvo (${target}${unit})`;
+            action = `Ajustar ${label} ${direction==='acima'?'para baixo':'para cima'} ~${target}${unit}`;
+        }
+        
         sug.push({
             type,
-            message: `${label} ${direction} do alvo (${target}${unit})`,
-            action: `Ajustar ${label} ${direction==='acima'?'para baixo':'para cima'} ~${target}${unit}`,
-            details: `Diferença: ${diff.toFixed(2)}${unit} • tolerância ±${tol}${unit} • gênero: ${window.PROD_AI_REF_GENRE}`
+            message,
+            action,
+            details: `Diferença: ${diff.toFixed(2)}${unit} • tolerância ±${tol}${unit} • gênero: ${window.PROD_AI_REF_GENRE || 'default'}`
         });
     };
     // Aplicar checks principais

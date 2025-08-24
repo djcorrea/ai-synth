@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Scoring V2 - Análise Detalhada</title>
+    <style>
+        body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; line-height: 1.4; }
+        .container { background: #2a2a2a; padding: 20px; border-radius: 10px; margin: 10px 0; }
+        .score { color: #4CAF50; font-weight: bold; }
+        .problem { color: #f44336; }
+        .warning { color: #ff9800; }
+        .good { color: #4CAF50; }
+        .debug { background: #333; padding: 10px; margin: 5px 0; border-left: 3px solid #4CAF50; }
+        .error { background: #4a1414; border-left: 3px solid #f44336; }
+        .details { font-size: 0.9em; margin-left: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🐛 DEBUG SCORING V2 - ANÁLISE DETALHADA</h1>
+    
+    <div id="results"></div>
+
+    <script src="scoring-v2-complete.js"></script>
+    
+    <script>
+        const log = (msg, className = '') => {
+            const div = document.createElement('div');
+            div.innerHTML = msg;
+            if (className) div.className = className + ' container';
+            document.getElementById('results').appendChild(div);
+        };
+
+        // Simular exatamente os dados da interface
+        const mockTechnicalData = {
+            // Valores principais
+            lufsIntegrated: -6.10,
+            truePeakDbtp: -1.26,
+            dynamicRange: 11.38,
+            lra: 4.91,
+            stereoCorrelation: 0.16,
+            dcOffset: -0.0039,  // Note: valor negativo na interface
+            clippingPercent: 7.223,
+            
+            // Estrutura das bandas que pode estar causando problema
+            bandEnergies: {
+                sub_bass: { rms_db: -10.50 },
+                bass: { rms_db: -11.50 },
+                low_mid: { rms_db: -8.07 },
+                mid: { rms_db: -6.61 },
+                high_mid: { rms_db: -10.67 },
+                treble: { rms_db: -15.76 }
+            }
+        };
+
+        const mockReference = {
+            genre: 'funk_mandela'
+        };
+
+        log('<h2>🔍 DADOS DE ENTRADA</h2>');
+        log(`<pre>${JSON.stringify(mockTechnicalData, null, 2)}</pre>`);
+        log(`<pre>Reference: ${JSON.stringify(mockReference, null, 2)}</pre>`);
+
+        // TESTE 1: Verificar se as funções existem
+        log('<h2>🧪 TESTE 1: Verificação de Funções</h2>');
+        
+        const funcsExist = {
+            scoreGaussian: typeof window.scoreGaussian === 'function',
+            calculateScoringV2: typeof window.calculateScoringV2 === 'function',
+            computeMixScore: typeof window.computeMixScore === 'function',
+            GENRE_TARGETS_V2: typeof window.GENRE_TARGETS_V2 === 'object',
+            GENRE_TOLERANCES_V2: typeof window.GENRE_TOLERANCES_V2 === 'object',
+            GENRE_WEIGHTS_V2: typeof window.GENRE_WEIGHTS_V2 === 'object'
+        };
+
+        log(`<div class="debug">
+            <strong>Funções Disponíveis:</strong><br>
+            ${Object.entries(funcsExist).map(([func, exists]) => 
+                `${func}: ${exists ? '✅' : '❌'}`
+            ).join('<br>')}
+        </div>`);
+
+        // TESTE 2: Targets e tolerâncias
+        log('<h2>🎯 TESTE 2: Targets e Tolerâncias</h2>');
+        
+        if (window.GENRE_TARGETS_V2?.funk_mandela) {
+            const targets = window.GENRE_TARGETS_V2.funk_mandela;
+            const tolerances = window.GENRE_TOLERANCES_V2.funk_mandela;
+            const weights = window.GENRE_WEIGHTS_V2.funk_mandela;
+            
+            log(`<div class="debug">
+                <strong>Targets Funk Mandela:</strong><br>
+                LUFS: ${targets.lufsIntegrated}<br>
+                Peak: ${targets.truePeakDbtp}<br>
+                DR: ${targets.dynamicRange}<br>
+                LRA: ${targets.lra}<br>
+                Stereo: ${targets.stereoCorrelation}<br>
+                Clipping: ${targets.clippingPercent}%
+            </div>`);
+            
+            log(`<div class="debug">
+                <strong>Tolerâncias:</strong><br>
+                Loudness: ±${tolerances.loudness}<br>
+                Dynamics: ±${tolerances.dynamics}<br>
+                Peak: ±${tolerances.peak}<br>
+                Tonal: ±${tolerances.tonal}<br>
+                Stereo: ±${tolerances.stereo}
+            </div>`);
+            
+            log(`<div class="debug">
+                <strong>Pesos:</strong><br>
+                ${Object.entries(weights).map(([key, weight]) => 
+                    `${key}: ${(weight * 100).toFixed(1)}%`
+                ).join('<br>')}
+            </div>`);
+        }
+
+        // TESTE 3: Cálculo manual de cada componente
+        log('<h2>🧮 TESTE 3: Cálculo Manual dos Componentes</h2>');
+        
+        if (window.GENRE_TARGETS_V2?.funk_mandela && typeof window.scoreGaussian === 'function') {
+            const targets = window.GENRE_TARGETS_V2.funk_mandela;
+            const tolerances = window.GENRE_TOLERANCES_V2.funk_mandela;
+            const weights = window.GENRE_WEIGHTS_V2.funk_mandela;
+            
+            // Loudness
+            const loudnessScore = window.scoreGaussian(
+                mockTechnicalData.lufsIntegrated, 
+                targets.lufsIntegrated, 
+                tolerances.loudness
+            );
+            log(`<div class="debug">
+                <strong>Loudness:</strong><br>
+                Valor: ${mockTechnicalData.lufsIntegrated} LUFS<br>
+                Target: ${targets.lufsIntegrated} LUFS<br>
+                Diferença: ${(mockTechnicalData.lufsIntegrated - targets.lufsIntegrated).toFixed(2)} LUFS<br>
+                Tolerância: ±${tolerances.loudness}<br>
+                Score: ${loudnessScore.toFixed(2)}%<br>
+                Peso: ${(weights.loudness * 100).toFixed(1)}%<br>
+                Contribuição: ${(loudnessScore * weights.loudness).toFixed(2)}
+            </div>`);
+            
+            // Dynamics
+            const dynamicsScore = window.scoreGaussian(
+                mockTechnicalData.dynamicRange, 
+                targets.dynamicRange, 
+                tolerances.dynamics
+            );
+            log(`<div class="debug">
+                <strong>Dynamics:</strong><br>
+                Valor: ${mockTechnicalData.dynamicRange} dB<br>
+                Target: ${targets.dynamicRange} dB<br>
+                Diferença: ${(mockTechnicalData.dynamicRange - targets.dynamicRange).toFixed(2)} dB<br>
+                Tolerância: ±${tolerances.dynamics}<br>
+                Score: ${dynamicsScore.toFixed(2)}%<br>
+                Peso: ${(weights.dynamics * 100).toFixed(1)}%<br>
+                Contribuição: ${(dynamicsScore * weights.dynamics).toFixed(2)}
+            </div>`);
+            
+            // Peak
+            const peakScore = window.scoreGaussian(
+                mockTechnicalData.truePeakDbtp, 
+                targets.truePeakDbtp, 
+                tolerances.peak
+            );
+            log(`<div class="debug">
+                <strong>Peak:</strong><br>
+                Valor: ${mockTechnicalData.truePeakDbtp} dBTP<br>
+                Target: ${targets.truePeakDbtp} dBTP<br>
+                Diferença: ${(mockTechnicalData.truePeakDbtp - targets.truePeakDbtp).toFixed(2)} dBTP<br>
+                Tolerância: ±${tolerances.peak}<br>
+                Score: ${peakScore.toFixed(2)}%<br>
+                Peso: ${(weights.peak * 100).toFixed(1)}%<br>
+                Contribuição: ${(peakScore * weights.peak).toFixed(2)}
+            </div>`);
+            
+            // Stereo
+            const stereoScore = window.scoreGaussian(
+                mockTechnicalData.stereoCorrelation, 
+                targets.stereoCorrelation, 
+                tolerances.stereo
+            );
+            log(`<div class="debug">
+                <strong>Stereo:</strong><br>
+                Valor: ${mockTechnicalData.stereoCorrelation}<br>
+                Target: ${targets.stereoCorrelation}<br>
+                Diferença: ${(mockTechnicalData.stereoCorrelation - targets.stereoCorrelation).toFixed(3)}<br>
+                Tolerância: ±${tolerances.stereo}<br>
+                Score: ${stereoScore.toFixed(2)}%<br>
+                Peso: ${(weights.stereo * 100).toFixed(1)}%<br>
+                Contribuição: ${(stereoScore * weights.stereo).toFixed(2)}
+            </div>`);
+            
+            // Bandas
+            log('<h3>🎵 Análise de Bandas</h3>');
+            let bandTotal = 0;
+            let bandCount = 0;
+            
+            Object.entries(targets.bandTargets).forEach(([band, target]) => {
+                if (mockTechnicalData.bandEnergies[band]) {
+                    const bandScore = window.scoreGaussian(
+                        mockTechnicalData.bandEnergies[band].rms_db,
+                        target.rms_db,
+                        tolerances.tonal
+                    );
+                    bandTotal += bandScore;
+                    bandCount++;
+                    
+                    log(`<div class="details">
+                        ${band}: ${mockTechnicalData.bandEnergies[band].rms_db} dB 
+                        (target: ${target.rms_db} dB) → ${bandScore.toFixed(1)}%
+                    </div>`);
+                }
+            });
+            
+            const bandsAverage = bandCount > 0 ? bandTotal / bandCount : 50;
+            log(`<div class="debug">
+                <strong>Tonal Balance:</strong><br>
+                Média das bandas: ${bandsAverage.toFixed(2)}%<br>
+                Peso: ${(weights.tonal * 100).toFixed(1)}%<br>
+                Contribuição: ${(bandsAverage * weights.tonal).toFixed(2)}
+            </div>`);
+            
+            // Artifacts (clipping)
+            let artifactsScore = 100;
+            if (mockTechnicalData.clippingPercent > 0.1) {
+                artifactsScore = Math.max(20, 100 - (mockTechnicalData.clippingPercent * 6));
+            }
+            log(`<div class="debug">
+                <strong>Artifacts:</strong><br>
+                Clipping: ${mockTechnicalData.clippingPercent}%<br>
+                Threshold: 0.1%<br>
+                Score: ${artifactsScore.toFixed(2)}%<br>
+                Peso: ${(weights.artifacts * 100).toFixed(1)}%<br>
+                Contribuição: ${(artifactsScore * weights.artifacts).toFixed(2)}
+            </div>`);
+            
+            // Score final manual
+            const manualScore = (
+                loudnessScore * weights.loudness +
+                dynamicsScore * weights.dynamics +
+                peakScore * weights.peak +
+                bandsAverage * weights.tonal +
+                stereoScore * weights.stereo +
+                artifactsScore * weights.artifacts
+            );
+            
+            log(`<div class="score">
+                <h3>📊 SCORE FINAL MANUAL</h3>
+                ${loudnessScore.toFixed(1)} × ${weights.loudness} = ${(loudnessScore * weights.loudness).toFixed(2)}<br>
+                ${dynamicsScore.toFixed(1)} × ${weights.dynamics} = ${(dynamicsScore * weights.dynamics).toFixed(2)}<br>
+                ${peakScore.toFixed(1)} × ${weights.peak} = ${(peakScore * weights.peak).toFixed(2)}<br>
+                ${bandsAverage.toFixed(1)} × ${weights.tonal} = ${(bandsAverage * weights.tonal).toFixed(2)}<br>
+                ${stereoScore.toFixed(1)} × ${weights.stereo} = ${(stereoScore * weights.stereo).toFixed(2)}<br>
+                ${artifactsScore.toFixed(1)} × ${weights.artifacts} = ${(artifactsScore * weights.artifacts).toFixed(2)}<br>
+                <br>
+                <strong>TOTAL: ${manualScore.toFixed(1)}%</strong>
+            </div>`);
+        }
+
+        // TESTE 4: Usar a função real do sistema
+        log('<h2>🔄 TESTE 4: Função Real do Sistema</h2>');
+        
+        if (typeof window.calculateScoringV2 === 'function') {
+            try {
+                const realResult = window.calculateScoringV2(mockTechnicalData, mockReference);
+                log(`<div class="good">
+                    <strong>Resultado da Função Real:</strong><br>
+                    Score: ${realResult.score?.toFixed(1)}%<br>
+                    Classificação: ${realResult.classification}<br>
+                    Tempo: ${realResult.processingTime?.toFixed(2)}ms
+                </div>`);
+                
+                if (realResult.categoryScores) {
+                    log(`<div class="debug">
+                        <strong>Scores por Categoria:</strong><br>
+                        ${Object.entries(realResult.categoryScores).map(([cat, score]) => 
+                            `${cat}: ${score?.toFixed(1)}%`
+                        ).join('<br>')}
+                    </div>`);
+                }
+            } catch (error) {
+                log(`<div class="error">
+                    <strong>ERRO na função real:</strong><br>
+                    ${error.message}<br>
+                    Stack: ${error.stack}
+                </div>`);
+            }
+        }
+
+        // TESTE 5: computeMixScore (função wrapper)
+        log('<h2>🔗 TESTE 5: Função Wrapper (computeMixScore)</h2>');
+        
+        if (typeof window.computeMixScore === 'function') {
+            window.computeMixScore(mockTechnicalData, mockReference).then(result => {
+                log(`<div class="good">
+                    <strong>Resultado do Wrapper:</strong><br>
+                    Score: ${result.score?.toFixed(1)}%<br>
+                    Método usado: ${result.decisionInfo?.usedScoringV2 ? 'V2' : 'V1'}<br>
+                    Info: ${JSON.stringify(result.decisionInfo, null, 2)}
+                </div>`);
+            }).catch(error => {
+                log(`<div class="error">
+                    <strong>ERRO no wrapper:</strong><br>
+                    ${error.message}
+                </div>`);
+            });
+        }
+    </script>
+</body>
+</html>
