@@ -805,7 +805,9 @@ async function fetchRefJsonWithFallback(paths) {
                 lastErr = new Error(`HTTP ${res.status} @ ${p}`);
             }
         } catch (e) {
-            console.warn('[refs] ❌ ERRO FETCH', url, ':', e?.message || e); // SEMPRE logar erro
+            // 🔧 FIX: Usar p ao invés de url que pode não estar definida
+            const urlAttempted = p + (p.includes('?') ? '&' : '?') + 'v=' + Date.now();
+            console.warn('[refs] ❌ ERRO FETCH', urlAttempted, ':', e?.message || e); // SEMPRE logar erro
             lastErr = e;
         }
     }
