@@ -358,6 +358,23 @@ class AudioAnalyzer {
   console.log('🎯 V2 INSTÂNCIA CRIADA:', !!v2);
   console.log('🎯 V2 BUILD VERSION:', v2.__buildVersion);
   await v2.initialize?.();
+  
+  // ✨ SISTEMA ESPECTRAL: Executar ANTES do V2 para afetar o scoring
+  try {
+    const spectralResult = this.calculateSpectralBalance(left, audioBuffer.sampleRate);
+    if (spectralResult && spectralResult.summary3Bands) {
+      console.log('✨ Sistema espectral ATIVADO ANTES do scoring V2');
+      baseAnalysis.spectralBalance = spectralResult;
+      
+      // Preparar dados para o V2 usar no scoring
+      window._SPECTRAL_DATA_FOR_V2 = spectralResult;
+    } else {
+      console.log('⚠️ Sistema espectral falhou, V2 usará método padrão');
+    }
+  } catch (spectralError) {
+    console.log('⚠️ Erro no sistema espectral:', spectralError.message);
+  }
+  
   if (typeof window !== 'undefined' && window.DEBUG_ANALYZER === true) {
     console.log('🛰️ [Telemetry] V2: performFullAnalysis com audioBuffer.');
   }
