@@ -3896,7 +3896,7 @@ function fixScoreCalculation(baseAnalysis, technicalData, unifiedData, v2Metrics
     
     // Só aplicar se a diferença for significativa (> 5%)
     if (Math.abs(newOverall - originalOverall) > 5) {
-      baseAnalysis.qualityOverall = Math.round(newOverall);
+      baseAnalysis.qualityOverall = Number(newOverall.toFixed(1));
       baseAnalysis.qualityBreakdown = scores;
       correction.applied = true;
       correction.description = `Score recalculado: ${originalOverall} → ${Math.round(newOverall)} (diferença: ${(newOverall - originalOverall).toFixed(1)})`;

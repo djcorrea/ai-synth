@@ -2499,7 +2499,7 @@ function displayModalResults(analysis) {
                 <div class="kpi-label">${label}</div>
             </div>`;
 
-        const scoreKpi = Number.isFinite(analysis.qualityOverall) ? kpi(Math.round(analysis.qualityOverall), 'SCORE GERAL', 'kpi-score') : '';
+        const scoreKpi = Number.isFinite(analysis.qualityOverall) ? kpi(Number(analysis.qualityOverall.toFixed(1)), 'SCORE GERAL', 'kpi-score') : '';
         const timeKpi = Number.isFinite(analysis.processingMs) ? kpi(analysis.processingMs, 'TEMPO (MS)', 'kpi-time') : '';
 
         const src = (k) => (analysis.technicalData?._sources && analysis.technicalData._sources[k]) ? ` data-src="${analysis.technicalData._sources[k]}" title="origem: ${analysis.technicalData._sources[k]}"` : '';
