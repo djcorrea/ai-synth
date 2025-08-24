@@ -918,16 +918,20 @@ async function loadReferenceData(genre) {
             // 🔧 FIX: Detectar se está rodando via Vercel e usar servidor local
             const isVercel = window.location.hostname.includes('vercel.app');
             const baseUrls = isVercel ? [
-                `http://localhost:3000/public/refs/out/${genre}.json?v=${version}`,
-                `http://localhost:3000/refs/out/${genre}.json?v=${version}`
+                `/public/refs/out/${genre}.json?v=${version}`,
+                `/refs/out/${genre}.json?v=${version}`,
+                `refs/out/${genre}.json?v=${version}`,
+                `./refs/out/${genre}.json?v=${version}`
             ] : [
+                `http://localhost:3000/public/refs/out/${genre}.json?v=${version}`,
+                `http://localhost:3000/refs/out/${genre}.json?v=${version}`,
                 `/public/refs/out/${genre}.json?v=${version}`,
                 `/refs/out/${genre}.json?v=${version}`,
                 `refs/out/${genre}.json?v=${version}`,
                 `../refs/out/${genre}.json?v=${version}`
             ];
             
-            console.log('🌐 [REFS] Detectado ambiente:', isVercel ? 'Vercel (usando localhost:3000)' : 'Local');
+            console.log('🌐 [REFS] Detectado ambiente:', isVercel ? 'Vercel (usando caminhos relativos)' : 'Local (usando localhost:3000)');
             const json = await fetchRefJsonWithFallback(baseUrls);
             const rootKey = Object.keys(json)[0];
             const data = json[rootKey];

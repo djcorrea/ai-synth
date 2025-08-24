@@ -2267,6 +2267,11 @@ AudioAnalyzer.prototype.calculateSpectralBalance = function(audioData, sampleRat
     const bands = bandEnergies.map(band => {
       const energyPct = (band.totalEnergy / validTotalEnergy) * 100;
       
+      // 🔧 DEBUG: Verificar se alguma banda tem energia muito baixa
+      if (band.name === 'Presence' && energyPct < 0.01) {
+        console.warn(`🔍 PRESENCE DEBUG: energia muito baixa - ${energyPct.toFixed(6)}% (${band.totalEnergy}/${validTotalEnergy})`);
+      }
+      
       // 🔧 CORREÇÃO CRÍTICA: Fórmula matemática correta para conversão % → dB
       // Para energia espectral: usar 10 * log10 (não 20 * log10)
       const proportion = band.totalEnergy / validTotalEnergy;
@@ -2683,16 +2688,22 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               const spectralBands = baseAnalysis.spectralBalance.bands;
               const bandMapping = {
                 'Sub Bass': 'sub',
-                'Bass': 'low_bass', 
-                'Low Mid': 'low_mid',
+                'Bass': 'low_bass',
+                'Low Mid': 'low_mid', 
                 'Mid': 'mid',
                 'High Mid': 'high_mid',
                 'High': 'brilho',
                 'Presence': 'presenca'
               };
               
+              // 🔧 MAPEAMENTO COMPLETO: Mapear também as bandas que faltam
+              const extraBandMappings = {
+                'upper_bass': 'Bass',      // 120-250 Hz -> mapear para Bass
+                'sub': 'Sub Bass'          // Garantir que sub está mapeado
+              };
+              
               spectralBands.forEach(band => {
-                const mappedName = bandMapping[band.name] || band.name.toLowerCase().replace(' ', '_');
+                const mappedName = bandMapping[band.name];
                 if (mappedName) {
                   // 🔧 CORREÇÃO CRÍTICA: Usar fórmula matemática correta
                   // Para energia espectral: 10 * log10, não 20 * log10
@@ -2705,6 +2716,50 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
                     energyPct: band.energyPct, // ✨ Novo campo!
                     scale: 'spectral_balance_auto' 
                   };
+                }
+              });
+              
+              // 🔧 PREENCHER BANDAS FALTANTES: Garantir que todas as bandas da interface tenham valores
+              const requiredBands = ['sub', 'low_bass', 'upper_bass', 'low_mid', 'mid', 'high_mid', 'brilho', 'presenca'];
+              
+              requiredBands.forEach(bandName => {
+                if (!bandEnergies[bandName]) {
+                  // Tentar encontrar uma banda espectral correspondente para interpolar
+                  let sourceValue = null;
+                  
+                  // Mapeamento reverso e interpolação para bandas faltantes
+                  switch(bandName) {
+                    case 'upper_bass':
+                      // Usar valor da banda Bass (60-120 Hz) como aproximação para upper_bass (120-250 Hz)
+                      sourceValue = bandEnergies['low_bass'];
+                      break;
+                    case 'sub':
+                      // Tentar pegar de Sub Bass
+                      const subBand = spectralBands.find(b => b.name === 'Sub Bass');
+                      if (subBand) {
+                        const proportion = subBand.energyPct / 100;
+                        const energyDb = proportion > 0 ? 10 * Math.log10(proportion) : -80;
+                        sourceValue = { 
+                          energy: subBand.energy, 
+                          rms_db: energyDb,
+                          energyPct: subBand.energyPct,
+                          scale: 'spectral_balance_auto' 
+                        };
+                      }
+                      break;
+                  }
+                  
+                  if (sourceValue) {
+                    bandEnergies[bandName] = sourceValue;
+                  } else {
+                    // Valor padrão seguro para bandas não mapeadas
+                    bandEnergies[bandName] = { 
+                      energy: 0, 
+                      rms_db: -80, 
+                      energyPct: 0,
+                      scale: 'spectral_balance_auto_fallback' 
+                    };
+                  }
                 }
               });
               
