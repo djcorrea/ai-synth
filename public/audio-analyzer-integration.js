@@ -2337,6 +2337,9 @@ async function handleGenreFileSelection(file) {
                     analysis.spectralBalance = spectralResult;
                     analysis.bands = { ...analysis.bands, ...legacySpectralBands };
                     
+                    console.log('🎼 INTEGRAÇÃO: spectralBalance definido!', analysis.spectralBalance);
+                    console.log('🎼 INTEGRAÇÃO: bands atualizadas!', Object.keys(analysis.bands));
+                    
                     // Adicionar informações de debug
                     analysis._spectralDebug = {
                         mode: SPECTRAL_INTERNAL_MODE,
@@ -4104,16 +4107,18 @@ function displayModalResults(analysis) {
     const currentSpectralMode = window.SPECTRAL_INTERNAL_MODE || 'percent';
     console.log('🎼 DEBUG: spectralBalance existe?', !!analysis.spectralBalance);
     console.log('🎼 DEBUG: modo atual:', currentSpectralMode);
+    console.log('🎼 DEBUG: analysis completo:', analysis);
     
-    if (analysis.spectralBalance && currentSpectralMode === 'percent') {
+    // FORÇAR RENDERIZAÇÃO PARA DEBUG
+    if (analysis.spectralBalance) {
         try {
-            console.log('🎼 Renderizando seção espectral...');
+            console.log('🎼 FORÇANDO renderização da seção espectral...');
             renderSpectralBalanceSection(analysis.spectralBalance, analysis);
         } catch(spectralRenderError) {
-            console.warn('Erro ao renderizar seção espectral:', spectralRenderError);
+            console.error('🎼 ERRO ao renderizar seção espectral:', spectralRenderError);
         }
-    } else if (analysis.spectralBalance) {
-        console.log('🎼 SpectralBalance existe mas modo não é percent:', currentSpectralMode);
+    } else {
+        console.error('🎼 spectralBalance NÃO EXISTE em analysis!');
     }
     
     try { renderReferenceComparisons(analysis); } catch(e){ console.warn('ref compare fail', e);}    
@@ -4126,9 +4131,21 @@ function renderSpectralBalanceSection(spectralData, analysis) {
     console.log('🎼 renderSpectralBalanceSection INICIADA');
     console.log('🎼 spectralData:', spectralData);
     
+    // Tentar múltiplos containers
     const technicalData = document.getElementById('modalTechnicalData');
-    if (!technicalData) {
-        console.error('🎼 modalTechnicalData não encontrado!');
+    const modalContent = document.querySelector('.modal-content');
+    const modalBody = document.querySelector('.modal-body');
+    
+    console.log('🎼 Containers disponíveis:', {
+        technicalData: !!technicalData,
+        modalContent: !!modalContent, 
+        modalBody: !!modalBody
+    });
+    
+    const targetContainer = technicalData || modalContent || modalBody;
+    
+    if (!targetContainer) {
+        console.error('🎼 NENHUM container encontrado para a seção espectral!');
         return;
     }
     if (!spectralData) {
@@ -4142,7 +4159,7 @@ function renderSpectralBalanceSection(spectralData, analysis) {
         existingSection.remove();
     }
     
-    console.log('🎼 Criando seção espectral...');
+    console.log('🎼 Criando seção espectral em:', targetContainer.tagName, targetContainer.id || targetContainer.className);
     
     // Crear seção espectral
     const spectralSection = document.createElement('div');
@@ -4263,8 +4280,15 @@ function renderSpectralBalanceSection(spectralData, analysis) {
     `;
     
     // Adicionar à interface
-    technicalData.appendChild(spectralSection);
+    console.log('🎼 Tentando adicionar seção ao DOM...');
+    console.log('🎼 targetContainer element:', targetContainer);
+    console.log('🎼 spectralSection element:', spectralSection);
     
+    targetContainer.appendChild(spectralSection);
+    
+    // Verificar se foi realmente adicionado
+    const added = document.getElementById('spectralBalanceSection');
+    console.log('🎼 Seção adicionada ao DOM?', !!added);
     console.log('🎼 Seção espectral renderizada na interface - SUCESSO!');
     __dbg('🎼 Seção espectral renderizada na interface');
 }
