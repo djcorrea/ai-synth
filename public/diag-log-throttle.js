@@ -143,8 +143,14 @@ class DiagnosticLogger {
     }
 }
 
-// Instância global
-const diagLogger = new DiagnosticLogger();
+// Instância global protegida por namespace
+if (!window.AnalyzerDiag) {
+    window.AnalyzerDiag = {};
+}
+
+if (!window.AnalyzerDiag.logger) {
+    window.AnalyzerDiag.logger = new DiagnosticLogger();
+}
 
 /**
  * Função global para log de diagnóstico com throttling
@@ -152,15 +158,17 @@ const diagLogger = new DiagnosticLogger();
  * @param {string} message - Mensagem
  * @param {object} context - Contexto opcional
  */
-function diagLog(stage, message, context) {
-    diagLogger.log(stage, message, context);
+if (!window.diagLog) {
+    function diagLog(stage, message, context) {
+        window.AnalyzerDiag.logger.log(stage, message, context);
+    }
+    
+    // Funções utilitárias expostas globalmente com proteção
+    window.diagLog = diagLog;
+    window.diagFlush = () => window.AnalyzerDiag.logger.flush();
+    window.diagClear = (stage) => window.AnalyzerDiag.logger.clearThrottle(stage);
+    window.diagSetEnabled = (enabled) => window.AnalyzerDiag.logger.setEnabled(enabled);
 }
-
-// Funções utilitárias expostas globalmente
-window.diagLog = diagLog;
-window.diagFlush = () => diagLogger.flush();
-window.diagClear = (stage) => diagLogger.clearThrottle(stage);
-window.diagSetEnabled = (enabled) => diagLogger.setEnabled(enabled);
 
 // Export para modules
 if (typeof module !== 'undefined' && module.exports) {

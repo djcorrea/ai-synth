@@ -33,9 +33,9 @@ class AudioAnalyzer {
   
   // 🔬 Sistema de logs de diagnóstico com fallback robusto
   _initDiagnosticLogging() {
-    // Garantir que diagLog esteja sempre disponível
-    if (typeof window.diagLog !== 'function') {
-      window.diagLog = function(stage, message, context) {
+    // Garantir que diagLog esteja sempre disponível com proteção contra duplicatas
+    if (!window.__ANALYZER_DIAG_LOG__) {
+      window.__ANALYZER_DIAG_LOG__ = window.diagLog || function(stage, message, context) {
         if (typeof window !== 'undefined') {
           const urlParams = new URLSearchParams(window.location.search);
           const isDiagMode = urlParams.get('diag') === '1' || window.DIAGNOSTIC_MODE === true;
@@ -44,6 +44,11 @@ class AudioAnalyzer {
           }
         }
       };
+      
+      // Só definir window.diagLog se ainda não existir
+      if (!window.diagLog) {
+        window.diagLog = window.__ANALYZER_DIAG_LOG__;
+      }
     }
   }
 
@@ -121,6 +126,9 @@ class AudioAnalyzer {
 
   // �📊 LOG DE PIPELINE POR ETAPA - À PROVA DE FALHAS
   _logPipelineStage(stage, payload = {}) {
+    // Função local protegida para diagnósticos
+    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
+    
     try {
       // Usar runId atual ou extrair do payload
       const runId = this._currentRunId || payload.runId;
@@ -192,6 +200,9 @@ class AudioAnalyzer {
   
   // 🏁 FINALIZAR STAGE COM DURAÇÃO
   _finishPipelineStage(stage, result = {}) {
+    // Função local protegida para diagnósticos
+    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
+    
     try {
       const runId = this._currentRunId;
       if (!runId || !this._activeAnalyses || !this._activeAnalyses.has(runId)) return;
@@ -279,6 +290,9 @@ class AudioAnalyzer {
 
   // 🎼 Orquestração segura de análise com Promise.allSettled e logs detalhados
   async _orchestrateAnalysis(audioBuffer, options, runId) {
+    // Função local protegida para diagnósticos
+    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
+    
     // 📊 LOG: INPUT
     this._logPipelineStageCompat(runId, 'INPUT', {
       bufferLength: audioBuffer.length,
@@ -361,6 +375,9 @@ class AudioAnalyzer {
 
   // 📦 Cache thread-safe com bypass para modo diagnóstico
   _createThreadSafeCache() {
+    // Função local protegida para diagnósticos
+    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
+    
     const cache = new Map();
     const locks = new Map();
     
@@ -424,6 +441,13 @@ class AudioAnalyzer {
   // 🚀 Pre-carregar V2 imediatamente
   async _preloadV2() {
     console.log('🚀 Pré-carregando Audio Analyzer V2...');
+    
+    // Proteção contra carregamento duplicado
+    if (window.AudioAnalyzerV2 && typeof window.AudioAnalyzerV2 === 'function') {
+      console.log('✅ V2 já está carregado, pulando pré-carregamento');
+      this._v2Loaded = true;
+      return Promise.resolve();
+    }
     
     if (!this._v2LoadingPromise) {
       this._v2LoadingPromise = new Promise((resolve) => {
