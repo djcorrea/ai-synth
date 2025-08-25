@@ -6255,5 +6255,3 @@ if (typeof window !== 'undefined' && window.audioAnalyzer) {
   
   console.log('✅ Phase 2 - Reference Manager initialized safely');
 }
-
-
