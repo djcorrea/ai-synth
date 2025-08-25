@@ -15,12 +15,15 @@ class AudioAnalyzer {
     this._activeAnalyses = new Map();
     this._threadSafeCache = this._createThreadSafeCache();
     
+    // 🔬 SISTEMA DE DIAGNÓSTICO E LOGS DETALHADOS
+    this._diagnosticMode = false;
+    
   // CAIAR: log construção
   try { (window.__caiarLog||function(){})('INIT','AudioAnalyzer instanciado'); } catch {}
     
-    console.log('🎯 AudioAnalyzer V1 construído - ponte para V2 com sistema runId');
+    console.log('🎯 AudioAnalyzer V1 construído - ponte para V2 com sistema runId avançado');
     this._preloadV2();
-  this._pipelineVersion = 'CAIAR_PIPELINE_0.5_RUNID';
+  this._pipelineVersion = 'CAIAR_PIPELINE_1.0_DIAGNOSTIC';
   }
 
   // 🆔 Gerador de runId único para cada análise
@@ -28,6 +31,99 @@ class AudioAnalyzer {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
     return `run_${timestamp}_${random}`;
+  }
+
+  // 🔬 MODO DIAGNÓSTICO - Controle
+  enableDiagnosticMode(enabled = true) {
+    this._diagnosticMode = enabled;
+    console.log(`🔬 Modo diagnóstico: ${enabled ? 'ATIVADO' : 'DESATIVADO'}`);
+    if (enabled) {
+      console.log('📋 Logs detalhados por etapa habilitados');
+      console.log('🚫 Cache desabilitado - força recomputação');
+    }
+  }
+
+  // 📊 Geração de relatório completo do pipeline
+  _generatePipelineReport(runId) {
+    if (!this._activeAnalyses.has(runId)) {
+      console.warn(`⚠️ Tentativa de gerar relatório para runId inexistente: ${runId}`);
+      return null;
+    }
+    
+    const { pipelineLogs, stageTimings } = this._activeAnalyses.get(runId);
+    
+    const report = {
+      runId,
+      totalStages: pipelineLogs.length,
+      firstStage: pipelineLogs[0]?.stage || 'UNKNOWN',
+      lastStage: pipelineLogs[pipelineLogs.length - 1]?.stage || 'UNKNOWN',
+      errors: pipelineLogs.filter(log => log.stage.includes('ERROR')),
+      warnings: pipelineLogs.filter(log => log.stage.includes('TIMEOUT') || log.stage.includes('SKIPPED')),
+      timings: stageTimings,
+      stages: pipelineLogs.map(log => ({
+        stage: log.stage,
+        timestamp: log.timestamp,
+        duration: log.duration,
+        data: log.data
+      }))
+    };
+    
+    // Calcular estatísticas de performance
+    const allDurations = Object.values(stageTimings).filter(d => d > 0);
+    if (allDurations.length > 0) {
+      report.performance = {
+        totalDuration: Math.max(...Object.values(stageTimings)),
+        averageStageDuration: allDurations.reduce((a, b) => a + b, 0) / allDurations.length,
+        slowestStage: Object.entries(stageTimings).reduce((a, b) => a[1] > b[1] ? a : b),
+        fastestStage: Object.entries(stageTimings).reduce((a, b) => a[1] < b[1] ? a : b)
+      };
+    }
+    
+    console.log(`📊 [${runId}] Relatório de pipeline gerado:`, report);
+    return report;
+  }
+
+  // 📊 LOG DE PIPELINE POR ETAPA
+  _logPipelineStage(runId, stage, data = {}) {
+    if (!this._activeAnalyses.has(runId)) {
+      this._activeAnalyses.set(runId, {
+        pipelineLogs: [],
+        stageTimings: {},
+        startTime: Date.now()
+      });
+    }
+    
+    const analysisData = this._activeAnalyses.get(runId);
+    const timestamp = Date.now();
+    const logEntry = {
+      stage,
+      timestamp,
+      data: this._diagnosticMode ? data : Object.keys(data), // Full data apenas em diagnóstico
+      diagnosticMode: this._diagnosticMode
+    };
+    
+    analysisData.pipelineLogs.push(logEntry);
+    
+    // Timing da etapa anterior
+    if (analysisData.lastStageTime) {
+      const stageTime = timestamp - analysisData.lastStageTime;
+      console.log(`⏱️ [${runId}] ${analysisData.lastStage} → ${stage}: ${stageTime}ms`);
+    }
+    
+    analysisData.lastStage = stage;
+    analysisData.lastStageTime = timestamp;
+    
+    console.log(`🔄 [${runId}] ETAPA: ${stage}${this._diagnosticMode ? ' (DIAGNOSTIC)' : ''}`);
+    
+    return logEntry;
+  }
+
+  // 📋 RELATÓRIO DE PIPELINE COMPLETO (removendo duplicado)
+  // Usando o método _generatePipelineReport acima que está mais completo
+
+  // 🚫 BYPASS DE CACHE EM MODO DIAGNÓSTICO
+  _shouldBypassCache() {
+    return this._diagnosticMode;
   }
 
   // 🛡️ Fórmula dB padronizada para consistência
@@ -83,9 +179,15 @@ class AudioAnalyzer {
     return converted;
   }
 
-  // 🎼 Orquestração segura de análise com Promise.allSettled
+  // 🎼 Orquestração segura de análise com Promise.allSettled e logs detalhados
   async _orchestrateAnalysis(audioBuffer, options, runId) {
-    console.log(`🎼 [${runId}] Iniciando orquestração de análise`);
+    // 📊 LOG: INPUT
+    this._logPipelineStage(runId, 'INPUT', {
+      bufferLength: audioBuffer.length,
+      sampleRate: audioBuffer.sampleRate,
+      numberOfChannels: audioBuffer.numberOfChannels,
+      options: options
+    });
     
     const operations = [];
     const results = {};
@@ -95,13 +197,28 @@ class AudioAnalyzer {
       name: 'basic_analysis',
       priority: 1,
       operation: async () => {
-        console.log(`🔄 [${runId}] Executando análise básica`);
+        // 📊 LOG: FEATURES (início)
+        this._logPipelineStage(runId, 'FEATURES_START', {
+          stage: 'basic_analysis',
+          bypassCache: this._shouldBypassCache()
+        });
+        
         const basic = this.performFullAnalysis(audioBuffer, options);
+        
         // Adicionar runId aos dados
         if (basic && typeof basic === 'object') {
           basic._runId = runId;
           basic._phase = 'basic';
+          basic._diagnosticMode = this._diagnosticMode;
         }
+        
+        // 📊 LOG: FEATURES (conclusão)
+        this._logPipelineStage(runId, 'FEATURES_COMPLETE', {
+          hasData: !!basic,
+          dataKeys: basic ? Object.keys(basic) : [],
+          technicalDataKeys: basic?.technicalData ? Object.keys(basic.technicalData) : []
+        });
+        
         return basic;
       }
     });
@@ -114,6 +231,14 @@ class AudioAnalyzer {
         console.log(`✅ [${runId}] ${op.name} concluído`);
       } catch (error) {
         console.error(`❌ [${runId}] Erro em ${op.name}:`, error);
+        
+        // 📊 LOG: ERROR
+        this._logPipelineStage(runId, 'ERROR', {
+          operation: op.name,
+          error: error.message,
+          stack: this._diagnosticMode ? error.stack : undefined
+        });
+        
         results[op.name] = { error: error.message, _runId: runId };
       }
     }
@@ -136,13 +261,25 @@ class AudioAnalyzer {
     return true;
   }
 
-  // 📦 Cache thread-safe
+  // 📦 Cache thread-safe com bypass para modo diagnóstico
   _createThreadSafeCache() {
     const cache = new Map();
     const locks = new Map();
     
     return {
       async get(key, factory, runId) {
+        // 🚫 BYPASS CACHE EM MODO DIAGNÓSTICO
+        if (this._shouldBypassCache()) {
+          console.log(`🚫 [${runId}] Cache bypass (modo diagnóstico) para ${key}`);
+          const value = await factory(runId);
+          if (value && typeof value === 'object') {
+            value._runId = runId;
+            value._cacheKey = key;
+            value._diagnosticBypass = true;
+          }
+          return value;
+        }
+        
         if (cache.has(key)) {
           const cached = cache.get(key);
           if (cached._runId) {
@@ -471,20 +608,66 @@ class AudioAnalyzer {
     
     console.log(`🔄 [${runId}] Pipeline iniciado para buffer decodificado`);
     const t0Full = (performance&&performance.now)?performance.now():Date.now();
+    
+    // 📊 LOG: PIPELINE STARTED
+    this._logPipelineStage(runId, 'PIPELINE_START', {
+      fileHash,
+      bufferDuration: audioBuffer.duration,
+      qualityMode: (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast'
+    });
+    
     // Replicação da lógica existente (refatorada para reutilização)
     // Context + V1 + Phase2 + Stems + Matrix
     let analysis = this.performFullAnalysis(audioBuffer, { qualityMode: (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast' });
     analysis.qualityMode = analysis.qualityMode || ((window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast');
     try { (window.__caiarLog||function(){})('METRICS_V1_DONE','Métricas V1 calculadas(direct)'); } catch {}
+    
     try {
+      // 📊 LOG: PHASE 2 START
+      this._logPipelineStage(runId, 'PHASE2_START', {
+        v1Complete: !!analysis,
+        hasAudioBuffer: !!audioBuffer
+      });
+      
       analysis = await this._enrichWithPhase2Metrics(audioBuffer, analysis, file, runId);
-    } catch(e){ (window.__caiarLog||function(){})(`METRICS_V2_ERROR_${runId}`,'Falha Fase 2 direct',{err:e?.message}); }
+      
+      // 📊 LOG: PHASE 2 COMPLETE
+      this._logPipelineStage(runId, 'PHASE2_COMPLETE', {
+        enriched: true,
+        v2MetricsKeys: analysis._v2Metrics ? Object.keys(analysis._v2Metrics) : []
+      });
+      
+    } catch(e){ 
+      (window.__caiarLog||function(){})(`METRICS_V2_ERROR_${runId}`,'Falha Fase 2 direct',{err:e?.message}); 
+      
+      // 📊 LOG: PHASE 2 ERROR
+      this._logPipelineStage(runId, 'PHASE2_ERROR', {
+        error: e.message,
+        stack: this._diagnosticMode ? e.stack : undefined
+      });
+    }
+    
     // Stems (respeitar duração para evitar travamento)
     try {
       if (typeof window !== 'undefined' && window.CAIAR_ENABLED) {
         const dur = audioBuffer.duration;
+        
+        // 📊 LOG: STEMS START
+        this._logPipelineStage(runId, 'STEMS_START', {
+          stemsMode: window.STEMS_MODE,
+          duration: dur,
+          maxDuration: window.STEMS_MAX_DURATION_SEC || 360
+        });
+        
         if (window.STEMS_MODE === 'off' || dur > (window.STEMS_MAX_DURATION_SEC||360)) {
           (window.__caiarLog||function(){})('STEMS_SKIP','Stems pulados',{duration:dur});
+          
+          // 📊 LOG: STEMS SKIPPED
+          this._logPipelineStage(runId, 'STEMS_SKIPPED', {
+            reason: window.STEMS_MODE === 'off' ? 'disabled' : 'duration_exceeded',
+            duration: dur
+          });
+          
           try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch{}
         } else {
           const { enqueueJob } = await import('/lib/audio/features/job-queue.js?v=' + Date.now()).catch(()=>({enqueueJob:null}));
@@ -498,22 +681,121 @@ class AudioAnalyzer {
             const stemsRes = enqueueJob? await enqueueJob(jobFn,{label:'stems:'+ (fileHash||file?.name), priority: qualityMode==='fast'?4:2, timeoutMs: qualityMode==='fast'?45000:95000 }): await jobFn();
             if (stemsRes && !stemsRes._timeout) {
               analysis._stems = { method: stemsRes.method, totalMs: stemsRes.totalMs, metrics: stemsRes.metrics };
+              
+              // 📊 LOG: STEMS COMPLETE
+              this._logPipelineStage(runId, 'STEMS_COMPLETE', {
+                method: stemsRes.method,
+                totalMs: stemsRes.totalMs,
+                hasMetrics: !!stemsRes.metrics
+              });
+              
               try { this._computeAnalysisMatrix(audioBuffer, analysis, stemsRes.stems); } catch{}
             } else {
+              // 📊 LOG: STEMS TIMEOUT
+              this._logPipelineStage(runId, 'STEMS_TIMEOUT', {
+                qualityMode,
+                timeoutMs: qualityMode==='fast'?40000:90000
+              });
+              
               try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch{}
             }
           }
         }
       }
-    } catch(e){ (window.__caiarLog||function(){})('STEMS_CHAIN_ERROR','Erro stems direct',{err:e?.message}); }
-    return await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache: (typeof window!=='undefined' && window.DISABLE_ANALYSIS_CACHE) });
+    } catch(e){ 
+      (window.__caiarLog||function(){})('STEMS_CHAIN_ERROR','Erro stems direct',{err:e?.message}); 
+      
+      // 📊 LOG: STEMS ERROR
+      this._logPipelineStage(runId, 'STEMS_ERROR', {
+        error: e.message,
+        stack: this._diagnosticMode ? e.stack : undefined
+      });
+    }
+    
+    return await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache: (typeof window!=='undefined' && window.DISABLE_ANALYSIS_CACHE), runId });
   }
 
-  async _finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache }) {
+  async _finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache, runId }) {
     try {
+      // 📊 LOG: REFS START (referências e comparações)
+      this._logPipelineStage(runId, 'REFS_START', {
+        hasAnalysis: !!analysis,
+        genre: window.PROD_AI_REF_GENRE || 'unknown'
+      });
+      
+      // Aqui seria processamento de referências (se existir)
+      // TODO: Implementar logs específicos quando adicionarmos comparação externa
+      
+      // 📊 LOG: SCORING START
+      this._logPipelineStage(runId, 'SCORING_START', {
+        hasProblems: !!(analysis.problems && analysis.problems.length),
+        hasSuggestions: !!(analysis.suggestions && analysis.suggestions.length),
+        currentScore: analysis.mixScorePct
+      });
+      
+      // Aqui seria cálculo de scoring (já existe)
+      // O scoring atual já está computado, só logamos
+      
+      // 📊 LOG: SUGGESTIONS START
+      this._logPipelineStage(runId, 'SUGGESTIONS_START', {
+        problemsCount: (analysis.problems || []).length,
+        suggestionsCount: (analysis.suggestions || []).length
+      });
+      
+      // Aqui seria geração de sugestões (já existe)
+      
+      // 📊 LOG: UI PREPARATION
+      this._logPipelineStage(runId, 'UI_PREP', {
+        finalScore: analysis.mixScorePct,
+        problemsCount: (analysis.problems || []).length,
+        suggestionsCount: (analysis.suggestions || []).length,
+        hasV2Metrics: !!analysis._v2Metrics,
+        hasStems: !!analysis._stems
+      });
+      
       const t1Full=(performance&&performance.now)?performance.now():Date.now();
-      (window.__caiarLog||function(){})('OUTPUT','Análise final pronta', { totalMs: +(t1Full - t0Full).toFixed(1), problems: (analysis.problems||[]).length, suggestions: (analysis.suggestions||[]).length, scorePct: analysis.mixScorePct });
-    } catch {}
+      const totalMs = +(t1Full - t0Full).toFixed(1);
+      
+      // 📊 LOG: OUTPUT COMPLETE
+      this._logPipelineStage(runId, 'OUTPUT_COMPLETE', {
+        totalMs,
+        finalScore: analysis.mixScorePct,
+        problemsCount: (analysis.problems || []).length,
+        suggestionsCount: (analysis.suggestions || []).length,
+        cacheDisabled: disableCache,
+        fileHash: fileHash ? fileHash.substring(0, 8) + '...' : null
+      });
+      
+      // Gerar relatório final do pipeline
+      const pipelineReport = this._generatePipelineReport(runId);
+      
+      // Adicionar relatório à análise se em modo diagnóstico
+      if (this._diagnosticMode && pipelineReport) {
+        analysis._pipelineReport = pipelineReport;
+        console.log(`📊 [${runId}] Relatório de pipeline anexado à análise`);
+      }
+      
+      // Limpar registros após completar
+      this._activeAnalyses.delete(runId);
+      
+      (window.__caiarLog||function(){})('OUTPUT','Análise final pronta', { 
+        totalMs, 
+        problems: (analysis.problems||[]).length, 
+        suggestions: (analysis.suggestions||[]).length, 
+        scorePct: analysis.mixScorePct,
+        runId,
+        diagnosticMode: this._diagnosticMode
+      });
+      
+    } catch(e) {
+      console.error(`❌ [${runId}] Erro na finalização:`, e);
+      
+      // 📊 LOG: FINALIZATION ERROR
+      this._logPipelineStage(runId, 'FINALIZATION_ERROR', {
+        error: e.message,
+        stack: this._diagnosticMode ? e.stack : undefined
+      });
+    }
     try { analysis.pipelineVersion = this._pipelineVersion; } catch {}
     if (fileHash && !disableCache) {
       try {
