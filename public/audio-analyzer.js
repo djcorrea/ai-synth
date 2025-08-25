@@ -6094,4 +6094,166 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// 🚨 PHASE 2: REFERENCE MANAGER - IMPLEMENTAÇÃO SEGURA
+// 📋 Gerenciamento inteligente de referências com cache otimizado e fallbacks robustos
+// 🔒 COMPATIBILIDADE: 100% compatível com sistema existente (loadReferenceData, enrichReferenceObject)
+if (typeof window !== 'undefined' && window.audioAnalyzer) {
+  
+  // 🧠 REFERENCE MANAGER - Métodos seguros integrados ao AudioAnalyzer
+  Object.assign(window.audioAnalyzer, {
+    
+    /**
+     * 🔄 REFERENCE CACHE MANAGER
+     * Gerencia cache de referências com limpeza inteligente
+     */
+    _manageReferenceCache() {
+      try {
+        // Verificar se existe cache global do sistema
+        const globalCache = window.__refDataCache || {};
+        const cacheKeys = Object.keys(globalCache);
+        
+        // Limpar entradas antigas (mais de 5 gêneros em cache)
+        if (cacheKeys.length > 5) {
+          // Manter apenas os 3 mais recentes
+          const sortedKeys = cacheKeys.sort((a, b) => {
+            const timestampA = globalCache[a]?._cacheTimestamp || 0;
+            const timestampB = globalCache[b]?._cacheTimestamp || 0;
+            return timestampB - timestampA;
+          });
+          
+          // Remover os mais antigos
+          const toRemove = sortedKeys.slice(3);
+          toRemove.forEach(key => {
+            delete globalCache[key];
+            console.log(`🧹 Reference cache cleaned: ${key}`);
+          });
+        }
+        
+        return {
+          cacheSize: Object.keys(globalCache).length,
+          cleanedEntries: cacheKeys.length - Object.keys(globalCache).length
+        };
+      } catch (error) {
+        console.warn('⚠️ Reference cache cleanup error:', error.message);
+        return { error: error.message };
+      }
+    },
+    
+    /**
+     * 🎯 REFERENCE PRELOADER
+     * Pré-carrega referências populares para melhor performance
+     */
+    _preloadPopularReferences() {
+      try {
+        // Lista de gêneros populares para pré-carregar
+        const popularGenres = ['funk_mandela', 'trance', 'eletronico'];
+        const preloadPromises = [];
+        
+        popularGenres.forEach(genre => {
+          // Verificar se já existe no cache
+          const cached = window.__refDataCache?.[genre];
+          if (!cached) {
+            // Criar promise de pré-carregamento (apenas se loadReferenceData existir)
+            if (typeof window.loadReferenceData === 'function') {
+              const preloadPromise = window.loadReferenceData(genre)
+                .then(() => console.log(`✅ Preloaded reference: ${genre}`))
+                .catch(() => console.log(`⚠️ Failed to preload: ${genre}`));
+              preloadPromises.push(preloadPromise);
+            }
+          }
+        });
+        
+        return {
+          initiated: preloadPromises.length,
+          genres: popularGenres,
+          alreadyCached: popularGenres.length - preloadPromises.length
+        };
+      } catch (error) {
+        console.warn('⚠️ Reference preload error:', error.message);
+        return { error: error.message };
+      }
+    },
+    
+    /**
+     * 📊 REFERENCE VALIDATOR
+     * Valida integridade das referências carregadas
+     */
+    _validateReferenceIntegrity(referenceData) {
+      try {
+        if (!referenceData || typeof referenceData !== 'object') {
+          return { valid: false, reason: 'Reference data is not an object' };
+        }
+        
+        // Verificar estrutura mínima esperada
+        const requiredFields = ['legacy_compatibility'];
+        const missingFields = requiredFields.filter(field => !referenceData[field]);
+        
+        if (missingFields.length > 0) {
+          return { valid: false, reason: `Missing fields: ${missingFields.join(', ')}` };
+        }
+        
+        // Verificar métricas essenciais
+        const compat = referenceData.legacy_compatibility;
+        const essentialMetrics = ['lufs_target', 'true_peak_target', 'dr_target'];
+        const missingMetrics = essentialMetrics.filter(metric => 
+          typeof compat[metric] !== 'number' || !Number.isFinite(compat[metric])
+        );
+        
+        if (missingMetrics.length > 0) {
+          return { valid: false, reason: `Invalid metrics: ${missingMetrics.join(', ')}` };
+        }
+        
+        return {
+          valid: true,
+          version: referenceData.version,
+          numTracks: referenceData.num_tracks,
+          generatedAt: referenceData.generated_at
+        };
+      } catch (error) {
+        return { valid: false, reason: error.message };
+      }
+    },
+    
+    /**
+     * 🔍 REFERENCE DIAGNOSTICS
+     * Diagnóstico completo do sistema de referências
+     */
+    _diagnoseReferenceSystem() {
+      try {
+        const diagnosis = {
+          timestamp: new Date().toISOString(),
+          globalCache: {
+            exists: typeof window.__refDataCache === 'object',
+            size: Object.keys(window.__refDataCache || {}).length,
+            genres: Object.keys(window.__refDataCache || {})
+          },
+          activeReference: {
+            exists: typeof window.__activeRefData === 'object',
+            genre: window.__activeRefGenre,
+            valid: window.__activeRefData ? this._validateReferenceIntegrity(window.__activeRefData).valid : false
+          },
+          embeddedRefs: {
+            loaded: window.EMBEDDED_REFS_LOADED === true,
+            version: window.EMBEDDED_REFS_VERSION,
+            dataExists: typeof window.PROD_AI_REF_DATA === 'object'
+          },
+          functions: {
+            loadReferenceData: typeof window.loadReferenceData === 'function',
+            enrichReferenceObject: typeof window.enrichReferenceObject === 'function'
+          }
+        };
+        
+        console.log('🔍 Reference System Diagnosis:', diagnosis);
+        return diagnosis;
+      } catch (error) {
+        const errorDiagnosis = { error: error.message, timestamp: new Date().toISOString() };
+        console.error('❌ Reference diagnosis failed:', errorDiagnosis);
+        return errorDiagnosis;
+      }
+    }
+  });
+  
+  console.log('✅ Phase 2 - Reference Manager initialized safely');
+}
+
 
