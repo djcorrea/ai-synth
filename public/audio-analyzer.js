@@ -2079,53 +2079,102 @@ class AudioAnalyzer {
     // 📊 Análise de Volume e Dinâmica
     analysis.technicalData.peak = this.findPeakLevel(leftChannel);
     analysis.technicalData.rms = this.calculateRMS(leftChannel);
-    // 🎯 Calcular Crest Factor (nova nomenclatura correta)
-    analysis.technicalData.crestFactor = this.calculateCrestFactor(leftChannel);
-    // 🔄 Manter dynamicRange para compatibilidade (mesmo valor que crestFactor)
-    analysis.technicalData.dynamicRange = analysis.technicalData.crestFactor;
-    // 🔬 Nova métrica de dinâmica estatística (dr_stat) – não substitui dynamicRange legacy
-    try {
-      const enableDRRedef = (typeof window !== 'undefined') && (
-        (window.AUDIT_MODE === true && window.DR_REDEF !== false) ||
-        window.FORCE_SCORING_V2 === true || window.AUTO_SCORING_V2 === true
-      );
-      if (enableDRRedef && !analysis.technicalData.dr_stat) {
-        const sampleRate = audioBuffer.sampleRate || 48000;
-        const winMs = 300; const hopMs = 100;
-        const win = Math.max(1, Math.round(sampleRate * winMs / 1000));
-        const hop = Math.max(1, Math.round(sampleRate * hopMs / 1000));
-        // Construir mid para robustez stereo
-        const n = Math.min(leftChannel.length, rightChannel.length);
-        const mid = new Float32Array(n);
-        for (let i=0;i<n;i++) mid[i] = 0.5*(leftChannel[i] + rightChannel[i]);
-        // Sliding RMS
-        const rmsVals = [];
-        let sum = 0; let buf = new Float32Array(win); let bi=0; let filled=0;
-        for (let i=0;i<n;i++) {
-          const x = mid[i];
-          const prev = buf[bi];
-          buf[bi] = x; bi = (bi+1)%win;
-          if (filled < win) { sum += x*x; filled++; } else { sum += x*x - prev*prev; }
-          if (i+1 >= win && ((i - win) % hop === 0)) {
-            const ms = sum / win; rmsVals.push(ms>0 ? 20*Math.log10(Math.sqrt(ms)) : -Infinity);
+    
+    // 🎯 TT-DR OFICIAL: Dynamic Range conforme padrão da indústria
+    const enableTTDR = (typeof window !== 'undefined') && (
+      (window.AUDIT_MODE === true && window.DR_REDEF !== false) ||
+      window.FORCE_SCORING_V2 === true || window.AUTO_SCORING_V2 === true ||
+      window.USE_TT_DR === true
+    );
+    
+    if (enableTTDR) {
+      try {
+        // Importar módulo dynamics se disponível
+        if (typeof window !== 'undefined' && window.dynamicsModule) {
+          const ttResult = window.dynamicsModule.computeTTDynamicRange(leftChannel, rightChannel, audioBuffer.sampleRate || 48000);
+          if (ttResult && ttResult.is_valid && Number.isFinite(ttResult.tt_dr)) {
+            analysis.technicalData.tt_dr = parseFloat(ttResult.tt_dr.toFixed(2));
+            analysis.technicalData.dr_stat = analysis.technicalData.tt_dr; // Alias para compatibilidade
+            analysis.technicalData._ttdr_metadata = {
+              algorithm: ttResult.algorithm,
+              version: ttResult.version,
+              rms_windows: ttResult.rms_windows,
+              p95_rms: ttResult.p95_rms,
+              p10_rms: ttResult.p10_rms
+            };
           }
         }
-        const finite = rmsVals.filter(v => Number.isFinite(v)).sort((a,b)=>a-b);
-        if (finite.length > 5) { // garantir amostra mínima
-          const idx = (p)=> Math.min(finite.length-1, Math.max(0, Math.floor(finite.length * p)));
-          const p10 = finite[idx(0.10)];
-          const p95 = finite[idx(0.95)];
-          const drStat = (Number.isFinite(p95) && Number.isFinite(p10)) ? (p95 - p10) : null;
-          if (drStat != null) {
-            analysis.technicalData.dr_stat = parseFloat(drStat.toFixed(2));
-            analysis.technicalData.dr_stat_p95 = p95;
-            analysis.technicalData.dr_stat_p10 = p10;
-            analysis.technicalData.dr_stat_windows = rmsVals.length;
-            (analysis.technicalData._sources = analysis.technicalData._sources || {}).dr_stat = 'audit:dr_percentile';
+        
+        // Fallback: implementação inline (compatibilidade)
+        if (!analysis.technicalData.tt_dr) {
+          const sampleRate = audioBuffer.sampleRate || 48000;
+          const n = Math.min(leftChannel.length, rightChannel.length);
+          const mid = new Float32Array(n);
+          for (let i = 0; i < n; i++) mid[i] = 0.5 * (leftChannel[i] + rightChannel[i]);
+          
+          // TT-DR: janelas 300ms, hop 100ms
+          const winSamples = Math.max(1, Math.round(sampleRate * 0.3)); // 300ms
+          const hopSamples = Math.max(1, Math.round(sampleRate * 0.1)); // 100ms
+          const rmsValues = [];
+          
+          let sumSquares = 0;
+          const buffer = new Float32Array(winSamples);
+          let bufferIndex = 0;
+          let samplesInBuffer = 0;
+          
+          for (let i = 0; i < n; i++) {
+            const currentSample = mid[i];
+            const oldSample = buffer[bufferIndex];
+            
+            buffer[bufferIndex] = currentSample;
+            bufferIndex = (bufferIndex + 1) % winSamples;
+            
+            if (samplesInBuffer < winSamples) {
+              sumSquares += currentSample * currentSample;
+              samplesInBuffer++;
+            } else {
+              sumSquares += currentSample * currentSample - oldSample * oldSample;
+            }
+            
+            if (samplesInBuffer >= winSamples && ((i - winSamples + 1) % hopSamples === 0)) {
+              const rmsLinear = Math.sqrt(sumSquares / winSamples);
+              const rmsDb = rmsLinear > 1e-10 ? 20 * Math.log10(rmsLinear) : -200;
+              rmsValues.push(rmsDb);
+            }
+          }
+          
+          // Calcular percentis TT
+          const validRms = rmsValues.filter(v => Number.isFinite(v) && v > -200).sort((a, b) => a - b);
+          if (validRms.length > 5) {
+            const p10Index = Math.floor((validRms.length - 1) * 0.10);
+            const p95Index = Math.floor((validRms.length - 1) * 0.95);
+            const p10 = validRms[p10Index];
+            const p95 = validRms[p95Index];
+            
+            if (Number.isFinite(p95) && Number.isFinite(p10)) {
+              const ttDR = p95 - p10;
+              analysis.technicalData.tt_dr = parseFloat(ttDR.toFixed(2));
+              analysis.technicalData.dr_stat = analysis.technicalData.tt_dr;
+              analysis.technicalData._ttdr_metadata = {
+                algorithm: 'TT-DR Inline',
+                version: '1.0',
+                rms_windows: validRms.length,
+                p95_rms: p95,
+                p10_rms: p10
+              };
+            }
           }
         }
+      } catch (error) {
+        console.warn('⚠️ TT-DR calculation failed, using fallback:', error.message);
       }
-    } catch (e) { if (window && window.DEBUG_ANALYZER) console.warn('DR_STAT erro:', e); }
+    }
+    
+    // 🎚️ Crest Factor (DR_CF): Métrica auxiliar - mantida para compatibilidade
+    analysis.technicalData.crestFactor = this.calculateCrestFactor(leftChannel);
+    // 🔄 Manter dynamicRange para retrocompatibilidade (Crest Factor legacy)
+    analysis.technicalData.dynamicRange = analysis.technicalData.crestFactor;
+
     // Garantir crestFactor base (peak - rms) já inicial
     if (Number.isFinite(analysis.technicalData.peak) && Number.isFinite(analysis.technicalData.rms)) {
       const cf = (analysis.technicalData.peak - analysis.technicalData.rms);
@@ -2256,8 +2305,10 @@ class AudioAnalyzer {
     return 20 * Math.log10(rms); // Converter para dB
   }
 
-  // 🎚️ Calcular Crest Factor (anteriormente chamado Dynamic Range)
-  // Nota: Esta é a diferença Peak-RMS em dB, não o Dynamic Range técnico (TT DR ou EBU PLR)
+  // 🎚️ Calcular Crest Factor (DR_CF) - Métrica auxiliar 
+  // ⚠️ IMPORTANTE: Esta é a diferença Peak-RMS (Crest Factor), NÃO o Dynamic Range oficial
+  // Para TT-DR (True Technical Dynamic Range), use tt_dr ou dr_stat
+  // Crest Factor permanece disponível para compatibilidade e comparação
   calculateCrestFactor(channelData) {
     const peak = this.findPeakLevel(channelData);
     const rms = this.calculateRMS(channelData);
@@ -2270,9 +2321,12 @@ class AudioAnalyzer {
     return Math.abs(peak - rms);
   }
 
-  // 🔄 Alias para compatibilidade (será removido gradualmente)
+  // 🔄 Alias para compatibilidade (DEPRECATED - use calculateCrestFactor)
+  // Este método será removido em versões futuras - use TT-DR ou Crest Factor explicitamente
   calculateDynamicRange(channelData) {
-    console.warn('⚠️ calculateDynamicRange() deprecated - use calculateCrestFactor() instead');
+    if (typeof window !== 'undefined' && window.DEBUG_ANALYZER) {
+      console.warn('⚠️ calculateDynamicRange() deprecated - use TT-DR (tt_dr) for official analysis or calculateCrestFactor() for Peak-RMS');
+    }
     return this.calculateCrestFactor(channelData);
   }
 
