@@ -1,7 +1,7 @@
 {
   "funk_mandela": {
-    "version": "2025-08-mandela-targets.5-spectral-percent",
-    "generated_at": "2025-08-24T13:39:47.661Z",
+    "version": "2025-08-mandela-targets.5-spectral-percent-rebuild-rebuild",
+    "generated_at": "2025-08-25T01:33:39.965Z",
     "num_tracks": 17,
     "aggregation_method": "hybrid_fixed_flexible",
     "fixed": {
@@ -130,21 +130,21 @@
     },
     "notes": "Manter demais métricas como estão; este gênero aceita clipping controlado e abertura estéreo mais agressiva em médios/agudos. Estéreo: correlação (-1..+1) calculada como 1-2*largura; largura exibível = (1-correlação)/2. Estéreo: correlação (-1..+1) calculada como 1-2*largura; largura exibível = (1-correlação)/2.",
     "legacy_compatibility": {
-      "lufs_target": -8,
+      "lufs_target": -5,
       "tol_lufs": 2.5,
       "tol_lufs_min": 1,
       "tol_lufs_max": 1,
-      "true_peak_target": -8,
+      "true_peak_target": -2.9,
       "tol_true_peak": 3.4,
       "true_peak_streaming_max": -0.3,
       "true_peak_baile_max": 0,
-      "dr_target": 8,
+      "dr_target": 7.2,
       "tol_dr": 3,
-      "lra_target": 9,
+      "lra_target": 9.2,
       "lra_min": 1,
       "lra_max": 4,
       "tol_lra": 2.5,
-      "stereo_target": 0.6,
+      "stereo_target": 0.52,
       "tol_stereo": 0.25,
       "stereo_width_mids_highs_tolerance": "wide",
       "low_end_mono_cutoff": 100,
@@ -170,50 +170,48 @@
       },
       "bands": {
         "sub": {
-          "target_db": -7.2,
+          "target_db": -5.7,
           "tol_db": 2.5,
-          "severity": "soft"
+          "energy_pct": 19.25
         },
         "low_bass": {
-          "target_db": -8.9,
+          "target_db": -6.1,
           "tol_db": 2.5,
-          "severity": "soft"
+          "energy_pct": 17.11
         },
         "upper_bass": {
           "target_db": -12.8,
           "tol_db": 2.5,
-          "severity": "soft"
+          "energy_pct": 3.56
         },
         "low_mid": {
-          "target_db": -9.2,
+          "target_db": -6.6,
           "tol_db": 2,
-          "severity": "soft"
+          "energy_pct": 17.83
         },
         "mid": {
-          "target_db": -6.8,
+          "target_db": -3.3,
           "tol_db": 1.5,
-          "severity": "hard",
-          "vocal_presence_range": true
+          "energy_pct": 33.79
         },
         "high_mid": {
-          "target_db": -12.3,
+          "target_db": -12.2,
           "tol_db": 1.5,
-          "severity": "soft"
+          "energy_pct": 4.39
         },
         "brilho": {
-          "target_db": -16.2,
+          "target_db": -13.5,
           "tol_db": 2,
-          "severity": "soft"
+          "energy_pct": 3.37
         },
         "presenca": {
-          "target_db": -19.1,
+          "target_db": -20.6,
           "tol_db": 2.5,
-          "severity": "hard",
-          "vocal_presence_range": true
+          "energy_pct": 0.69
         }
       }
     },
-    "last_updated": "2025-08-24T16:05:40.328Z",
+    "last_updated": "2025-08-25T01:33:39.965Z",
     "spectralBalance": {
       "version": "v1.0-percent-energy",
       "method": "energy_percentage",
@@ -401,6 +399,7 @@
         }
       }
     },
-    "updated_spectral": "2025-08-24T17:22:07.957Z"
+    "updated_spectral": "2025-08-24T17:22:07.957Z",
+    "rebuildRunId": "rebuild_1756085619952_f5445196"
   }
 }

@@ -1,7 +1,7 @@
 {
   "funk_mandela": {
-    "version": "2025-08-mandela-targets.5-spectral-percent-rebuild-rebuild",
-    "generated_at": "2025-08-25T01:33:39.965Z",
+    "version": "2025-08-mandela-targets.5-spectral-percent-rebuild",
+    "generated_at": "2025-08-25T01:24:16.806Z",
     "num_tracks": 17,
     "aggregation_method": "hybrid_fixed_flexible",
     "fixed": {
@@ -211,7 +211,7 @@
         }
       }
     },
-    "last_updated": "2025-08-25T01:33:39.965Z",
+    "last_updated": "2025-08-25T01:24:16.806Z",
     "spectralBalance": {
       "version": "v1.0-percent-energy",
       "method": "energy_percentage",
@@ -400,6 +400,6 @@
       }
     },
     "updated_spectral": "2025-08-24T17:22:07.957Z",
-    "rebuildRunId": "rebuild_1756085619952_f5445196"
+    "rebuildRunId": "rebuild_1756085056794_f5c28169"
   }
 }

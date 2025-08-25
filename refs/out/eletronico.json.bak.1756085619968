@@ -1,7 +1,7 @@
 {
   "eletronico": {
-    "version": "1.0.3-rebuild",
-    "generated_at": "2025-08-25T01:33:39.969Z",
+    "version": "1.0.2-rebuild",
+    "generated_at": "2025-08-25T01:24:16.810Z",
     "num_tracks": 13,
     "lufs_target": -14,
     "tol_lufs": 0.5,
@@ -50,8 +50,8 @@
         "tol_db": 3
       }
     },
-    "rebuildRunId": "rebuild_1756085619952_f5445196",
-    "last_updated": "2025-08-25T01:33:39.969Z",
+    "rebuildRunId": "rebuild_1756085056794_f5c28169",
+    "last_updated": "2025-08-25T01:24:16.810Z",
     "legacy_compatibility": {
       "lufs_target": -4.5,
       "true_peak_target": -0.5,

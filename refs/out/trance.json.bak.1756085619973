@@ -1,7 +1,7 @@
 {
   "trance": {
-    "version": "1.0-rebuild-rebuild",
-    "generated_at": "2025-08-25T01:33:39.973Z",
+    "version": "1.0-rebuild",
+    "generated_at": "2025-08-25T01:24:16.814Z",
     "num_tracks": 5,
     "lufs_target": -14,
     "tol_lufs": 0.5,
@@ -50,8 +50,8 @@
         "tol_db": 2.1
       }
     },
-    "rebuildRunId": "rebuild_1756085619952_f5445196",
-    "last_updated": "2025-08-25T01:33:39.973Z",
+    "rebuildRunId": "rebuild_1756085056794_f5c28169",
+    "last_updated": "2025-08-25T01:24:16.814Z",
     "legacy_compatibility": {
       "lufs_target": -5.9,
       "true_peak_target": -3,
