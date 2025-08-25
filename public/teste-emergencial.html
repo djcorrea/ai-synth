@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚨 TESTE EMERGENCIAL - Comparações</title>
+    <style>body{background:#000;color:#fff;font-family:Arial;padding:20px;}</style>
+</head>
+<body>
+    <h1>🚨 TESTE EMERGENCIAL</h1>
+    <div id="test"></div>
+    
+    <script src="refs/embedded-refs.js?v=1756090000000&emergency=true"></script>
+    <script>
+        setTimeout(() => {
+            const test = document.getElementById('test');
+            
+            if (window.PROD_AI_REF_DATA) {
+                const funk = window.PROD_AI_REF_DATA.funk_mandela;
+                if (funk && funk.legacy_compatibility) {
+                    test.innerHTML = `
+                        <h2>✅ REFERÊNCIAS CARREGADAS</h2>
+                        <p>LUFS Target: ${funk.legacy_compatibility.lufs_target}</p>
+                        <p>DR Target: ${funk.legacy_compatibility.dr_target}</p>
+                        <p>Version: ${funk.version}</p>
+                        <h3>🎯 TESTE COMPARAÇÃO</h3>
+                        <table border="1">
+                            <tr><th>Métrica</th><th>Música</th><th>Referência</th><th>Diff</th></tr>
+                            <tr><td>LUFS</td><td>-6.0</td><td>${funk.legacy_compatibility.lufs_target}</td><td>${(-6.0 - funk.legacy_compatibility.lufs_target).toFixed(1)}</td></tr>
+                            <tr><td>DR</td><td>6.5</td><td>${funk.legacy_compatibility.dr_target}</td><td>${(6.5 - funk.legacy_compatibility.dr_target).toFixed(1)}</td></tr>
+                        </table>
+                    `;
+                } else {
+                    test.innerHTML = '<h2>❌ ESTRUTURA INCORRETA</h2>';
+                }
+            } else {
+                test.innerHTML = '<h2>❌ REFERÊNCIAS NÃO CARREGADAS</h2>';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

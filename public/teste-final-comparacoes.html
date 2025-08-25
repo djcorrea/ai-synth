@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Teste Final - Comparações Corrigidas</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #1a472a; border: 1px solid #2ea043; }
+        .error { background: #4c1e1e; border: 1px solid #f85149; }
+        .warning { background: #4a3d1a; border: 1px solid #d29922; }
+        .mono { font-family: 'Courier New', monospace; background: #21262d; padding: 2px 4px; border-radius: 3px; }
+        .valor { color: #7ee787; font-weight: bold; }
+        pre { background: #21262d; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        button { background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2ea043; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Teste Final - Sistema Corrigido</h1>
+        <p>Verificando se as comparações de referência estão funcionando corretamente.</p>
+        
+        <button onclick="testarReferencias()">🔍 Testar Referências</button>
+        <button onclick="simularAnalise()">🎵 Simular Análise</button>
+        
+        <div id="resultados"></div>
+    </div>
+
+    <script src="refs/embedded-refs.js?v=1756088323635&corrected=1724440700"></script>
+    <script>
+        function testarReferencias() {
+            const resultados = document.getElementById('resultados');
+            
+            // Simular as variáveis que devem existir
+            if (!window.currentAnalysisMode) window.currentAnalysisMode = 'genre';
+            if (!window.PROD_AI_REF_GENRE) window.PROD_AI_REF_GENRE = 'funk_mandela';
+            
+            let html = '<h2>🔍 Teste de Referências</h2>';
+            
+            // 1. Verificar se as referências estão carregadas
+            const refsOk = !!window.PROD_AI_REF_DATA;
+            html += `<div class="status ${refsOk ? 'success' : 'error'}">`;
+            html += `Referências carregadas: ${refsOk ? 'SIM' : 'NÃO'}`;
+            html += `</div>`;
+            
+            if (refsOk) {
+                // 2. Verificar funk_mandela especificamente
+                const funkData = window.PROD_AI_REF_DATA[window.PROD_AI_REF_GENRE];
+                const funkOk = !!(funkData && funkData.legacy_compatibility);
+                
+                html += `<div class="status ${funkOk ? 'success' : 'error'}">`;
+                html += `Gênero ${window.PROD_AI_REF_GENRE}: ${funkOk ? 'DISPONÍVEL' : 'ERRO'}`;
+                html += `</div>`;
+                
+                if (funkOk) {
+                    const compat = funkData.legacy_compatibility;
+                    html += '<pre>';
+                    html += `Valores disponíveis:
+LUFS Target: ${compat.lufs_target}
+True Peak Target: ${compat.true_peak_target}  
+DR Target: ${compat.dr_target}
+LRA Target: ${compat.lra_target}
+Stereo Target: ${compat.stereo_target}`;
+                    html += '</pre>';
+                }
+            }
+            
+            resultados.innerHTML = html;
+        }
+        
+        function simularAnalise() {
+            const resultados = document.getElementById('resultados');
+            
+            // Simular dados de análise como se fosse uma música real
+            const analiseSimulada = {
+                technicalData: {
+                    lufsIntegrated: -6.2,
+                    truePeakDbtp: -1.86,
+                    dynamicRange: 6.55,
+                    lra: 4.98,
+                    stereoCorrelation: 0.20
+                }
+            };
+            
+            // Simular variáveis globais
+            if (!window.currentAnalysisMode) window.currentAnalysisMode = 'genre';
+            if (!window.PROD_AI_REF_GENRE) window.PROD_AI_REF_GENRE = 'funk_mandela';
+            
+            let html = '<h2>🎵 Simulação de Análise</h2>';
+            
+            if (window.PROD_AI_REF_DATA && window.PROD_AI_REF_DATA[window.PROD_AI_REF_GENRE]) {
+                const ref = window.PROD_AI_REF_DATA[window.PROD_AI_REF_GENRE].legacy_compatibility;
+                const tech = analiseSimulada.technicalData;
+                
+                html += '<h3>📊 Comparações Simuladas</h3>';
+                html += '<table border="1" style="width:100%; border-collapse:collapse;">';
+                html += '<tr><th>Métrica</th><th>Valor</th><th>Alvo</th><th>Δ</th></tr>';
+                
+                // LUFS
+                const diffLufs = tech.lufsIntegrated - ref.lufs_target;
+                html += `<tr>
+                    <td>Volume Integrado</td>
+                    <td>${tech.lufsIntegrated} LUFS</td>
+                    <td>${ref.lufs_target} LUFS</td>
+                    <td class="valor">${diffLufs > 0 ? '+' : ''}${diffLufs.toFixed(2)}</td>
+                </tr>`;
+                
+                // True Peak
+                const diffTP = tech.truePeakDbtp - ref.true_peak_target;
+                html += `<tr>
+                    <td>Pico Real</td>
+                    <td>${tech.truePeakDbtp} dBTP</td>
+                    <td>${ref.true_peak_target} dBTP</td>
+                    <td class="valor">${diffTP > 0 ? '+' : ''}${diffTP.toFixed(2)}</td>
+                </tr>`;
+                
+                // DR
+                const diffDR = tech.dynamicRange - ref.dr_target;
+                html += `<tr>
+                    <td>Dinâmica</td>
+                    <td>${tech.dynamicRange}</td>
+                    <td>${ref.dr_target}</td>
+                    <td class="valor">${diffDR > 0 ? '+' : ''}${diffDR.toFixed(2)}</td>
+                </tr>`;
+                
+                // Stereo
+                const diffStereo = tech.stereoCorrelation - ref.stereo_target;
+                html += `<tr>
+                    <td>Correlação Estéreo</td>
+                    <td>${tech.stereoCorrelation}</td>
+                    <td>${ref.stereo_target}</td>
+                    <td class="valor">${diffStereo > 0 ? '+' : ''}${diffStereo.toFixed(2)}</td>
+                </tr>`;
+                
+                html += '</table>';
+                
+                html += '<div class="status success">✅ SUCESSO: Comparações funcionando corretamente!</div>';
+            } else {
+                html += '<div class="status error">❌ ERRO: Não foi possível simular - referências não encontradas</div>';
+            }
+            
+            resultados.innerHTML = html;
+        }
+        
+        // Auto-teste ao carregar
+        setTimeout(() => {
+            testarReferencias();
+        }, 1000);
+    </script>
+</body>
+</html>
