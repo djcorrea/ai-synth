@@ -1363,6 +1363,9 @@ function openAnalysisModalForMode(mode) {
 
 // 🎯 NOVO: Configurar modal baseado no modo selecionado
 function configureModalForMode(mode) {
+    // CORREÇÃO: Garantir que window.currentAnalysisMode esteja sempre definida
+    window.currentAnalysisMode = mode;
+    
     const title = document.getElementById('audioModalTitle');
     const subtitle = document.getElementById('audioModalSubtitle');
     const modeIndicator = document.getElementById('audioModeIndicator');
