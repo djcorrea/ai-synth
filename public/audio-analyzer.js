@@ -1140,6 +1140,40 @@ class AudioAnalyzer {
         hasV2Metrics: !!analysis._v2Metrics,
         hasStems: !!analysis._stems
       });
+
+      // 🛡️ SAFETY GATES: Análise de segurança (apenas warnings, não afeta funcionamento)
+      try {
+        // Implementação inline ultra-segura para não quebrar nada
+        if (window.AUDIT_MODE && analysis.technicalData) {
+          const truePeak = analysis.technicalData.truePeakDbtp || 
+                          analysis.technicalData.true_peak_dbtp ||
+                          (analysis._v2Metrics && analysis._v2Metrics.truePeakDbtp);
+          
+          if (Number.isFinite(truePeak) && truePeak > 0.0) {
+            console.warn(`🛡️ [SAFETY-GATE] True Peak warning: ${truePeak.toFixed(2)} dBTP acima de 0 dBTP`);
+            console.info('💡 [RECOMMENDATION] Considere aplicar limiting para compliance EBU R128');
+            
+            // Adicionar ao analysis sem quebrar estrutura existente
+            if (!analysis.safetyGates) {
+              analysis.safetyGates = {
+                warnings: [{
+                  type: 'truePeak',
+                  severity: truePeak > 1.0 ? 'critical' : 'warning',
+                  value: truePeak,
+                  message: `True Peak acima de 0 dBTP: ${truePeak.toFixed(2)} dBTP`,
+                  recommendation: 'Aplicar limiting para broadcast compliance'
+                }],
+                summary: { totalWarnings: 1, allClear: false }
+              };
+            }
+          } else {
+            console.log('🛡️ [SAFETY-GATE] True Peak OK');
+          }
+        }
+      } catch (safetyError) {
+        console.warn('⚠️ [SAFETY-GATES] Erro na análise de segurança (não crítico):', safetyError.message);
+        // Não propagar erro - safety gates são opcionais
+      }
       
       const t1Full=(performance&&performance.now)?performance.now():Date.now();
       const totalMs = +(t1Full - t0Full).toFixed(1);
