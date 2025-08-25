@@ -1,7 +1,7 @@
 /**
  * 🎵 REFERÊNCIAS MUSICAIS EMBEDDADAS - ATUALIZADAS
  * Médias aritméticas recalculadas corretamente
- * Gerado automaticamente em: 2025-08-25T02:17:11.549Z
+ * Gerado automaticamente em: 2025-08-25T02:16:47.342Z
  */
 
 // 🔥 NOVO SISTEMA: Referências com médias aritméticas corretas
@@ -444,6 +444,40 @@ window.PROD_AI_REF_DATA = {
       "note": "Médias aritméticas recalculadas corretamente, substituindo valores anteriores incorretos"
     }
   },
+  "genres": [
+    {
+      "key": "trance",
+      "label": "Trance"
+    },
+    {
+      "key": "funk_mandela",
+      "label": "Funk Mandela"
+    },
+    {
+      "key": "funk_bruxaria",
+      "label": "Funk Bruxaria"
+    },
+    {
+      "key": "funk_automotivo",
+      "label": "Funk Automotivo"
+    },
+    {
+      "key": "eletronico",
+      "label": "Eletrônico"
+    },
+    {
+      "key": "eletrofunk",
+      "label": "Eletrofunk"
+    },
+    {
+      "key": "funk_consciente",
+      "label": "Funk Consciente"
+    },
+    {
+      "key": "trap",
+      "label": "Trap"
+    }
+  ],
   "trance": {
     "version": "2025-08-recalc-trance-arithmetic-means",
     "generated_at": "2025-08-25T02:15:41.052Z",

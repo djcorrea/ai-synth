@@ -1,55 +1,75 @@
 {
   "funk_automotivo": {
-    "version": "v2.0",
-    "generated_at": "2025-08-23T16:41:07.468Z",
-    "num_tracks": 9,
-    "aggregation_method": "linear_domain",
-    "lufs_target": -8,
-    "tol_lufs": 1.2,
-    "true_peak_target": -9.58,
-    "tol_true_peak": 2.5,
-    "dr_target": 8.1,
-    "tol_dr": 2.0,
-    "lra_target": 6.6,
-    "tol_lra": 4.0,
-    "stereo_target": 0.3,
-    "tol_stereo": 0.15,
-    "calor_target": -8.23,
-    "brilho_target": -16.56,
-    "clareza_target": -2.63,
-    "bands": {
-      "sub": {
-        "target_db": -7.6,
-        "tol_db": 6.0
-      },
-      "low_bass": {
-        "target_db": -6.6,
-        "tol_db": 4.5
-      },
-      "upper_bass": {
-        "target_db": -11.4,
-        "tol_db": 3.5
-      },
-      "low_mid": {
-        "target_db": -8.2,
-        "tol_db": 3.5
-      },
-      "mid": {
-        "target_db": -6.7,
-        "tol_db": 3.0
-      },
-      "high_mid": {
-        "target_db": -12.8,
-        "tol_db": 4.5
-      },
-      "brilho": {
-        "target_db": -16.6,
-        "tol_db": 4.5
-      },
-      "presenca": {
-        "target_db": -22.7,
-        "tol_db": 5.0
+    "version": "2025-08-recalc-funk_automotivo-arithmetic-means",
+    "generated_at": "2025-08-25T02:15:41.007Z",
+    "num_tracks": 12,
+    "aggregation_method": "arithmetic_mean_corrected",
+    "legacy_compatibility": {
+      "lufs_target": -6.2,
+      "tol_lufs": 1.5,
+      "tol_lufs_min": 1.5,
+      "tol_lufs_max": 1.5,
+      "true_peak_target": -2.8,
+      "tol_true_peak": 1,
+      "dr_target": 6.8,
+      "tol_dr": 2,
+      "dr_stat_target": 6.8,
+      "tol_dr_stat": 2,
+      "lra_target": 8.2,
+      "tol_lra": 1.6,
+      "lra_min": 6.56,
+      "lra_max": 9.84,
+      "stereo_target": 0.4,
+      "tol_stereo": 0.15,
+      "bands": {
+        "sub": {
+          "target_db": -4.5,
+          "tol_db": 1.5,
+          "severity": "soft"
+        },
+        "low_bass": {
+          "target_db": -3.2,
+          "tol_db": 1.5,
+          "severity": "soft"
+        },
+        "upper_bass": {
+          "target_db": -5.1,
+          "tol_db": 1.5,
+          "severity": "soft"
+        },
+        "low_mid": {
+          "target_db": -2.8,
+          "tol_db": 1.5,
+          "severity": "soft"
+        },
+        "mid": {
+          "target_db": 0.5,
+          "tol_db": 1.5,
+          "severity": "soft"
+        },
+        "high_mid": {
+          "target_db": -8.2,
+          "tol_db": 1.6,
+          "severity": "soft"
+        },
+        "brilho": {
+          "target_db": -12.5,
+          "tol_db": 2.5,
+          "severity": "soft"
+        },
+        "presenca": {
+          "target_db": -16.8,
+          "tol_db": 3.4,
+          "severity": "soft"
+        }
       }
+    },
+    "recalculation_info": {
+      "method": "arithmetic_mean",
+      "calculated_at": "2025-08-25T02:15:41.007Z",
+      "source": "recalcular-referencias-completo.js",
+      "validation": "17_tracks_processed",
+      "note": "Médias aritméticas recalculadas corretamente, substituindo valores anteriores incorretos"
     }
   }
 }
