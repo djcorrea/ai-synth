@@ -713,23 +713,19 @@ async function ensureEmbeddedRefsReady(timeoutMs = 2500) {
 }
 
 // Helper: buscar JSON tentando múltiplos caminhos (resiliente a diferenças local x produção)
-async function fetchRefJsonWithFallback(paths) {
+// 🎯 FETCH PARA MANIFESTOS (função separada, mantém comportamento antigo)
+async function fetchManifestWithFallback(paths) {
     let lastErr = null;
     for (const p of paths) {
         if (!p) continue;
         try {
-            // Cache-busting para evitar CDN retornar 404 ou versões antigas
             const hasQ = p.includes('?');
             const url = p + (hasQ ? '&' : '?') + 'v=' + Date.now();
-            if (__DEBUG_ANALYZER__) console.log('[refs] tentando fetch:', url);
             const res = await fetch(url, {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
             });
             if (res.ok) {
-                if (__DEBUG_ANALYZER__) console.log('[refs] OK:', p);
-                
-                // Verificar se a resposta tem conteúdo JSON válido
                 const text = await res.text();
                 if (text.trim()) {
                     try {
@@ -738,20 +734,122 @@ async function fetchRefJsonWithFallback(paths) {
                         console.warn('[refs] JSON inválido em', p, ':', text.substring(0, 100));
                         throw new Error(`JSON inválido em ${p}`);
                     }
-                } else {
-                    console.warn('[refs] Resposta vazia em', p);
-                    throw new Error(`Resposta vazia em ${p}`);
                 }
             } else {
-                if (__DEBUG_ANALYZER__) console.warn('[refs] Falha', res.status, 'em', p);
                 lastErr = new Error(`HTTP ${res.status} @ ${p}`);
             }
         } catch (e) {
-            if (__DEBUG_ANALYZER__) console.warn('[refs] Erro fetch', p, e?.message || e);
             lastErr = e;
         }
     }
     throw lastErr || new Error('Falha ao carregar JSON de referência (todas as rotas testadas)');
+}
+
+async function fetchRefJsonWithFallback(genre) {
+    // 🎯 FALLBACK DETERMINÍSTICO: exatamente 3 tentativas na ordem especificada
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    
+    // 1) Primeira tentativa: ${origin}/public/refs/out/${genre}.json
+    try {
+        const url1 = `${origin}/public/refs/out/${genre}.json?v=${Date.now()}`;
+        console.log(`🔍 [REFS] Tentativa 1: ${url1}`);
+        
+        const res = await fetch(url1, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+        });
+        
+        if (res.ok) {
+            const text = await res.text();
+            if (text.trim()) {
+                const data = JSON.parse(text);
+                console.log(`✅ [REFS] Sucesso via external (public): ${genre}`);
+                return { source: 'external', data };
+            }
+        } else if (res.status === 404) {
+            console.log(`❌ [REFS] 404 em tentativa 1: ${url1}`);
+        } else {
+            console.log(`⚠️ [REFS] HTTP ${res.status} em tentativa 1: ${url1}`);
+        }
+    } catch (error) {
+        console.log(`❌ [REFS] Erro em tentativa 1: ${error.message}`);
+    }
+    
+    // 2) Segunda tentativa: ${origin}/refs/out/${genre}.json
+    try {
+        const url2 = `${origin}/refs/out/${genre}.json?v=${Date.now()}`;
+        console.log(`🔍 [REFS] Tentativa 2: ${url2}`);
+        
+        const res = await fetch(url2, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+        });
+        
+        if (res.ok) {
+            const text = await res.text();
+            if (text.trim()) {
+                const data = JSON.parse(text);
+                console.log(`✅ [REFS] Sucesso via external (root): ${genre}`);
+                return { source: 'external', data };
+            }
+        } else if (res.status === 404) {
+            console.log(`❌ [REFS] 404 em tentativa 2: ${url2}`);
+        } else {
+            console.log(`⚠️ [REFS] HTTP ${res.status} em tentativa 2: ${url2}`);
+        }
+    } catch (error) {
+        console.log(`❌ [REFS] Erro em tentativa 2: ${error.message}`);
+    }
+    
+    // 3) Fallback final: embedded/inline (__INLINE_EMBEDDED_REFS__)
+    console.log(`🔄 [REFS] Fallback para embedded: ${genre}`);
+    
+    try {
+        // Verificar window.__EMBEDDED_REFS__ primeiro
+        if (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__[genre]) {
+            console.log(`✅ [REFS] Sucesso via embedded (window): ${genre}`);
+            return { source: 'embedded', data: window.__EMBEDDED_REFS__[genre] };
+        }
+        
+        // Verificar __INLINE_EMBEDDED_REFS__ 
+        if (typeof __INLINE_EMBEDDED_REFS__ !== 'undefined' && __INLINE_EMBEDDED_REFS__ && __INLINE_EMBEDDED_REFS__[genre]) {
+            console.log(`✅ [REFS] Sucesso via embedded (inline): ${genre}`);
+            return { source: 'embedded', data: __INLINE_EMBEDDED_REFS__[genre] };
+        }
+        
+        // Se não encontrou nem em embedded
+        console.warn(`⚠️ [REFS] Gênero '${genre}' não encontrado nem em external nem em embedded`);
+        
+        // Retornar referência padrão básica para não quebrar o sistema
+        const defaultRef = {
+            version: '1.0.0',
+            genre: genre,
+            lufs_target: -14.0,
+            true_peak_target: -1.0,
+            stereo_target: 0.0,
+            num_tracks: 0,
+            frequency_response: {},
+            note: 'Referência padrão gerada automaticamente'
+        };
+        
+        console.log(`🔧 [REFS] Usando referência padrão para: ${genre}`);
+        return { source: 'embedded', data: defaultRef };
+        
+    } catch (error) {
+        console.error(`❌ [REFS] Erro ao acessar embedded refs: ${error.message}`);
+        
+        // Último recurso: referência mínima
+        const minimalRef = {
+            version: '1.0.0',
+            genre: genre || 'unknown',
+            lufs_target: -14.0,
+            true_peak_target: -1.0,
+            stereo_target: 0.0,
+            num_tracks: 0
+        };
+        
+        return { source: 'embedded', data: minimalRef };
+    }
 }
 
 // 📚 Carregar manifesto de gêneros (opcional). Se ausente, manter fallback.
@@ -768,7 +866,7 @@ async function loadGenreManifest() {
     // 2) Se permitido, tentar rede
     if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
         try {
-            const json = await fetchRefJsonWithFallback([
+            const json = await fetchManifestWithFallback([
                 `/refs/out/genres.json`,
                 `/public/refs/out/genres.json`,
                 `refs/out/genres.json`,
@@ -848,18 +946,15 @@ async function loadReferenceData(genre) {
         console.log('🔍 DEBUG loadReferenceData início:', { genre, bypassCache });
         
         // PRIORIDADE CORRIGIDA: external > embedded > fallback
-        // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
+        // 1) Tentar carregar JSON externo primeiro usando fetchRefJsonWithFallback
         console.log('🌐 Tentando carregar JSON externo primeiro...');
-        try {
-            const version = __refDataCache[genre]?.version || 'force';
-            const json = await fetchRefJsonWithFallback([
-                `/refs/out/${genre}.json?v=${version}`,
-                `/public/refs/out/${genre}.json?v=${version}`,
-                `refs/out/${genre}.json?v=${version}`,
-                `../refs/out/${genre}.json?v=${version}`
-            ]);
-            const rootKey = Object.keys(json)[0];
-            const data = json[rootKey];
+        const result = await fetchRefJsonWithFallback(genre);
+        
+        if (result.source === 'external') {
+            // Processar JSON externo
+            const rootKey = Object.keys(result.data)[0];
+            const data = result.data[rootKey] || result.data;
+            
             if (data && typeof data === 'object' && data.version) {
                 const enrichedNet = enrichReferenceObject(data, genre);
                 __refDataCache[genre] = enrichedNet;
@@ -871,7 +966,7 @@ async function loadReferenceData(genre) {
                 console.log('🎯 REFS DIAGNOSTIC:', {
                     genre,
                     source: 'external',
-                    path: `/refs/out/${genre}.json`,
+                    path: `external refs endpoint`,
                     version: data.version,
                     num_tracks: data.num_tracks,
                     lufs_target: data.lufs_target,
@@ -879,102 +974,40 @@ async function loadReferenceData(genre) {
                     stereo_target: data.stereo_target
                 });
                 
-                updateRefStatus('✔ referências aplicadas', '#0d6efd');
+                updateRefStatus('✔ referências aplicadas (external)', '#0d6efd');
                 try { buildAggregatedRefStats(); } catch {}
                 return enrichedNet;
             }
-        } catch (netError) {
-            console.log('❌ External refs failed:', netError.message);
-            console.log('🔄 Fallback para embedded refs...');
-        }
-        
-        // 2) Fallback para referências embutidas (embedded)
-        const embWin = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre && window.__EMBEDDED_REFS__.byGenre[genre]) || null;
-        const embInline = __INLINE_EMBEDDED_REFS__?.byGenre?.[genre] || null;
-        const useData = embWin || embInline;
-        if (useData && typeof useData === 'object') {
-            const enriched = enrichReferenceObject(structuredClone(useData), genre);
-            __refDataCache[genre] = enriched;
-            __activeRefData = enriched;
+        } else if (result.source === 'embedded') {
+            // Processar embedded/fallback
+            const data = result.data;
+            const enrichedEmb = enrichReferenceObject(data, genre);
+            __refDataCache[genre] = enrichedEmb;
+            __activeRefData = enrichedEmb;
             __activeRefGenre = genre;
-            window.PROD_AI_REF_DATA = enriched;
+            window.PROD_AI_REF_DATA = enrichedEmb;
             
-            // Log de diagnóstico
             console.log('🎯 REFS DIAGNOSTIC:', {
                 genre,
                 source: 'embedded',
-                path: embWin ? 'window.__EMBEDDED_REFS__' : '__INLINE_EMBEDDED_REFS__',
-                version: 'embedded',
-                num_tracks: useData.num_tracks || 'unknown',
-                lufs_target: useData.lufs_target,
-                true_peak_target: useData.true_peak_target,
-                stereo_target: useData.stereo_target
+                path: 'embedded/inline',
+                version: data.version || '1.0.0',
+                num_tracks: data.num_tracks || 0,
+                lufs_target: data.lufs_target || -14.0,
+                true_peak_target: data.true_peak_target || -1.0,
+                stereo_target: data.stereo_target || 0.0
             });
             
-            updateRefStatus('✔ referências embutidas', '#0d6efd');
+            updateRefStatus('✔ referências aplicadas (embedded)', '#ffc107');
             try { buildAggregatedRefStats(); } catch {}
-            return enriched;
+            return enrichedEmb;
         }
         
-        // 3) Se ainda nada funcionou e REFS_ALLOW_NETWORK está ativo (legacy path)
-        if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
-            console.log('⚠️ Using legacy REFS_ALLOW_NETWORK path - should not happen with new logic');
-        }
-        
-        // 4) Último recurso: trance inline (fallback)
-        const fallback = __INLINE_EMBEDDED_REFS__?.byGenre?.trance;
-        if (fallback) {
-            const enrichedFb = enrichReferenceObject(structuredClone(fallback), 'trance');
-            __refDataCache['trance'] = enrichedFb;
-            __activeRefData = enrichedFb;
-            __activeRefGenre = 'trance';
-            window.PROD_AI_REF_DATA = enrichedFb;
-            
-            // Log de diagnóstico
-            console.log('🎯 REFS DIAGNOSTIC:', {
-                genre,
-                source: 'fallback',
-                path: '__INLINE_EMBEDDED_REFS__.trance',
-                version: 'fallback',
-                num_tracks: fallback.num_tracks || 'unknown',
-                lufs_target: fallback.lufs_target,
-                true_peak_target: fallback.true_peak_target,
-                stereo_target: fallback.stereo_target
-            });
-            
-            updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
-            try { buildAggregatedRefStats(); } catch {}
-            return enrichedFb;
-        }
+        // Se chegou até aqui, a fetchRefJsonWithFallback já retornou embedded
         throw new Error('Sem referências disponíveis');
+        
     } catch (e) {
         console.warn('Falha ao carregar referências', genre, e);
-        // Fallback: tentar EMBEDDED
-        try {
-            const embMap = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre) || __INLINE_EMBEDDED_REFS__.byGenre || {};
-            const emb = embMap[genre];
-            if (emb && typeof emb === 'object') {
-                const enrichedEmb = enrichReferenceObject(structuredClone(emb), genre);
-                __refDataCache[genre] = enrichedEmb;
-                __activeRefData = enrichedEmb;
-                __activeRefGenre = genre;
-                window.PROD_AI_REF_DATA = enrichedEmb;
-                updateRefStatus('✔ referências embutidas', '#0d6efd');
-                try { buildAggregatedRefStats(); } catch {}
-                return enrichedEmb;
-            }
-            // Se o gênero específico não existir, usar um padrão seguro (trance) se disponível
-            if (embMap && embMap.trance) {
-                const enrichedEmbTr = enrichReferenceObject(structuredClone(embMap.trance), 'trance');
-                __refDataCache['trance'] = enrichedEmbTr;
-                __activeRefData = enrichedEmbTr;
-                __activeRefGenre = 'trance';
-                window.PROD_AI_REF_DATA = enrichedEmbTr;
-                updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
-                try { buildAggregatedRefStats(); } catch {}
-                return enrichedEmbTr;
-            }
-        } catch(_) {}
         updateRefStatus('⚠ falha refs', '#992222');
         return null;
     }
