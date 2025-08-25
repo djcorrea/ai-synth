@@ -1,6 +1,4 @@
-refs/wav/
-refs/**/samples/
-refs/**/*.wav
+refs/
 *.wav
 *.mp3
 *.zip

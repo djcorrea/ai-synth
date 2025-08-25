@@ -526,7 +526,7 @@ window.diagnosRefSources = function(genre = null) {
     });
     
     // Test fetch do JSON externo
-    const testUrl = `/refs/out/${targetGenre}.json?v=diagnostic`;
+    const testUrl = `/public/refs/out/${targetGenre}.json?v=diagnostic`;
     fetch(testUrl).then(r => r.json()).then(j => {
         const data = j[targetGenre];
         console.log('🌐 EXTERNAL JSON TEST:', {
@@ -825,9 +825,9 @@ async function loadGenreManifest() {
     if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
         try {
             const json = await fetchRefJsonWithFallback([
+                `/public/refs/out/genres.json`,
                 `/refs/out/genres.json`,
                 `refs/out/genres.json`,
-                `/public/refs/out/genres.json`,
                 `../refs/out/genres.json`
             ]);
             if (json && Array.isArray(json.genres)) { __genreManifest = json.genres; return __genreManifest; }
@@ -909,9 +909,9 @@ async function loadReferenceData(genre) {
         try {
             const version = Date.now(); // Force cache bust
             const json = await fetchRefJsonWithFallback([
+                `/public/refs/out/${genre}.json?v=${version}`,
                 `/refs/out/${genre}.json?v=${version}`,
                 `refs/out/${genre}.json?v=${version}`,
-                `/public/refs/out/${genre}.json?v=${version}`,
                 `../refs/out/${genre}.json?v=${version}`
             ]);
             const rootKey = Object.keys(json)[0];
@@ -927,7 +927,7 @@ async function loadReferenceData(genre) {
                 console.log('🎯 REFS DIAGNOSTIC:', {
                     genre,
                     source: 'external',
-                    path: `/refs/out/${genre}.json`,
+                    path: `/public/refs/out/${genre}.json`,
                     version: data.version,
                     num_tracks: data.num_tracks,
                     lufs_target: data.lufs_target,
@@ -1363,9 +1363,6 @@ function openAnalysisModalForMode(mode) {
 
 // 🎯 NOVO: Configurar modal baseado no modo selecionado
 function configureModalForMode(mode) {
-    // CORREÇÃO: Garantir que window.currentAnalysisMode esteja sempre definida
-    window.currentAnalysisMode = mode;
-    
     const title = document.getElementById('audioModalTitle');
     const subtitle = document.getElementById('audioModalSubtitle');
     const modeIndicator = document.getElementById('audioModeIndicator');
@@ -4380,96 +4377,6 @@ if (typeof window !== 'undefined' && !window.__testConsistency) {
     };
 }
 
-// 🎯 IMPLEMENTAÇÃO FALTANTE: Display Comparison Section
-function displayComparisonSection(comparisonData, suggestions) {
-    console.log('🔍 [DEBUG] displayComparisonSection chamada com:', { comparisonData, suggestions });
-    
-    const results = document.getElementById('results');
-    if (!results) {
-        console.error('❌ Results container não encontrado');
-        return;
-    }
-
-    // � FORÇA BRUTA: Se não tem dados corretos, usar valores da referência Funk Mandela diretamente
-    const FUNK_MANDELA_TARGETS = {
-        lufs: -5.0,
-        truePeak: -2.9,
-        dynamicRange: 6.55,
-        stereoCorrelation: 0.12
-    };
-
-    // Tentar acessar dados reais ou usar fallback
-    let actualData = comparisonData;
-    if (comparisonData.details) {
-        actualData = comparisonData.details;
-    }
-    
-    console.log('🔍 [DEBUG] actualData:', actualData);
-
-    // Função que FORÇA valores corretos se N/A
-    function generateComparisonRowForced(label, dataKey, unit, targetValue) {
-        let userValue = 'N/A';
-        let refValue = targetValue.toFixed(1);
-        let diff = 'N/A';
-        let diffClass = 'neutral';
-
-        // Tentar extrair valor do usuário de múltiplas fontes possíveis
-        if (actualData && actualData[dataKey]) {
-            const obj = actualData[dataKey];
-            if (obj.user !== undefined && obj.user !== null) {
-                userValue = obj.user.toFixed(1);
-                if (obj.reference !== undefined && obj.reference !== null) {
-                    refValue = obj.reference.toFixed(1);
-                }
-                if (obj.difference !== undefined && obj.difference !== null) {
-                    diff = (obj.difference > 0 ? '+' : '') + obj.difference.toFixed(1);
-                    diffClass = obj.difference > 0 ? 'positive' : obj.difference < 0 ? 'negative' : 'neutral';
-                }
-            }
-        }
-        
-        return `
-            <div class="comparison-row">
-                <div class="comparison-label">${label}</div>
-                <div class="comparison-values">
-                    <span class="user-value">Valor: ${userValue}${unit}</span>
-                    <span class="ref-value">Alvo: ${refValue}${unit}</span>
-                    <span class="difference-indicator ${diffClass}">Δ: ${diff}${unit}</span>
-                </div>
-            </div>
-        `;
-    }
-
-    // Remover seção anterior se existir
-    const existingSection = results.querySelector('.reference-comparison-section');
-    if (existingSection) {
-        existingSection.remove();
-    }
-
-    // Criar nova seção de comparação COM VALORES FORÇADOS
-    const comparisonSection = document.createElement('div');
-    comparisonSection.className = 'reference-comparison-section';
-    comparisonSection.innerHTML = `
-        <div class="comparison-header">
-            <h4>🎯 COMPARAÇÃO DE REFERÊNCIA (FUNK_MANDELA)</h4>
-        </div>
-        
-        <div class="comparison-content">
-            <div class="comparison-grid">
-                ${generateComparisonRowForced('Volume Integrado (padrão streaming)', 'loudness', ' LUFS', FUNK_MANDELA_TARGETS.lufs)}
-                ${generateComparisonRowForced('Pico real (dBTP)', 'peak', ' dBTP', FUNK_MANDELA_TARGETS.truePeak)}
-                ${generateComparisonRowForced('Dinâmica (diferença entre alto/baixo)', 'dynamic', ' dB', FUNK_MANDELA_TARGETS.dynamicRange)}
-                ${generateComparisonRowForced('Correlação Estéreo (largura)', 'stereo', '', FUNK_MANDELA_TARGETS.stereoCorrelation)}
-            </div>
-        </div>
-    `;
-
-    // Inserir no topo da seção de resultados
-    results.insertBefore(comparisonSection, results.firstChild);
-    
-    console.log('✅ [DEBUG] Seção de comparação adicionada ao DOM com valores FORÇADOS');
-}
-
 // 🎯 FINAL: Display Reference Results
 window.displayReferenceResults = function(referenceResults) {
     window.logReferenceEvent('displaying_reference_results', {
@@ -4480,8 +4387,8 @@ window.displayReferenceResults = function(referenceResults) {
     try {
         const { comparisonData, referenceSuggestions, baseline_source } = referenceResults;
         
-        if (baseline_source !== 'reference' && baseline_source !== 'reference_audio') {
-            throw new Error(`Invalid baseline source: ${baseline_source}. Expected 'reference' or 'reference_audio'`);
+        if (baseline_source !== 'reference') {
+            throw new Error(`Invalid baseline source: ${baseline_source}. Expected 'reference'`);
         }
         
         if (!comparisonData) {

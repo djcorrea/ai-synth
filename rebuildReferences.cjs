@@ -22,7 +22,7 @@ const crypto = require('crypto');
 const CONFIG = {
   refsDir: './refs',
   outputDir: './refs/out',
-  genresDirs: ['funk_mandela', 'eletronico', 'funk_bruxaria', 'trance'], // removido 'trap'
+  genresDirs: ['funk_mandela', 'eletronico', 'funk_bruxaria', 'trance', 'trap'],
   backupSuffix: '.bak',
   tempSuffix: '.tmp',
   validationTolerance: 0.1, // % para soma de bandas
@@ -228,30 +228,13 @@ class GenreProcessor {
   }
   
   _detectWAVFiles() {
-    // Tentar pasta principal primeiro
-    if (fs.existsSync(this.wavsDir)) {
-      const mainFiles = fs.readdirSync(this.wavsDir)
-        .filter(file => file.toLowerCase().endsWith('.wav'));
-      
-      if (mainFiles.length > 0) {
-        return mainFiles.sort();
-      }
+    if (!fs.existsSync(this.wavsDir)) {
+      return [];
     }
     
-    // Tentar subpasta 'samples'
-    const samplesDir = path.join(this.wavsDir, 'samples');
-    if (fs.existsSync(samplesDir)) {
-      const sampleFiles = fs.readdirSync(samplesDir)
-        .filter(file => file.toLowerCase().endsWith('.wav'));
-      
-      if (sampleFiles.length > 0) {
-        // Atualizar wavsDir para apontar para samples
-        this.wavsDir = samplesDir;
-        return sampleFiles.sort();
-      }
-    }
-    
-    return [];
+    return fs.readdirSync(this.wavsDir)
+      .filter(file => file.toLowerCase().endsWith('.wav'))
+      .sort();
   }
   
   _calculateAverages() {
