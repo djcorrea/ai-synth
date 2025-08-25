@@ -1,7 +1,7 @@
 {
   "version": 2,
   "env": {
-    "FORCE_REBUILD": "1756090000000",
+        "FORCE_REBUILD": "20241230_020901_BRUTAL_FORCE",
     "NODE_ENV": "production"
   },
   "builds": [

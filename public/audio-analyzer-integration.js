@@ -3828,239 +3828,175 @@ function renderSmartSummary(analysis){
 }
 
 function renderReferenceComparisons(analysis) {
+    // 🔥 BRUTAL FORCE REPLACEMENT - Função simplificada para forçar comparações
+    console.log('� BRUTAL FORCE: Iniciando renderReferenceComparisons simplificada');
+    
     const container = document.getElementById('referenceComparisons');
-    if (!container) return;
+    if (!container) {
+        console.error('🔥 BRUTAL: Container referenceComparisons não encontrado');
+        return;
+    }
     
-    // 🔧 DEBUG: Log para diagnosticar problema
-    console.log('🔍 renderReferenceComparisons DEBUG:', {
-        analysis: !!analysis,
-        __activeRefData: !!__activeRefData,
-        PROD_AI_REF_DATA: !!window.PROD_AI_REF_DATA,
-        PROD_AI_REF_GENRE: window.PROD_AI_REF_GENRE,
-        analysisMode: analysis?.analysisMode,
-        technicalData: !!analysis?.technicalData
-    });
+    // Forçar obtenção de dados de referência diretamente
+    let refData = null;
+    let genreName = '';
     
-    // 🎯 DETECÇÃO DE MODO REFERÊNCIA - Usar dados da referência em vez de gênero
-    const isReferenceMode = analysis.analysisMode === 'reference' || 
-                           analysis.baseline_source === 'reference' ||
-                           (analysis.comparison && analysis.comparison.baseline_source === 'reference');
-    
-    let ref, titleText;
-    
-    if (isReferenceMode && analysis.referenceMetrics) {
-        // Modo referência: usar métricas extraídas do áudio de referência
-        ref = {
-            lufs_target: analysis.referenceMetrics.lufs,
-            true_peak_target: analysis.referenceMetrics.truePeakDbtp,
-            dr_target: analysis.referenceMetrics.dynamicRange,
-            lra_target: analysis.referenceMetrics.lra,
-            stereo_target: analysis.referenceMetrics.stereoCorrelation,
-            tol_lufs: 0.2,
-            tol_true_peak: 0.2,
-            tol_dr: 0.5,
-            tol_lra: 0.5,
-            tol_stereo: 0.05,
-            bands: analysis.referenceMetrics.bands || null
-        };
-        titleText = "Música de Referência";
-    } else {
-        // Modo gênero: usar targets de gênero como antes
-        ref = __activeRefData;
-        titleText = window.PROD_AI_REF_GENRE;
-        
-        // 🔥 CORREÇÃO CRÍTICA: Se __activeRefData não existe, usar window.PROD_AI_REF_DATA
-        if (!ref && window.PROD_AI_REF_DATA && window.PROD_AI_REF_GENRE) {
-            const genreData = window.PROD_AI_REF_DATA[window.PROD_AI_REF_GENRE];
-            if (genreData && genreData.legacy_compatibility) {
-                ref = genreData.legacy_compatibility;
-                console.log('🔧 RECUPERAÇÃO: Usando window.PROD_AI_REF_DATA para comparação:', window.PROD_AI_REF_GENRE);
-            }
-        }
-        
-        if (!ref) { 
-            console.error('❌ ERRO: Nenhuma referência encontrada para comparação');
-            container.innerHTML = '<div style="font-size:12px;opacity:.6">Referências não carregadas</div>'; 
-            return; 
+    // 1. Tentar obter do window.PROD_AI_REF_DATA primeiro
+    if (window.PROD_AI_REF_DATA && window.PROD_AI_REF_GENRE) {
+        const genre = window.PROD_AI_REF_GENRE;
+        const genreData = window.PROD_AI_REF_DATA[genre];
+        if (genreData && genreData.legacy_compatibility) {
+            refData = genreData.legacy_compatibility;
+            genreName = genre;
+            console.log('� BRUTAL: Usando window.PROD_AI_REF_DATA para:', genre);
         }
     }
     
-    const tech = analysis.technicalData || {};
+    // 2. Fallback para __activeRefData
+    if (!refData && window.__activeRefData) {
+        refData = window.__activeRefData;
+        genreName = window.PROD_AI_REF_GENRE || 'Referência';
+        console.log('🔥 BRUTAL: Fallback para __activeRefData');
+    }
     
-    // 🔧 DEBUG: Log para verificar métricas disponíveis
-    console.log('🔍 Métricas disponíveis:', {
+    // 3. Se ainda não tem dados, mostrar erro
+    if (!refData) {
+        console.error('🔥 BRUTAL: Nenhum dado de referência encontrado');
+        container.innerHTML = '<div style="color:#ff7b7b;font-size:12px;padding:10px;">❌ Dados de referência não carregados</div>';
+        return;
+    }
+    
+    // Obter dados técnicos da análise
+    const tech = analysis?.technicalData || {};
+    
+    console.log('� BRUTAL: Dados obtidos:', {
+        refData: !!refData,
+        genreName,
         tech_keys: Object.keys(tech),
-        lufsIntegrated: tech.lufsIntegrated,
-        truePeakDbtp: tech.truePeakDbtp,
-        dynamicRange: tech.dynamicRange,
-        stereoCorrelation: tech.stereoCorrelation
+        lufs: tech.lufsIntegrated,
+        truePeak: tech.truePeakDbtp,
+        dr: tech.dynamicRange
     });
     
-    // Mapeamento de métricas
-    const rows = [];
-    const nf = (n, d=2) => Number.isFinite(n) ? n.toFixed(d) : '—';
-    const pushRow = (label, val, target, tol, unit='') => {
-        // Usar sistema de enhancement se disponível
-        const enhancedLabel = (typeof window !== 'undefined' && window.enhanceRowLabel) 
-            ? window.enhanceRowLabel(label, label.toLowerCase().replace(/[^a-z]/g, '')) 
-            : label;
-            
-        // Tratar target null ou NaN como N/A explicitamente
-        const targetIsNA = (target == null || target === '' || (typeof target==='number' && !Number.isFinite(target)));
-        if (!Number.isFinite(val) && targetIsNA) return; // nada útil
-        if (targetIsNA) {
-            rows.push(`<tr>
-                <td>${enhancedLabel}</td>
-                <td>${Number.isFinite(val)?nf(val)+unit:'—'}</td>
-                <td colspan="2" style="opacity:.55">N/A</td>
-            </tr>`);
-            return;
-        }
-        const diff = Number.isFinite(val) && Number.isFinite(target) ? (val - target) : null;
-        
-        // Usar nova função de célula melhorada se disponível
-        let diffCell;
-        if (typeof window !== 'undefined' && window.createEnhancedDiffCell) {
-            diffCell = window.createEnhancedDiffCell(diff, unit, tol);
-        } else {
-            // Fallback para sistema antigo
-            let cssClass = 'na';
-            if (Number.isFinite(diff) && Number.isFinite(tol) && tol > 0) {
-                const adiff = Math.abs(diff);
-                if (adiff <= tol) {
-                    cssClass = 'ok';
-                } else {
-                    const n = adiff / tol;
-                    if (n <= 2) {
-                        cssClass = 'yellow';
-                    } else {
-                        cssClass = 'warn';
-                    }
-                }
-            }
-            
-            diffCell = Number.isFinite(diff)
-                ? `<td class="${cssClass}">${diff>0?'+':''}${nf(diff)}${unit}</td>`
-                : '<td class="na" style="opacity:.55">—</td>';
+    // Função helper para formatar números
+    const fmt = (num, decimals = 2) => {
+        return Number.isFinite(num) ? num.toFixed(decimals) : '—';
+    };
+    
+    // Função para calcular diferença e classe CSS
+    const calcDiff = (val, target, tolerance) => {
+        if (!Number.isFinite(val) || !Number.isFinite(target)) {
+            return { diff: '—', className: 'na' };
         }
         
-        rows.push(`<tr>
-            <td>${enhancedLabel}</td>
-            <td>${Number.isFinite(val)?nf(val)+unit:'—'}</td>
-            <td>${Number.isFinite(target)?nf(target)+unit:'N/A'}${tol!=null?`<span class="tol">±${nf(tol,2)}</span>`:''}</td>
-            ${diffCell}
-        </tr>`);
-    };
-    // 🎯 CENTRALIZAÇÃO DAS MÉTRICAS - Função de acesso para comparação por referência
-    const getMetricForRef = (metricPath, fallbackPath = null) => {
-        // Prioridade: analysis.metrics > tech (technicalData) > fallback
-        const centralizedValue = analysis.metrics && getNestedValue(analysis.metrics, metricPath);
-        if (Number.isFinite(centralizedValue)) {
-            // Log temporário para validação
-            if (typeof window !== 'undefined' && window.METRICS_REF_VALIDATION !== false) {
-                const legacyValue = fallbackPath ? getNestedValue(tech, fallbackPath) : getNestedValue(tech, metricPath);
-                if (Number.isFinite(legacyValue) && Math.abs(centralizedValue - legacyValue) > 0.01) {
-                    console.warn(`🎯 REF_METRIC_DIFF: ${metricPath} centralized=${centralizedValue} vs legacy=${legacyValue}`);
-                }
-            }
-            return centralizedValue;
-        }
+        const diff = val - target;
+        const absDiff = Math.abs(diff);
         
-        // Fallback para technicalData legado
-        const legacyValue = fallbackPath ? getNestedValue(tech, fallbackPath) : getNestedValue(tech, metricPath);
-        return Number.isFinite(legacyValue) ? legacyValue : null;
-    };
-    
-    const getNestedValue = (obj, path) => {
-        return path.split('.').reduce((current, key) => current?.[key], obj);
-    };
-    
-    // Usar somente métricas reais (sem fallback para RMS/Peak, que têm unidades e conceitos distintos)
-    // Função para obter o valor LUFS integrado usando métricas centralizadas
-    const getLufsIntegratedValue = () => {
-        return getMetricForRef('lufs_integrated', 'lufsIntegrated');
-    };
-    
-    pushRow('Loudness Integrado (LUFS)', getLufsIntegratedValue(), ref.lufs_target, ref.tol_lufs, ' LUFS');
-    pushRow('Pico Real (dBTP)', getMetricForRef('true_peak_dbtp', 'truePeakDbtp'), ref.true_peak_target, ref.tol_true_peak, ' dBTP');
-    pushRow('DR', getMetricForRef('dynamic_range', 'dynamicRange'), ref.dr_target, ref.tol_dr, '');
-    pushRow('Faixa de Loudness – LRA (LU)', getMetricForRef('lra'), ref.lra_target, ref.tol_lra, ' LU');
-    pushRow('Stereo Corr.', getMetricForRef('stereo_correlation', 'stereoCorrelation'), ref.stereo_target, ref.tol_stereo, '');
-    
-    // Bandas detalhadas Fase 2: usar métricas centralizadas para bandas
-    const centralizedBands = analysis.metrics?.bands;
-    const legacyBandEnergies = tech.bandEnergies || null;
-    
-    // Priorizar bandas centralizadas se disponíveis
-    const bandsToUse = centralizedBands && Object.keys(centralizedBands).length > 0 ? centralizedBands : legacyBandEnergies;
-    
-    if (bandsToUse && ref.bands) {
-        const normMap = (analysis?.technicalData?.refBandTargetsNormalized?.mapping) || null;
-        const showNorm = (typeof window !== 'undefined' && window.SHOW_NORMALIZED_REF_TARGETS === true && normMap);
-        
-        for (const [band, refBand] of Object.entries(ref.bands)) {
-            let bLocal;
-            
-            // Acessar dados da banda (centralizadas vs legado)
-            if (centralizedBands && centralizedBands[band]) {
-                bLocal = { rms_db: centralizedBands[band].energy_db };
-                
-                // Log temporário para validação
-                if (typeof window !== 'undefined' && window.METRICS_BANDS_VALIDATION !== false && legacyBandEnergies?.[band]) {
-                    const legacyValue = legacyBandEnergies[band].rms_db;
-                    if (Number.isFinite(legacyValue) && Math.abs(centralizedBands[band].energy_db - legacyValue) > 0.01) {
-                        console.warn(`🎯 BAND_DIFF: ${band} centralized=${centralizedBands[band].energy_db} vs legacy=${legacyValue}`);
-                    }
-                }
+        let className = 'na';
+        if (Number.isFinite(tolerance) && tolerance > 0) {
+            if (absDiff <= tolerance) {
+                className = 'ok';
+            } else if (absDiff <= tolerance * 2) {
+                className = 'yellow';
             } else {
-                bLocal = legacyBandEnergies?.[band];
-            }
-            
-            if (bLocal && Number.isFinite(bLocal.rms_db)) {
-                let tgt = null;
-                if (!refBand._target_na && Number.isFinite(refBand.target_db)) tgt = refBand.target_db;
-                if (showNorm && normMap && Number.isFinite(normMap[band])) tgt = normMap[band];
-                pushRow(band, bLocal.rms_db, tgt, refBand.tol_db);
+                className = 'warn';
             }
         }
-    } else {
-        // Fallback antigo: tonalBalance simplificado
-        const tb = tech.tonalBalance || {};
-        const bandMap = { sub:'sub', low:'low_bass', mid:'mid', high:'brilho' };
-        Object.entries(bandMap).forEach(([tbKey, refBand]) => {
-            const bData = tb[tbKey];
-            const refBandData = ref.bands?.[refBand];
-            if (bData && refBandData && Number.isFinite(bData.rms_db)) {
-                pushRow(`${tbKey.toUpperCase()}`, bData.rms_db, refBandData.target_db, refBandData.tol_db);
-            }
-        });
+        
+        const sign = diff > 0 ? '+' : '';
+        return { diff: `${sign}${fmt(diff)}`, className };
+    };
+    
+    // Construir linhas da tabela diretamente
+    const rows = [];
+    
+    // LUFS
+    if (Number.isFinite(tech.lufsIntegrated)) {
+        const result = calcDiff(tech.lufsIntegrated, refData.lufs_target, refData.tol_lufs);
+        rows.push(`<tr>
+            <td>Loudness Integrado (LUFS)</td>
+            <td>${fmt(tech.lufsIntegrated)} LUFS</td>
+            <td>${fmt(refData.lufs_target)} LUFS<span class="tol">±${fmt(refData.tol_lufs, 2)}</span></td>
+            <td class="${result.className}">${result.diff} LUFS</td>
+        </tr>`);
     }
-    container.innerHTML = `<div class="card" style="margin-top:12px;">
-        <div class="card-title">📌 Comparação de Referência (${titleText})</div>
+    
+    // True Peak
+    if (Number.isFinite(tech.truePeakDbtp)) {
+        const result = calcDiff(tech.truePeakDbtp, refData.true_peak_target, refData.tol_true_peak);
+        rows.push(`<tr>
+            <td>Pico Real (dBTP)</td>
+            <td>${fmt(tech.truePeakDbtp)} dBTP</td>
+            <td>${fmt(refData.true_peak_target)} dBTP<span class="tol">±${fmt(refData.tol_true_peak, 2)}</span></td>
+            <td class="${result.className}">${result.diff} dBTP</td>
+        </tr>`);
+    }
+    
+    // Dynamic Range
+    if (Number.isFinite(tech.dynamicRange)) {
+        const result = calcDiff(tech.dynamicRange, refData.dr_target, refData.tol_dr);
+        rows.push(`<tr>
+            <td>DR</td>
+            <td>${fmt(tech.dynamicRange)}</td>
+            <td>${fmt(refData.dr_target)}<span class="tol">±${fmt(refData.tol_dr, 2)}</span></td>
+            <td class="${result.className}">${result.diff}</td>
+        </tr>`);
+    }
+    
+    // LRA
+    if (Number.isFinite(tech.lra)) {
+        const result = calcDiff(tech.lra, refData.lra_target, refData.tol_lra);
+        rows.push(`<tr>
+            <td>Faixa de Loudness – LRA (LU)</td>
+            <td>${fmt(tech.lra)} LU</td>
+            <td>${fmt(refData.lra_target)} LU<span class="tol">±${fmt(refData.tol_lra, 2)}</span></td>
+            <td class="${result.className}">${result.diff} LU</td>
+        </tr>`);
+    }
+    
+    // Stereo Correlation
+    if (Number.isFinite(tech.stereoCorrelation)) {
+        const result = calcDiff(tech.stereoCorrelation, refData.stereo_target, refData.tol_stereo);
+        rows.push(`<tr>
+            <td>Stereo Corr.</td>
+            <td>${fmt(tech.stereoCorrelation)}</td>
+            <td>${fmt(refData.stereo_target)}<span class="tol">±${fmt(refData.tol_stereo, 2)}</span></td>
+            <td class="${result.className}">${result.diff}</td>
+        </tr>`);
+    }
+    
+    // Renderizar HTML final
+    const html = `<div class="card" style="margin-top:12px;">
+        <div class="card-title">📌 Comparação de Referência (${genreName})</div>
         <table class="ref-compare-table">
             <thead><tr>
                 <th>Métrica</th><th>Valor</th><th>Alvo</th><th>Δ</th>
             </tr></thead>
-            <tbody>${rows.join('') || '<tr><td colspan="4" style="opacity:.6">Sem métricas disponíveis</td></tr>'}</tbody>
+            <tbody>${rows.length > 0 ? rows.join('') : '<tr><td colspan="4" style="opacity:.6">Sem métricas disponíveis</td></tr>'}</tbody>
         </table>
     </div>`;
-    // Estilos injetados uma vez
+    
+    container.innerHTML = html;
+    
+    // Injetar estilos se não existirem
     if (!document.getElementById('refCompareStyles')) {
         const style = document.createElement('style');
         style.id = 'refCompareStyles';
         style.textContent = `
         .ref-compare-table{width:100%;border-collapse:collapse;font-size:11px;}
-    .ref-compare-table th{font-weight:500;text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.12);font-size:11px;color:#fff;letter-spacing:.3px;}
-    .ref-compare-table td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.06);color:#f5f7fa;} 
+        .ref-compare-table th{font-weight:500;text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.12);font-size:11px;color:#fff;letter-spacing:.3px;}
+        .ref-compare-table td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.06);color:#f5f7fa;} 
         .ref-compare-table tr:last-child td{border-bottom:0;} 
-    .ref-compare-table td.ok{color:#52f7ad;font-weight:600;} 
-    .ref-compare-table td.yellow{color:#ffce4d;font-weight:600;} 
-    .ref-compare-table td.warn{color:#ff7b7b;font-weight:600;} 
-    .ref-compare-table .tol{opacity:.7;margin-left:4px;font-size:10px;color:#b8c2d6;} 
-    .ref-compare-table tbody tr:hover td{background:rgba(255,255,255,.04);} 
+        .ref-compare-table td.ok{color:#52f7ad;font-weight:600;} 
+        .ref-compare-table td.yellow{color:#ffce4d;font-weight:600;} 
+        .ref-compare-table td.warn{color:#ff7b7b;font-weight:600;} 
+        .ref-compare-table .tol{opacity:.7;margin-left:4px;font-size:10px;color:#b8c2d6;} 
+        .ref-compare-table tbody tr:hover td{background:rgba(255,255,255,.04);} 
         `;
         document.head.appendChild(style);
     }
+    
+    console.log(`🔥 BRUTAL: Tabela renderizada com ${rows.length} linhas`);
 }
 
 // Recalcular apenas as sugestões baseadas em referência (sem reprocessar o áudio)
