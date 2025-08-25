@@ -1208,25 +1208,31 @@ class AudioAnalyzer {
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
             console.log('[SCORE_DEBUG] ✅ scoring.js válido, executando...');
             console.log('[SCORE_DEBUG] 🎯 CONFIRMAÇÃO: Sistema V4 Balanced Penalties ativo!');
-            // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
-            let genreSpecificRef = null;
-            if (mode === 'genre' && activeRef) {
-              const activeGenre = window.PROD_AI_REF_GENRE || 'default';
-              genreSpecificRef = activeRef[activeGenre] || null;
-              if (DEBUG_MODE_REFERENCE) {
-                console.log('🔍 [MODE_DEBUG] Final scoring using genre-specific ref:', activeGenre);
-                console.log('🔍 [MODE_DEBUG] Final genre ref targets:', genreSpecificRef);
-              }
-            } else if (DEBUG_MODE_REFERENCE) {
-              console.log('🔍 [MODE_DEBUG] Final scoring skipping genre-specific ref (mode=' + mode + ')');
-            }
             
-            console.log('[SCORE_DEBUG] 🎯 USANDO SISTEMA V4 BALANCED PENALTIES!');
-            console.log('[SCORE_DEBUG] 📊 Dados enviados para scoring:', Object.keys(tdFinal));
-            const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
-            console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
-            console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
-            console.log('[SCORE_DEBUG] 🎯 Final score é válido?', !!(finalScore && finalScore.scorePct));
+            try {
+              // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
+              let genreSpecificRef = null;
+              if (mode === 'genre' && activeRef) {
+                const activeGenre = window.PROD_AI_REF_GENRE || 'default';
+                genreSpecificRef = activeRef[activeGenre] || null;
+                if (DEBUG_MODE_REFERENCE) {
+                  console.log('🔍 [MODE_DEBUG] Final scoring using genre-specific ref:', activeGenre);
+                  console.log('🔍 [MODE_DEBUG] Final genre ref targets:', genreSpecificRef);
+                }
+              } else if (DEBUG_MODE_REFERENCE) {
+                console.log('🔍 [MODE_DEBUG] Final scoring skipping genre-specific ref (mode=' + mode + ')');
+              }
+              
+              console.log('[SCORE_DEBUG] 🎯 USANDO SISTEMA V4 BALANCED PENALTIES!');
+              console.log('[SCORE_DEBUG] 📊 Dados enviados para scoring:', Object.keys(tdFinal));
+              console.log('[SCORE_DEBUG] 🔍 Iniciando chamada computeMixScore...');
+              
+              const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
+              
+              console.log('[SCORE_DEBUG] 🔍 Chamada computeMixScore concluída');
+              console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
+              console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
+              console.log('[SCORE_DEBUG] 🎯 Final score é válido?', !!(finalScore && finalScore.scorePct));
             
             if (finalScore && Number.isFinite(finalScore.scorePct)) {
               console.log('[SCORE_DEBUG] ✅ V4 Score válido, aplicando:', finalScore.scorePct);
@@ -1283,14 +1289,22 @@ class AudioAnalyzer {
                   yellowKeys: finalScore.yellowKeys
                 });
               }
-              try { window.__LAST_MIX_SCORE = finalScore; } catch {}
-            } catch {}
+              try { window.__LAST_MIX_SCORE = finalScore; } catch (err) { console.warn('Error saving mix score:', err); }
+            } catch (scoringError) {
+              console.error('[SCORE_DEBUG] ❌ Erro no sistema V4:', scoringError);
+            }
+            
             if (window.DEBUG_SCORE === true) console.log('[ANALYSIS][RECALC_SCORE] method=', finalScore.scoringMethod, 'scorePct=', finalScore.scorePct, finalScore.colorCounts, 'weights=', finalScore.weights, 'denom=', finalScore.denominator_info, 'yellowKeys=', finalScore.yellowKeys);
-            } // Fechamento do if (finalScore && Number.isFinite(finalScore.scorePct))
+          } else {
+            console.log('[SCORE_DEBUG] ❌ computeMixScore não disponível');
           }
-        } catch (reScoreErr) { if (window.DEBUG_SCORE) console.warn('[RECALC_SCORE_ERROR]', reScoreErr); }
+        } catch (loadingError) {
+          console.error('[SCORE_DEBUG] ❌ Erro carregando scoring.js:', loadingError);
+        }
       }
-    } catch {}
+    } catch (mainError) {
+      console.error('[SCORE_DEBUG] ❌ Erro geral no recálculo:', mainError);
+    }
     
     // 🎯 GARANTIR QUE SEMPRE TEMOS UM SCORE VÁLIDO
     if (!Number.isFinite(baseAnalysis.qualityOverall)) {
@@ -1306,52 +1320,17 @@ class AudioAnalyzer {
     return baseAnalysis;
   }
 
-  // 🔧 MÉTODO DE FALLBACK PARA SCORE - DESABILITADO PARA PRESERVAR V4
+  // 🔧 MÉTODO DE FALLBACK PARA SCORE - TEMPORARIAMENTE REABILITADO
   _applyWeightedScoreFallback(baseAnalysis) {
-    console.log('[SCORE_DEBUG] 📊 Fallback desabilitado - preservando score V4');
-    console.log('[SCORE_DEBUG] ⚠️ FALLBACK DESABILITADO - score atual:', baseAnalysis.qualityOverall);
+    console.log('[SCORE_DEBUG] 📊 Fallback temporariamente reabilitado');
     
-    // NÃO APLICAR FALLBACK - PRESERVAR SCORE V4
-    return;
-    
-    try {
-      // Usar sistema de agregação ponderada existente
-      if (!Number.isFinite(baseAnalysis.qualityOverall)) {
-        console.log('[WEIGHTED_AGGREGATE] Triggered - qualityOverall was:', baseAnalysis.qualityOverall);
-        
-        // Coletar sub-scores válidos
-        const subScores = [];
-        const breakdown = baseAnalysis.qualityBreakdown || {};
-        
-        if (Number.isFinite(breakdown.dynamics)) subScores.push({ value: breakdown.dynamics, weight: 0.25 });
-        if (Number.isFinite(breakdown.technical)) subScores.push({ value: breakdown.technical, weight: 0.25 });
-        if (Number.isFinite(breakdown.stereo)) subScores.push({ value: breakdown.stereo, weight: 0.20 });
-        if (Number.isFinite(breakdown.loudness)) subScores.push({ value: breakdown.loudness, weight: 0.15 });
-        if (Number.isFinite(breakdown.frequency)) subScores.push({ value: breakdown.frequency, weight: 0.15 });
-        
-        if (subScores.length > 0) {
-          const totalWeight = subScores.reduce((sum, s) => sum + s.weight, 0);
-          const weightedScore = subScores.reduce((sum, s) => sum + (s.value * s.weight), 0) / totalWeight;
-          const clamp = (v) => Math.max(0, Math.min(100, v));
-          
-          baseAnalysis.qualityOverall = clamp(weightedScore);
-          console.log('[WEIGHTED_AGGREGATE] Set qualityOverall =', baseAnalysis.qualityOverall, 
-                     'from', subScores.length, 'sub-scores');
-        } else {
-          // Último recurso: score padrão conservador
-          baseAnalysis.qualityOverall = 50;
-          console.log('[WEIGHTED_AGGREGATE] No sub-scores available, using default 50');
-        }
-      }
-    } catch (fallbackError) {
-      console.error('[SCORE_DEBUG] ❌ Erro no fallback:', fallbackError);
-      baseAnalysis.qualityOverall = 50; // Último recurso
+    if (!Number.isFinite(baseAnalysis.qualityOverall)) {
+      baseAnalysis.qualityOverall = 50; // Score padrão
+      console.log('[SCORE_DEBUG] ✅ Score definido para 50 (fallback)');
     }
     
-    console.log('[SCORE_DEBUG] ✅ Fallback concluído - score:', baseAnalysis.qualityOverall);
+    return baseAnalysis;
   }
-
-  // (remoção do conversor WAV — não é mais necessário)
 
   // 🔬 Realizar análise completa
   performFullAnalysis(audioBuffer) {
@@ -2391,6 +2370,15 @@ class AudioAnalyzer {
       meta: { version: '1.0.0', bands: bandsDef, approximations: true, generatedAt: new Date().toISOString() }
     };
     log('MATRIX_DONE','analysis_matrix pronta', { stems: Object.keys(stems).length });
+  }
+
+  // 🔧 MÉTODO DE FALLBACK PARA SCORE - DESABILITADO PARA PRESERVAR V4
+  _applyWeightedScoreFallback(baseAnalysis) {
+    console.log('[SCORE_DEBUG] 📊 Fallback desabilitado - preservando score V4');
+    console.log('[SCORE_DEBUG] ⚠️ FALLBACK DESABILITADO - score atual:', baseAnalysis.qualityOverall);
+    
+    // NÃO APLICAR FALLBACK - PRESERVAR SCORE V4
+    return;
   }
 }
 
