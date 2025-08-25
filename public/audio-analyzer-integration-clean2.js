@@ -752,7 +752,6 @@ async function fetchRefJsonWithFallback(genre) {
     // 1) Primeira tentativa: ${origin}/public/refs/out/${genre}.json
     try {
         const url1 = `${origin}/public/refs/out/${genre}.json?v=${Date.now()}`;
-        console.log(`🔍 [REFS] Tentativa 1: ${url1}`);
         
         const res = await fetch(url1, {
             cache: 'no-store',
@@ -763,22 +762,21 @@ async function fetchRefJsonWithFallback(genre) {
             const text = await res.text();
             if (text.trim()) {
                 const data = JSON.parse(text);
-                console.log(`✅ [REFS] Sucesso via external (public): ${genre}`);
+                console.log(`✅ [REFS] Sucesso: ${url1}`);
                 return { source: 'external', data };
             }
         } else if (res.status === 404) {
-            console.log(`❌ [REFS] 404 em tentativa 1: ${url1}`);
+            console.log(`❌ [REFS] 404: ${url1}`);
         } else {
-            console.log(`⚠️ [REFS] HTTP ${res.status} em tentativa 1: ${url1}`);
+            console.log(`⚠️ [REFS] HTTP ${res.status}: ${url1}`);
         }
     } catch (error) {
-        console.log(`❌ [REFS] Erro em tentativa 1: ${error.message}`);
+        console.log(`❌ [REFS] Erro: ${url1} - ${error.message}`);
     }
     
-    // 2) Segunda tentativa: ${origin}/refs/out/${genre}.json
+    // 2) Segunda tentativa: ${origin}/refs/out/${genre}.json  
     try {
         const url2 = `${origin}/refs/out/${genre}.json?v=${Date.now()}`;
-        console.log(`🔍 [REFS] Tentativa 2: ${url2}`);
         
         const res = await fetch(url2, {
             cache: 'no-store',
@@ -789,16 +787,16 @@ async function fetchRefJsonWithFallback(genre) {
             const text = await res.text();
             if (text.trim()) {
                 const data = JSON.parse(text);
-                console.log(`✅ [REFS] Sucesso via external (root): ${genre}`);
+                console.log(`✅ [REFS] Sucesso: ${url2}`);
                 return { source: 'external', data };
             }
         } else if (res.status === 404) {
-            console.log(`❌ [REFS] 404 em tentativa 2: ${url2}`);
+            console.log(`❌ [REFS] 404: ${url2}`);
         } else {
-            console.log(`⚠️ [REFS] HTTP ${res.status} em tentativa 2: ${url2}`);
+            console.log(`⚠️ [REFS] HTTP ${res.status}: ${url2}`);
         }
     } catch (error) {
-        console.log(`❌ [REFS] Erro em tentativa 2: ${error.message}`);
+        console.log(`❌ [REFS] Erro: ${url2} - ${error.message}`);
     }
     
     // 3) Fallback final: embedded/inline (__INLINE_EMBEDDED_REFS__)
