@@ -1230,24 +1230,24 @@ class AudioAnalyzer {
             
             if (finalScore && Number.isFinite(finalScore.scorePct)) {
               console.log('[SCORE_DEBUG] ✅ V4 Score válido, aplicando:', finalScore.scorePct);
-            
-            // TESTE MANUAL COM DADOS CONHECIDOS
-            const testData = {
-              "spectrum.balance": { classification: "yellow" },
-              "spectrum.clarity": { classification: "red" },
-              "spectrum.presence": { classification: "green" },
-              "spectrum.warmth": { classification: "yellow" },
-              "spectrum.brightness": { classification: "green" },
-              "spectrum.fullness": { classification: "green" },
-              "dynamics.punch": { classification: "yellow" },
-              "dynamics.consistency": { classification: "red" },
-              "dynamics.contrast": { classification: "green" },
-              "technical.clipCount": { classification: "green" },
-              "technical.distortionLevel": { classification: "red" },
-              "technical.noiseFloor": { classification: "yellow" }
-            };
-            // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (terceira ocorrência - teste)
-            let testGenreSpecificRef = null;
+              
+              // TESTE MANUAL COM DADOS CONHECIDOS
+              const testData = {
+                "spectrum.balance": { classification: "yellow" },
+                "spectrum.clarity": { classification: "red" },
+                "spectrum.presence": { classification: "green" },
+                "spectrum.warmth": { classification: "yellow" },
+                "spectrum.brightness": { classification: "green" },
+                "spectrum.fullness": { classification: "green" },
+                "dynamics.punch": { classification: "yellow" },
+                "dynamics.consistency": { classification: "red" },
+                "dynamics.contrast": { classification: "green" },
+                "technical.clipCount": { classification: "green" },
+                "technical.distortionLevel": { classification: "red" },
+                "technical.noiseFloor": { classification: "yellow" }
+              };
+              // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (terceira ocorrência - teste)
+              let testGenreSpecificRef = null;
             if (mode === 'genre' && activeRef) {
               const activeGenre = window.PROD_AI_REF_GENRE || 'default';
               testGenreSpecificRef = activeRef[activeGenre] || null;
@@ -1286,6 +1286,7 @@ class AudioAnalyzer {
               try { window.__LAST_MIX_SCORE = finalScore; } catch {}
             } catch {}
             if (window.DEBUG_SCORE === true) console.log('[ANALYSIS][RECALC_SCORE] method=', finalScore.scoringMethod, 'scorePct=', finalScore.scorePct, finalScore.colorCounts, 'weights=', finalScore.weights, 'denom=', finalScore.denominator_info, 'yellowKeys=', finalScore.yellowKeys);
+            } // Fechamento do if (finalScore && Number.isFinite(finalScore.scorePct))
           }
         } catch (reScoreErr) { if (window.DEBUG_SCORE) console.warn('[RECALC_SCORE_ERROR]', reScoreErr); }
       }
