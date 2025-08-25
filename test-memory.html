@@ -168,11 +168,20 @@
             const runButton = document.getElementById('runTest');
             runButton.disabled = true;
             
-            updateStatus('🔄 Executando teste de memória...', 'running');
+            updateStatus('🔄 Carregando AudioAnalyzer...', 'running');
             
             try {
+                // Carregar o AudioAnalyzer primeiro
+                await loadScript('./public/audio-analyzer.js');
+                addLogEntry('✅ AudioAnalyzer carregado');
+                
+                updateStatus('🔄 Carregando teste de memória...', 'running');
+                
                 // Carregar o arquivo de teste
                 await loadScript('./test-memory-management.js');
+                addLogEntry('✅ Teste de memória carregado');
+                
+                updateStatus('🔄 Executando teste de memória...', 'running');
                 
                 // Executar o teste
                 const report = await window.runMemoryTest();

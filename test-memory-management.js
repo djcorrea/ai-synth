@@ -19,15 +19,13 @@ class MemoryTestRunner {
   async initialize() {
     console.log('🧪 Inicializando teste de Memory Management...');
     
-    // Importar AudioAnalyzer
-    try {
-      const analyzerModule = await import('./public/audio-analyzer.js');
-      this.audioAnalyzer = new analyzerModule.AudioAnalyzer();
-      console.log('✅ AudioAnalyzer inicializado');
-    } catch (err) {
-      console.error('❌ Falha ao carregar AudioAnalyzer:', err);
-      throw err;
+    // AudioAnalyzer deve estar disponível globalmente
+    if (typeof window.AudioAnalyzer !== 'function') {
+      throw new Error('AudioAnalyzer não encontrado. Certifique-se de que audio-analyzer.js foi carregado.');
     }
+    
+    this.audioAnalyzer = new window.AudioAnalyzer();
+    console.log('✅ AudioAnalyzer inicializado');
 
     // Força GC inicial e captura baseline
     if (window.gc) {

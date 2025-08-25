@@ -3052,10 +3052,7 @@ class AudioAnalyzer {
   }
 }
 
-// 🌟 Interface simplificada para uso
-window.audioAnalyzer = new AudioAnalyzer();
-
-// 🎤 Função para analisar arquivo e enviar para chat
+//  Função para analisar arquivo e enviar para chat
 async function analyzeAndChat(file) {
   try {
     console.log('🎵 Iniciando análise de áudio...');
@@ -6082,6 +6079,22 @@ function findStandardBandName(inputName, bandMapping) {
   }
   
   return null;
+}
+
+// 🚀 EXPORTAÇÃO DA CLASSE PARA ES MODULES
+export { AudioAnalyzer };
+
+// 🌐 DISPONIBILIZAR GLOBALMENTE PARA COMPATIBILIDADE
+if (typeof window !== 'undefined') {
+  window.AudioAnalyzer = AudioAnalyzer;
+  
+  // 🌟 Interface simplificada para uso (instância global)
+  window.audioAnalyzer = new AudioAnalyzer();
+  
+  console.log('✅ AudioAnalyzer disponibilizado:', {
+    classe: typeof window.AudioAnalyzer,
+    instancia: typeof window.audioAnalyzer
+  });
 }
 
 
