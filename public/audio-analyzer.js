@@ -20,35 +20,137 @@ class AudioAnalyzer {
     // 🔬 SISTEMA DE DIAGNÓSTICO E LOGS DETALHADOS
     this._diagnosticMode = false;
     
-    // 🔬 Garantir que diagLog esteja disponível
-    this._initDiagnosticLogging();
+    // 🧠 MEMORY MANAGEMENT - Sistema de limpeza agressiva
+    this._memoryManager = {
+      maxCacheEntries: 50,
+      gcAfterAnalysis: true,
+      trackAllocations: true,
+      lastGC: Date.now()
+    };
     
   // CAIAR: log construção
   try { (window.__caiarLog||function(){})('INIT','AudioAnalyzer instanciado'); } catch {}
     
-    console.log('🎯 AudioAnalyzer V1 construído - ponte para V2 com sistema runId avançado');
+    console.log('🎯 AudioAnalyzer V1 construído - ponte para V2 com sistema runId avançado + Memory Management');
     this._preloadV2();
-  this._pipelineVersion = 'CAIAR_PIPELINE_1.0_DIAGNOSTIC';
+  this._pipelineVersion = 'CAIAR_PIPELINE_1.0_DIAGNOSTIC_MEMORY_SAFE';
+  }
+
+  // 🧠 MEMORY MANAGEMENT - Limpeza agressiva de vazamentos
+  _cleanupAudioBuffer(audioBuffer) {
+    try {
+      if (audioBuffer && typeof audioBuffer === 'object') {
+        // Limpar referências internas se possível
+        if (audioBuffer._channelData) {
+          audioBuffer._channelData = null;
+        }
+        // Sinalizar para GC
+        audioBuffer = null;
+        console.log('🧹 AudioBuffer cleanup executado');
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro na limpeza de AudioBuffer:', error);
+    }
   }
   
-  // 🔬 Sistema de logs de diagnóstico com fallback robusto
-  _initDiagnosticLogging() {
-    // Garantir que diagLog esteja sempre disponível com proteção contra duplicatas
-    if (!window.__ANALYZER_DIAG_LOG__) {
-      window.__ANALYZER_DIAG_LOG__ = window.diagLog || function(stage, message, context) {
-        if (typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search);
-          const isDiagMode = urlParams.get('diag') === '1' || window.DIAGNOSTIC_MODE === true;
-          if (isDiagMode) {
-            console.log(`🔍 [${stage}] ${message}`, context || '');
+  _cleanupStemsArrays(stems) {
+    try {
+      if (stems && Array.isArray(stems)) {
+        stems.forEach((stem, index) => {
+          if (stem && stem.buffer) {
+            // Limpar buffers de stems
+            if (stem.buffer._channelData) {
+              stem.buffer._channelData = null;
+            }
+            stem.buffer = null;
+            console.log(`🧹 Stem ${index} buffer cleanup executado`);
           }
+          // Limpar arrays float32
+          if (stem.data && stem.data.length) {
+            stem.data.fill(0); // Zero out antes de liberar
+            stem.data = null;
+          }
+        });
+        // Limpar array principal
+        stems.length = 0;
+        stems = null;
+        console.log('🧹 Stems arrays cleanup executado');
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro na limpeza de stems:', error);
+    }
+  }
+  
+  _cleanupLRUCache() {
+    try {
+      const cacheMap = window.__AUDIO_ANALYSIS_CACHE__;
+      if (!cacheMap || !(cacheMap instanceof Map)) return;
+      
+      const maxEntries = this._memoryManager.maxCacheEntries;
+      
+      if (cacheMap.size > maxEntries) {
+        // LRU: remover entradas mais antigas
+        const entries = Array.from(cacheMap.entries());
+        // Ordenar por timestamp (mais antigo primeiro)
+        entries.sort((a, b) => (a[1]._ts || 0) - (b[1]._ts || 0));
+        
+        const toRemove = entries.slice(0, cacheMap.size - maxEntries);
+        toRemove.forEach(([key, value]) => {
+          // Cleanup do objeto de análise
+          if (value.analysis) {
+            value.analysis = null;
+          }
+          cacheMap.delete(key);
+        });
+        
+        console.log(`🧹 LRU Cache cleanup: removidas ${toRemove.length} entradas antigas`);
+        console.log(`📊 Cache size: ${cacheMap.size}/${maxEntries}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro na limpeza LRU cache:', error);
+    }
+  }
+  
+  _forceGarbageCollection() {
+    try {
+      if (this._memoryManager.gcAfterAnalysis) {
+        // Força GC se disponível (apenas para debug/desenvolvimento)
+        if (window.gc && typeof window.gc === 'function') {
+          window.gc();
+          console.log('🧹 Garbage Collection forçado (dev mode)');
+        } else {
+          // Simular pressão de memória para encorajar GC
+          const dummy = new ArrayBuffer(1024 * 1024); // 1MB
+          setTimeout(() => dummy = null, 0);
         }
+        this._memoryManager.lastGC = Date.now();
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao forçar GC:', error);
+    }
+  }
+  
+  _getMemoryStats() {
+    try {
+      const stats = {
+        timestamp: Date.now(),
+        cacheSize: window.__AUDIO_ANALYSIS_CACHE__?.size || 0,
+        activeAnalyses: this._activeAnalyses?.size || 0
       };
       
-      // Só definir window.diagLog se ainda não existir
-      if (!window.diagLog) {
-        window.diagLog = window.__ANALYZER_DIAG_LOG__;
+      // Estatísticas de memória do navegador se disponível
+      if (performance.memory) {
+        stats.memory = {
+          used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024), // MB
+          total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024), // MB
+          limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) // MB
+        };
       }
+      
+      return stats;
+    } catch (error) {
+      console.warn('⚠️ Erro ao obter stats de memória:', error);
+      return { error: error.message };
     }
   }
 
@@ -126,9 +228,6 @@ class AudioAnalyzer {
 
   // �📊 LOG DE PIPELINE POR ETAPA - À PROVA DE FALHAS
   _logPipelineStage(stage, payload = {}) {
-    // Função local protegida para diagnósticos
-    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
-    
     try {
       // Usar runId atual ou extrair do payload
       const runId = this._currentRunId || payload.runId;
@@ -184,13 +283,13 @@ class AudioAnalyzer {
       // Timing da etapa anterior
       if (ctx.lastStageTime) {
         const stageTime = timestamp - ctx.lastStageTime;
-        diagLog('PIPELINE', `${ctx.lastStage} → ${stage}: ${stageTime}ms`, { runId, stageTime });
+        console.log(`⏱️ [${runId}] ${ctx.lastStage} → ${stage}: ${stageTime}ms`);
       }
       
       ctx.lastStage = stage;
       ctx.lastStageTime = timestamp;
       
-      diagLog('PIPELINE', `ETAPA: ${stage}${this._diagnosticMode ? ' (DIAGNOSTIC)' : ''}`, { runId, stage });
+      console.log(`🔄 [${runId}] ETAPA: ${stage}${this._diagnosticMode ? ' (DIAGNOSTIC)' : ''}`);
       
     } catch (error) {
       // CRÍTICO: Logging nunca pode quebrar o pipeline
@@ -200,9 +299,6 @@ class AudioAnalyzer {
   
   // 🏁 FINALIZAR STAGE COM DURAÇÃO
   _finishPipelineStage(stage, result = {}) {
-    // Função local protegida para diagnósticos
-    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
-    
     try {
       const runId = this._currentRunId;
       if (!runId || !this._activeAnalyses || !this._activeAnalyses.has(runId)) return;
@@ -215,12 +311,7 @@ class AudioAnalyzer {
         stageObj.durationMs = stageObj.finishedAt - stageObj.startedAt;
         stageObj.result = result;
         
-        diagLog('PIPELINE', `${stage} concluído em ${stageObj.durationMs.toFixed(1)}ms`, { 
-          runId, 
-          stage, 
-          duration: stageObj.durationMs,
-          result: typeof result === 'object' && result !== null ? Object.keys(result).length + ' propriedades' : result
-        });
+        console.log(`✅ [${runId}] ${stage} concluído em ${stageObj.durationMs.toFixed(1)}ms`);
       }
     } catch (error) {
       console.warn('⚠️ Erro ao finalizar stage (não crítico):', error.message);
@@ -290,9 +381,6 @@ class AudioAnalyzer {
 
   // 🎼 Orquestração segura de análise com Promise.allSettled e logs detalhados
   async _orchestrateAnalysis(audioBuffer, options, runId) {
-    // Função local protegida para diagnósticos
-    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
-    
     // 📊 LOG: INPUT
     this._logPipelineStageCompat(runId, 'INPUT', {
       bufferLength: audioBuffer.length,
@@ -338,9 +426,9 @@ class AudioAnalyzer {
     // Executar operações em ordem de prioridade
     for (const op of operations.sort((a, b) => a.priority - b.priority)) {
       try {
-        diagLog('ANALYSIS', `Executando ${op.name}`, { runId, operation: op.name });
+        console.log(`⚡ [${runId}] Executando ${op.name}`);
         results[op.name] = await op.operation();
-        diagLog('ANALYSIS', `${op.name} concluído`, { runId, operation: op.name });
+        console.log(`✅ [${runId}] ${op.name} concluído`);
       } catch (error) {
         console.error(`❌ [${runId}] Erro em ${op.name}:`, error);
         
@@ -375,9 +463,6 @@ class AudioAnalyzer {
 
   // 📦 Cache thread-safe com bypass para modo diagnóstico
   _createThreadSafeCache() {
-    // Função local protegida para diagnósticos
-    const diagLog = window.__ANALYZER_DIAG_LOG__ || window.diagLog || function(){};
-    
     const cache = new Map();
     const locks = new Map();
     
@@ -385,7 +470,7 @@ class AudioAnalyzer {
       async get(key, factory, runId) {
         // 🚫 BYPASS CACHE EM MODO DIAGNÓSTICO
         if (this._shouldBypassCache()) {
-          diagLog('CACHE', `Cache bypass (modo diagnóstico) para ${key}`, { runId, key });
+          console.log(`🚫 [${runId}] Cache bypass (modo diagnóstico) para ${key}`);
           const value = await factory(runId);
           if (value && typeof value === 'object') {
             value._runId = runId;
@@ -398,19 +483,19 @@ class AudioAnalyzer {
         if (cache.has(key)) {
           const cached = cache.get(key);
           if (cached._runId) {
-            diagLog('CACHE', `Cache hit para ${key} (originado em ${cached._runId})`, { runId, key, originRunId: cached._runId });
+            console.log(`📦 [${runId}] Cache hit para ${key} (originado em ${cached._runId})`);
           }
           return cached;
         }
         
         if (locks.has(key)) {
-          diagLog('CACHE', `Aguardando computação em andamento para ${key}`, { runId, key });
+          console.log(`⏳ [${runId}] Aguardando computação em andamento para ${key}`);
           return await locks.get(key);
         }
         
         const promise = (async () => {
           try {
-            diagLog('CACHE', `Computando ${key}`, { runId, key });
+            console.log(`🔄 [${runId}] Computando ${key}`);
             const value = await factory(runId);
             if (value && typeof value === 'object') {
               value._runId = runId;
@@ -441,13 +526,6 @@ class AudioAnalyzer {
   // 🚀 Pre-carregar V2 imediatamente
   async _preloadV2() {
     console.log('🚀 Pré-carregando Audio Analyzer V2...');
-    
-    // Proteção contra carregamento duplicado
-    if (window.AudioAnalyzerV2 && typeof window.AudioAnalyzerV2 === 'function') {
-      console.log('✅ V2 já está carregado, pulando pré-carregamento');
-      this._v2Loaded = true;
-      return Promise.resolve();
-    }
     
     if (!this._v2LoadingPromise) {
       this._v2LoadingPromise = new Promise((resolve) => {
@@ -606,8 +684,20 @@ class AudioAnalyzer {
             const analysis = await this._pipelineFromDecodedBuffer(audioBuffer, file, { fileHash }, runId);
             // Cache store
             try { if (fileHash && !disableCache) { const cacheMap = (window.__AUDIO_ANALYSIS_CACHE__ = window.__AUDIO_ANALYSIS_CACHE__ || new Map()); cacheMap.set(fileHash, { analysis: JSON.parse(JSON.stringify(analysis)), _ts: Date.now() }); } } catch{}
+            this._cleanupAudioBuffer(audioBuffer);
             resolve(analysis);
-          } catch(e){ clearTimeout(timeout); reject(e); }
+          } catch(e){ 
+            clearTimeout(timeout); 
+            try {
+              if (audioBuffer) {
+                this._cleanupAudioBuffer(audioBuffer);
+                console.log('🧹 AudioBuffer limpo em direct decode error path');
+              }
+            } catch (cleanupErr) {
+              console.warn('⚠️ Erro na limpeza do AudioBuffer (direct decode error):', cleanupErr);
+            }
+            reject(e); 
+          }
         });
       } catch(e){ console.warn('Direct decode fallback para FileReader', e); }
     }
@@ -699,15 +789,44 @@ class AudioAnalyzer {
                     this._computeAnalysisMatrix(audioBuffer, analysis, stemsRes.stems);
                   } catch (mxErr) { (window.__caiarLog||function(){})('MATRIX_ERROR','Falha construir analysis_matrix', { error: mxErr?.message||String(mxErr) }); }
                   (window.__caiarLog||function(){})('STEMS_CHAIN_DONE','Stems anexados', { ms: stemsRes.totalMs, method: stemsRes.method });
-                  // Liberar referências de buffers crus para GC (não anexar à análise principal)
-                  try { stemsRes.stems = null; } catch {}
+                  
+                  // 🧠 MEMORY CLEANUP: Limpeza agressiva de stems após uso
+                  try {
+                    this._cleanupStemsArrays(stemsRes.stems);
+                    stemsRes.stems = null;
+                    stemsRes = null;
+                    console.log('🧹 Memory cleanup: stems liberados após matrix computation');
+                  } catch (cleanupErr) {
+                    console.warn('⚠️ Erro na limpeza de stems:', cleanupErr);
+                  }
                 } else if (stemsRes && stemsRes._timeout) {
                   (window.__caiarLog||function(){})('STEMS_TIMEOUT','Timeout stems (>90s)');
                   // Mesmo sem stems, ainda podemos gerar matriz apenas do mix
                   try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch {}
+                  
+                  // 🧠 MEMORY CLEANUP: Limpar dados parciais de timeout
+                  try {
+                    if (stemsRes.stems) {
+                      this._cleanupStemsArrays(stemsRes.stems);
+                    }
+                    stemsRes = null;
+                    console.log('🧹 Memory cleanup: dados de timeout liberados');
+                  } catch (cleanupErr) {
+                    console.warn('⚠️ Erro na limpeza de timeout:', cleanupErr);
+                  }
                 } else {
                   (window.__caiarLog||function(){})('STEMS_FALLBACK','Stems não disponíveis');
                   try { this._computeAnalysisMatrix(audioBuffer, analysis, null); } catch {}
+                  
+                  // 🧠 MEMORY CLEANUP: Limpar qualquer dado parcial
+                  try {
+                    if (stemsRes) {
+                      stemsRes = null;
+                    }
+                    console.log('🧹 Memory cleanup: fallback stems limpo');
+                  } catch (cleanupErr) {
+                    console.warn('⚠️ Erro na limpeza de fallback:', cleanupErr);
+                  }
                 }
               }
               else {
@@ -719,9 +838,28 @@ class AudioAnalyzer {
           
           clearTimeout(timeout);
           const finalAnalysis = await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache });
+          
+          // 🧠 MEMORY CLEANUP: Limpeza final do AudioBuffer
+          try {
+            this._cleanupAudioBuffer(audioBuffer);
+            console.log(`🧹 [${runId}] AudioBuffer principal liberado`);
+          } catch (bufferCleanupErr) {
+            console.warn(`⚠️ [${runId}] Erro na limpeza do AudioBuffer:`, bufferCleanupErr);
+          }
+          
           resolve(finalAnalysis);
         } catch (error) {
           clearTimeout(timeout);
+          
+          // 🧠 MEMORY CLEANUP: Limpar AudioBuffer em caso de erro
+          try {
+            if (typeof audioBuffer !== 'undefined' && audioBuffer) {
+              this._cleanupAudioBuffer(audioBuffer);
+              console.log(`🧹 [${runId}] AudioBuffer limpo em caso de erro`);
+            }
+          } catch (bufferCleanupErr) {
+            console.warn(`⚠️ [${runId}] Erro na limpeza do AudioBuffer (error path):`, bufferCleanupErr);
+          }
           
           // 📊 LOG: ERRO NA DECODIFICAÇÃO/PIPELINE
           this._logPipelineStage('DECODE_ERROR', {
@@ -1027,6 +1165,25 @@ class AudioAnalyzer {
       
       // Limpar registros após completar
       this._activeAnalyses.delete(runId);
+      
+      // 🧠 MEMORY MANAGEMENT: Limpeza final agressiva
+      try {
+        // Limpar cache LRU (manter apenas 50 entradas)
+        this._cleanupLRUCache();
+        
+        // Forçar garbage collection após análise pesada
+        this._forceGarbageCollection();
+        
+        // Log de estatísticas de memória
+        const memStats = this._getMemoryStats();
+        console.log('🧠 Memory stats pós-análise:', memStats);
+        
+        // Log específico para memory management
+        console.log(`🧹 [${runId}] Memory cleanup completo - GC forçado, cache LRU aplicado`);
+        
+      } catch (memoryError) {
+        console.warn(`⚠️ [${runId}] Erro na limpeza de memória:`, memoryError);
+      }
       
       (window.__caiarLog||function(){})('OUTPUT','Análise final pronta', { 
         totalMs, 
