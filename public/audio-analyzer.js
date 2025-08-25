@@ -1306,9 +1306,13 @@ class AudioAnalyzer {
     return baseAnalysis;
   }
 
-  // 🔧 MÉTODO DE FALLBACK PARA SCORE
+  // 🔧 MÉTODO DE FALLBACK PARA SCORE - DESABILITADO PARA PRESERVAR V4
   _applyWeightedScoreFallback(baseAnalysis) {
-    console.log('[SCORE_DEBUG] 📊 Aplicando fallback de score ponderado...');
+    console.log('[SCORE_DEBUG] 📊 Fallback desabilitado - preservando score V4');
+    console.log('[SCORE_DEBUG] ⚠️ FALLBACK DESABILITADO - score atual:', baseAnalysis.qualityOverall);
+    
+    // NÃO APLICAR FALLBACK - PRESERVAR SCORE V4
+    return;
     
     try {
       // Usar sistema de agregação ponderada existente
