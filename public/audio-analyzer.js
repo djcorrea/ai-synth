@@ -6094,7 +6094,4 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// 📦 ES MODULE EXPORT
-export { AudioAnalyzer };
-
 
