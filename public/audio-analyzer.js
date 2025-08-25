@@ -6081,9 +6081,6 @@ function findStandardBandName(inputName, bandMapping) {
   return null;
 }
 
-// 🚀 EXPORTAÇÃO DA CLASSE PARA ES MODULES
-export { AudioAnalyzer };
-
 // 🌐 DISPONIBILIZAR GLOBALMENTE PARA COMPATIBILIDADE
 if (typeof window !== 'undefined') {
   window.AudioAnalyzer = AudioAnalyzer;
