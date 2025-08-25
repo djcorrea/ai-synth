@@ -526,7 +526,7 @@ window.diagnosRefSources = function(genre = null) {
     });
     
     // Test fetch do JSON externo
-    const testUrl = `/public/refs/out/${targetGenre}.json?v=diagnostic`;
+    const testUrl = `/refs/out/${targetGenre}.json?v=diagnostic`;
     fetch(testUrl).then(r => r.json()).then(j => {
         const data = j[targetGenre];
         console.log('🌐 EXTERNAL JSON TEST:', {
@@ -825,9 +825,9 @@ async function loadGenreManifest() {
     if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
         try {
             const json = await fetchRefJsonWithFallback([
-                `/public/refs/out/genres.json`,
                 `/refs/out/genres.json`,
                 `refs/out/genres.json`,
+                `/public/refs/out/genres.json`,
                 `../refs/out/genres.json`
             ]);
             if (json && Array.isArray(json.genres)) { __genreManifest = json.genres; return __genreManifest; }
@@ -909,9 +909,9 @@ async function loadReferenceData(genre) {
         try {
             const version = Date.now(); // Force cache bust
             const json = await fetchRefJsonWithFallback([
-                `/public/refs/out/${genre}.json?v=${version}`,
                 `/refs/out/${genre}.json?v=${version}`,
                 `refs/out/${genre}.json?v=${version}`,
+                `/public/refs/out/${genre}.json?v=${version}`,
                 `../refs/out/${genre}.json?v=${version}`
             ]);
             const rootKey = Object.keys(json)[0];
@@ -927,7 +927,7 @@ async function loadReferenceData(genre) {
                 console.log('🎯 REFS DIAGNOSTIC:', {
                     genre,
                     source: 'external',
-                    path: `/public/refs/out/${genre}.json`,
+                    path: `/refs/out/${genre}.json`,
                     version: data.version,
                     num_tracks: data.num_tracks,
                     lufs_target: data.lufs_target,
