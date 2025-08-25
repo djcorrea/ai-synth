@@ -11,9 +11,11 @@ class AudioAnalyzer {
     this._v2Loaded = false;
     this._v2LoadingPromise = null;
     
-    // 🆔 SISTEMA runId para prevenir race conditions
+    // 🆔 SISTEMA runId para prevenir race conditions - INICIALIZAÇÃO DEFENSIVA
     this._activeAnalyses = new Map();
     this._threadSafeCache = this._createThreadSafeCache();
+    this._currentRunId = null; // Track do runId atual para contexto
+    this._abortController = null; // Para cancelar análises duplicadas
     
     // 🔬 SISTEMA DE DIAGNÓSTICO E LOGS DETALHADOS
     this._diagnosticMode = false;
@@ -83,39 +85,111 @@ class AudioAnalyzer {
     return report;
   }
 
-  // 📊 LOG DE PIPELINE POR ETAPA
-  _logPipelineStage(runId, stage, data = {}) {
-    if (!this._activeAnalyses.has(runId)) {
-      this._activeAnalyses.set(runId, {
-        pipelineLogs: [],
-        stageTimings: {},
-        startTime: Date.now()
-      });
+  // � HELPER PARA COMPATIBILIDADE COM CHAMADAS ANTIGAS
+  _logPipelineStageCompat(runId, stage, data = {}) {
+    // Definir temporariamente o runId se não estiver definido
+    const originalRunId = this._currentRunId;
+    if (!this._currentRunId && runId) {
+      this._currentRunId = runId;
     }
     
-    const analysisData = this._activeAnalyses.get(runId);
-    const timestamp = Date.now();
-    const logEntry = {
-      stage,
-      timestamp,
-      data: this._diagnosticMode ? data : Object.keys(data), // Full data apenas em diagnóstico
-      diagnosticMode: this._diagnosticMode
-    };
+    // Chamar a versão nova
+    this._logPipelineStage(stage, { runId, ...data });
     
-    analysisData.pipelineLogs.push(logEntry);
-    
-    // Timing da etapa anterior
-    if (analysisData.lastStageTime) {
-      const stageTime = timestamp - analysisData.lastStageTime;
-      console.log(`⏱️ [${runId}] ${analysisData.lastStage} → ${stage}: ${stageTime}ms`);
+    // Restaurar o runId original
+    this._currentRunId = originalRunId;
+  }
+
+  // �📊 LOG DE PIPELINE POR ETAPA - À PROVA DE FALHAS
+  _logPipelineStage(stage, payload = {}) {
+    try {
+      // Usar runId atual ou extrair do payload
+      const runId = this._currentRunId || payload.runId;
+      if (!runId) return; // Sem contexto, não loga mas não quebra
+      
+      // Inicialização defensiva se necessário
+      if (!this._activeAnalyses) this._activeAnalyses = new Map();
+      
+      if (!this._activeAnalyses.has(runId)) {
+        this._activeAnalyses.set(runId, {
+          runId,
+          startedAt: performance.now(),
+          stages: new Map(),
+          pipelineLogs: [],
+          stageTimings: {},
+          startTime: Date.now()
+        });
+      }
+      
+      const ctx = this._activeAnalyses.get(runId);
+      if (!ctx) return; // Nunca travar por falta de contexto
+      
+      // Gerenciar stage individual
+      if (!ctx.stages.has(stage)) {
+        ctx.stages.set(stage, {
+          name: stage,
+          startedAt: performance.now(),
+          logs: []
+        });
+      }
+      
+      const stageObj = ctx.stages.get(stage);
+      if (stageObj && stageObj.logs) {
+        stageObj.logs.push({
+          ts: performance.now(),
+          ...payload
+        });
+      }
+      
+      // Log legado para compatibilidade
+      const timestamp = Date.now();
+      const logEntry = {
+        stage,
+        timestamp,
+        data: this._diagnosticMode ? payload : Object.keys(payload),
+        diagnosticMode: this._diagnosticMode
+      };
+      
+      if (ctx.pipelineLogs) {
+        ctx.pipelineLogs.push(logEntry);
+      }
+      
+      // Timing da etapa anterior
+      if (ctx.lastStageTime) {
+        const stageTime = timestamp - ctx.lastStageTime;
+        console.log(`⏱️ [${runId}] ${ctx.lastStage} → ${stage}: ${stageTime}ms`);
+      }
+      
+      ctx.lastStage = stage;
+      ctx.lastStageTime = timestamp;
+      
+      console.log(`🔄 [${runId}] ETAPA: ${stage}${this._diagnosticMode ? ' (DIAGNOSTIC)' : ''}`);
+      
+    } catch (error) {
+      // CRÍTICO: Logging nunca pode quebrar o pipeline
+      console.warn('⚠️ Erro no logging (não crítico):', error.message);
     }
-    
-    analysisData.lastStage = stage;
-    analysisData.lastStageTime = timestamp;
-    
-    console.log(`🔄 [${runId}] ETAPA: ${stage}${this._diagnosticMode ? ' (DIAGNOSTIC)' : ''}`);
-    
-    return logEntry;
+  }
+  
+  // 🏁 FINALIZAR STAGE COM DURAÇÃO
+  _finishPipelineStage(stage, result = {}) {
+    try {
+      const runId = this._currentRunId;
+      if (!runId || !this._activeAnalyses || !this._activeAnalyses.has(runId)) return;
+      
+      const ctx = this._activeAnalyses.get(runId);
+      const stageObj = ctx?.stages?.get(stage);
+      
+      if (stageObj) {
+        stageObj.finishedAt = performance.now();
+        stageObj.durationMs = stageObj.finishedAt - stageObj.startedAt;
+        stageObj.result = result;
+        
+        console.log(`✅ [${runId}] ${stage} concluído em ${stageObj.durationMs.toFixed(1)}ms`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao finalizar stage (não crítico):', error.message);
+    }
   }
 
   // 📋 RELATÓRIO DE PIPELINE COMPLETO (removendo duplicado)
@@ -182,7 +256,7 @@ class AudioAnalyzer {
   // 🎼 Orquestração segura de análise com Promise.allSettled e logs detalhados
   async _orchestrateAnalysis(audioBuffer, options, runId) {
     // 📊 LOG: INPUT
-    this._logPipelineStage(runId, 'INPUT', {
+    this._logPipelineStageCompat(runId, 'INPUT', {
       bufferLength: audioBuffer.length,
       sampleRate: audioBuffer.sampleRate,
       numberOfChannels: audioBuffer.numberOfChannels,
@@ -198,7 +272,7 @@ class AudioAnalyzer {
       priority: 1,
       operation: async () => {
         // 📊 LOG: FEATURES (início)
-        this._logPipelineStage(runId, 'FEATURES_START', {
+        this._logPipelineStageCompat(runId, 'FEATURES_START', {
           stage: 'basic_analysis',
           bypassCache: this._shouldBypassCache()
         });
@@ -213,7 +287,7 @@ class AudioAnalyzer {
         }
         
         // 📊 LOG: FEATURES (conclusão)
-        this._logPipelineStage(runId, 'FEATURES_COMPLETE', {
+        this._logPipelineStageCompat(runId, 'FEATURES_COMPLETE', {
           hasData: !!basic,
           dataKeys: basic ? Object.keys(basic) : [],
           technicalDataKeys: basic?.technicalData ? Object.keys(basic.technicalData) : []
@@ -233,7 +307,7 @@ class AudioAnalyzer {
         console.error(`❌ [${runId}] Erro em ${op.name}:`, error);
         
         // 📊 LOG: ERROR
-        this._logPipelineStage(runId, 'ERROR', {
+        this._logPipelineStageCompat(runId, 'ERROR', {
           operation: op.name,
           error: error.message,
           stack: this._diagnosticMode ? error.stack : undefined
@@ -382,19 +456,48 @@ class AudioAnalyzer {
 
   // 📁 Analisar arquivo de áudio
   async analyzeAudioFile(file, options = {}) {
-    // � Gerar runId único para esta análise
+    // 🛡️ INICIALIZAÇÃO DEFENSIVA E CONTROLE DE DUPLICATAS
+    if (!this._activeAnalyses) this._activeAnalyses = new Map();
+    
+    // Abortar análise anterior se ainda ativa
+    if (this._abortController && !this._abortController.signal.aborted) {
+      console.log('🛑 Abortando análise anterior para evitar duplicata');
+      this._abortController.abort();
+    }
+    
+    // Novo controlador para esta análise
+    this._abortController = new AbortController();
+    
+    // 🆔 Gerar runId único para esta análise
     const runId = this._generateRunId();
+    this._currentRunId = runId; // Definir contexto atual
+    
     console.log(`🎵 [${runId}] Iniciando análise de arquivo:`, file?.name || 'unknown');
     
-    // Registrar análise ativa
-    this._activeAnalyses.set(runId, {
-      startTime: Date.now(),
-      file: file?.name || 'unknown',
-      options: { ...options }
-    });
+    // 🛡️ INICIALIZAÇÃO DEFENSIVA DO CONTEXTO
+    if (!this._activeAnalyses.has(runId)) {
+      this._activeAnalyses.set(runId, {
+        runId,
+        startedAt: performance.now(),
+        stages: new Map(),
+        pipelineLogs: [],
+        stageTimings: {},
+        startTime: Date.now(),
+        file: file?.name || 'unknown',
+        options: { ...options },
+        status: 'running'
+      });
+    }
     
     try {
-      // �🎯 CORREÇÃO TOTAL: Propagar contexto de modo
+      // 📊 LOG: ANÁLISE INICIADA (primeira entrada)
+      this._logPipelineStage('ANALYSIS_STARTED', {
+        fileName: file?.name,
+        fileSize: file?.size,
+        mode: options.mode || 'genre'
+      });
+      
+      // 🎯 CORREÇÃO TOTAL: Propagar contexto de modo
       const mode = options.mode || 'genre'; // Default para compatibilidade
       const DEBUG_MODE_REFERENCE = options.debugModeReference || false;
       
@@ -409,7 +512,7 @@ class AudioAnalyzer {
       }
       
       const tsStart = new Date().toISOString();
-  const disableCache = (typeof window !== 'undefined' && window.DISABLE_ANALYSIS_CACHE === true);
+      const disableCache = (typeof window !== 'undefined' && window.DISABLE_ANALYSIS_CACHE === true);
   // ====== CACHE POR HASH (somente leitura de conteúdo) ======
   let fileHash = null;
   try {
@@ -471,7 +574,13 @@ class AudioAnalyzer {
       
     reader.onload = async (e) => {
         try {
-      if (window.DEBUG_ANALYZER === true) console.log('� Decodificando áudio...');
+          // 📊 LOG: DECODIFICAÇÃO INICIADA
+          this._logPipelineStage('DECODING_AUDIO', {
+            fileName: file?.name,
+            fileSize: file?.size
+          });
+          
+          if (window.DEBUG_ANALYZER === true) console.log('🎵 Decodificando áudio...');
           let audioData = e.target.result;
           if (!audioData && file._cachedArrayBufferForHash) audioData = file._cachedArrayBufferForHash;
           const audioBuffer = await this.audioContext.decodeAudioData(audioData.slice ? audioData.slice(0) : audioData);
@@ -565,6 +674,38 @@ class AudioAnalyzer {
           resolve(finalAnalysis);
         } catch (error) {
           clearTimeout(timeout);
+          
+          // 📊 LOG: ERRO NA DECODIFICAÇÃO/PIPELINE
+          this._logPipelineStage('DECODE_ERROR', {
+            error: error?.message || String(error),
+            fileName: file?.name,
+            stack: this._diagnosticMode ? error.stack : undefined
+          });
+          
+          // 🛡️ MARCAR ANÁLISE COMO ERRO
+          try {
+            if (this._activeAnalyses && this._activeAnalyses.has(this._currentRunId)) {
+              const ctx = this._activeAnalyses.get(this._currentRunId);
+              ctx.status = 'error';
+              ctx.error = error?.message || String(error);
+              ctx.finishedAt = performance.now();
+            }
+          } catch (cleanupError) {
+            console.warn('⚠️ Erro na limpeza de estado:', cleanupError);
+          }
+          
+          // 🔄 NOTIFICAR UI PARA PARAR LOADING
+          try {
+            // Emitir evento para fechar modais de loading
+            if (typeof window !== 'undefined' && window.dispatchEvent) {
+              window.dispatchEvent(new CustomEvent('audio-analysis-error', {
+                detail: { error: error?.message, runId: this._currentRunId }
+              }));
+            }
+          } catch (uiError) {
+            console.warn('⚠️ Erro ao notificar UI:', uiError);
+          }
+          
           console.error('❌ Erro na decodificação:', error);
           try { (window.__caiarLog||function(){})('DECODE_ERROR','Erro ao decodificar', { error: error?.message||String(error) }); } catch {}
           reject(new Error(`Erro ao decodificar áudio: ${error.message}`));
@@ -585,17 +726,78 @@ class AudioAnalyzer {
       }
     });
     } catch (analysisError) {
-      // Limpar análise ativa em caso de erro
-      this._activeAnalyses.delete(runId);
+      // 📊 LOG: ERRO GERAL DA ANÁLISE
+      this._logPipelineStage('ANALYSIS_ERROR', {
+        error: analysisError?.message || String(analysisError),
+        fileName: file?.name,
+        stack: this._diagnosticMode ? analysisError.stack : undefined
+      });
+      
+      // 🛡️ MARCAR ANÁLISE COMO ERRO
+      try {
+        if (this._activeAnalyses && this._activeAnalyses.has(runId)) {
+          const ctx = this._activeAnalyses.get(runId);
+          ctx.status = 'error';
+          ctx.error = analysisError?.message || String(analysisError);
+          ctx.finishedAt = performance.now();
+        }
+      } catch (markError) {
+        console.warn('⚠️ Erro ao marcar estado de erro:', markError);
+      }
+      
+      // 🔄 NOTIFICAR UI PARA PARAR LOADING
+      try {
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('audio-analysis-error', {
+            detail: { error: analysisError?.message, runId }
+          }));
+        }
+      } catch (uiError) {
+        console.warn('⚠️ Erro ao notificar UI sobre erro:', uiError);
+      }
+      
       console.error(`❌ [${runId}] Erro na análise:`, analysisError);
       throw analysisError;
     } finally {
-      // Limpar análise ativa ao finalizar
-      const analysisInfo = this._activeAnalyses.get(runId);
-      if (analysisInfo) {
-        const duration = Date.now() - analysisInfo.startTime;
-        console.log(`⏱️ [${runId}] Análise finalizada em ${duration}ms`);
-        this._activeAnalyses.delete(runId);
+      // 🧹 LIMPEZA FINAL DEFENSIVA
+      try {
+        const analysisInfo = this._activeAnalyses?.get(runId);
+        if (analysisInfo) {
+          const duration = Date.now() - analysisInfo.startTime;
+          const wasError = analysisInfo.status === 'error';
+          
+          // Log final baseado no status
+          if (wasError) {
+            this._logPipelineStage('ANALYSIS_FAILED', {
+              duration: `${duration}ms`,
+              error: analysisInfo.error
+            });
+            console.log(`❌ [${runId}] Análise falhou em ${duration}ms: ${analysisInfo.error}`);
+          } else {
+            this._logPipelineStage('ANALYSIS_COMPLETED', {
+              duration: `${duration}ms`
+            });
+            console.log(`✅ [${runId}] Análise concluída com sucesso em ${duration}ms`);
+          }
+          
+          // Limpar independente do status
+          this._activeAnalyses.delete(runId);
+        }
+        
+        // Limpar contexto atual
+        if (this._currentRunId === runId) {
+          this._currentRunId = null;
+        }
+        
+        // 🔄 NOTIFICAR UI SOBRE CONCLUSÃO (sucesso ou erro)
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('audio-analysis-finished', {
+            detail: { runId, success: !analysisInfo?.error }
+          }));
+        }
+        
+      } catch (cleanupError) {
+        console.warn(`⚠️ [${runId}] Erro na limpeza final:`, cleanupError);
       }
     }
   }
@@ -610,7 +812,7 @@ class AudioAnalyzer {
     const t0Full = (performance&&performance.now)?performance.now():Date.now();
     
     // 📊 LOG: PIPELINE STARTED
-    this._logPipelineStage(runId, 'PIPELINE_START', {
+    this._logPipelineStageCompat(runId, 'PIPELINE_START', {
       fileHash,
       bufferDuration: audioBuffer.duration,
       qualityMode: (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast'
@@ -624,7 +826,7 @@ class AudioAnalyzer {
     
     try {
       // 📊 LOG: PHASE 2 START
-      this._logPipelineStage(runId, 'PHASE2_START', {
+      this._logPipelineStageCompat(runId, 'PHASE2_START', {
         v1Complete: !!analysis,
         hasAudioBuffer: !!audioBuffer
       });
@@ -632,7 +834,7 @@ class AudioAnalyzer {
       analysis = await this._enrichWithPhase2Metrics(audioBuffer, analysis, file, runId);
       
       // 📊 LOG: PHASE 2 COMPLETE
-      this._logPipelineStage(runId, 'PHASE2_COMPLETE', {
+      this._logPipelineStageCompat(runId, 'PHASE2_COMPLETE', {
         enriched: true,
         v2MetricsKeys: analysis._v2Metrics ? Object.keys(analysis._v2Metrics) : []
       });
@@ -641,7 +843,7 @@ class AudioAnalyzer {
       (window.__caiarLog||function(){})(`METRICS_V2_ERROR_${runId}`,'Falha Fase 2 direct',{err:e?.message}); 
       
       // 📊 LOG: PHASE 2 ERROR
-      this._logPipelineStage(runId, 'PHASE2_ERROR', {
+      this._logPipelineStageCompat(runId, 'PHASE2_ERROR', {
         error: e.message,
         stack: this._diagnosticMode ? e.stack : undefined
       });
@@ -653,7 +855,7 @@ class AudioAnalyzer {
         const dur = audioBuffer.duration;
         
         // 📊 LOG: STEMS START
-        this._logPipelineStage(runId, 'STEMS_START', {
+        this._logPipelineStageCompat(runId, 'STEMS_START', {
           stemsMode: window.STEMS_MODE,
           duration: dur,
           maxDuration: window.STEMS_MAX_DURATION_SEC || 360
@@ -663,7 +865,7 @@ class AudioAnalyzer {
           (window.__caiarLog||function(){})('STEMS_SKIP','Stems pulados',{duration:dur});
           
           // 📊 LOG: STEMS SKIPPED
-          this._logPipelineStage(runId, 'STEMS_SKIPPED', {
+          this._logPipelineStageCompat(runId, 'STEMS_SKIPPED', {
             reason: window.STEMS_MODE === 'off' ? 'disabled' : 'duration_exceeded',
             duration: dur
           });
@@ -683,7 +885,7 @@ class AudioAnalyzer {
               analysis._stems = { method: stemsRes.method, totalMs: stemsRes.totalMs, metrics: stemsRes.metrics };
               
               // 📊 LOG: STEMS COMPLETE
-              this._logPipelineStage(runId, 'STEMS_COMPLETE', {
+              this._logPipelineStageCompat(runId, 'STEMS_COMPLETE', {
                 method: stemsRes.method,
                 totalMs: stemsRes.totalMs,
                 hasMetrics: !!stemsRes.metrics
@@ -692,7 +894,7 @@ class AudioAnalyzer {
               try { this._computeAnalysisMatrix(audioBuffer, analysis, stemsRes.stems); } catch{}
             } else {
               // 📊 LOG: STEMS TIMEOUT
-              this._logPipelineStage(runId, 'STEMS_TIMEOUT', {
+              this._logPipelineStageCompat(runId, 'STEMS_TIMEOUT', {
                 qualityMode,
                 timeoutMs: qualityMode==='fast'?40000:90000
               });
@@ -706,7 +908,7 @@ class AudioAnalyzer {
       (window.__caiarLog||function(){})('STEMS_CHAIN_ERROR','Erro stems direct',{err:e?.message}); 
       
       // 📊 LOG: STEMS ERROR
-      this._logPipelineStage(runId, 'STEMS_ERROR', {
+      this._logPipelineStageCompat(runId, 'STEMS_ERROR', {
         error: e.message,
         stack: this._diagnosticMode ? e.stack : undefined
       });
@@ -718,7 +920,7 @@ class AudioAnalyzer {
   async _finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache, runId }) {
     try {
       // 📊 LOG: REFS START (referências e comparações)
-      this._logPipelineStage(runId, 'REFS_START', {
+      this._logPipelineStageCompat(runId, 'REFS_START', {
         hasAnalysis: !!analysis,
         genre: window.PROD_AI_REF_GENRE || 'unknown'
       });
@@ -727,7 +929,7 @@ class AudioAnalyzer {
       // TODO: Implementar logs específicos quando adicionarmos comparação externa
       
       // 📊 LOG: SCORING START
-      this._logPipelineStage(runId, 'SCORING_START', {
+      this._logPipelineStageCompat(runId, 'SCORING_START', {
         hasProblems: !!(analysis.problems && analysis.problems.length),
         hasSuggestions: !!(analysis.suggestions && analysis.suggestions.length),
         currentScore: analysis.mixScorePct
@@ -737,7 +939,7 @@ class AudioAnalyzer {
       // O scoring atual já está computado, só logamos
       
       // 📊 LOG: SUGGESTIONS START
-      this._logPipelineStage(runId, 'SUGGESTIONS_START', {
+      this._logPipelineStageCompat(runId, 'SUGGESTIONS_START', {
         problemsCount: (analysis.problems || []).length,
         suggestionsCount: (analysis.suggestions || []).length
       });
@@ -745,7 +947,7 @@ class AudioAnalyzer {
       // Aqui seria geração de sugestões (já existe)
       
       // 📊 LOG: UI PREPARATION
-      this._logPipelineStage(runId, 'UI_PREP', {
+      this._logPipelineStageCompat(runId, 'UI_PREP', {
         finalScore: analysis.mixScorePct,
         problemsCount: (analysis.problems || []).length,
         suggestionsCount: (analysis.suggestions || []).length,
@@ -757,7 +959,7 @@ class AudioAnalyzer {
       const totalMs = +(t1Full - t0Full).toFixed(1);
       
       // 📊 LOG: OUTPUT COMPLETE
-      this._logPipelineStage(runId, 'OUTPUT_COMPLETE', {
+      this._logPipelineStageCompat(runId, 'OUTPUT_COMPLETE', {
         totalMs,
         finalScore: analysis.mixScorePct,
         problemsCount: (analysis.problems || []).length,
@@ -791,7 +993,7 @@ class AudioAnalyzer {
       console.error(`❌ [${runId}] Erro na finalização:`, e);
       
       // 📊 LOG: FINALIZATION ERROR
-      this._logPipelineStage(runId, 'FINALIZATION_ERROR', {
+      this._logPipelineStageCompat(runId, 'FINALIZATION_ERROR', {
         error: e.message,
         stack: this._diagnosticMode ? e.stack : undefined
       });
