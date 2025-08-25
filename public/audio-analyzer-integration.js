@@ -4390,9 +4390,14 @@ function displayComparisonSection(comparisonData, suggestions) {
         return;
     }
 
+    // 🔧 CORREÇÃO: Acessar dados da estrutura correta
+    // Se comparisonData tem 'details', usar essa estrutura
+    const actualData = comparisonData.details || comparisonData;
+    console.log('🔍 [DEBUG] Dados reais para comparação:', actualData);
+
     // Função helper local para gerar linha de comparação
-    function generateComparisonRowLocal(label, comparisonData, unit) {
-        if (!comparisonData || comparisonData.difference === null || comparisonData.difference === undefined) {
+    function generateComparisonRowLocal(label, comparisonObj, unit) {
+        if (!comparisonObj || !Number.isFinite(comparisonObj.reference) || !Number.isFinite(comparisonObj.user)) {
             return `
                 <div class="comparison-row unavailable">
                     <div class="comparison-label">${label}</div>
@@ -4405,10 +4410,10 @@ function displayComparisonSection(comparisonData, suggestions) {
             `;
         }
         
-        const userValue = comparisonData.user?.toFixed?.(1) || comparisonData.user || 'N/A';
-        const refValue = comparisonData.reference?.toFixed?.(1) || comparisonData.reference || 'N/A';
-        const diff = comparisonData.difference?.toFixed?.(1) || 'N/A';
-        const diffClass = comparisonData.difference > 0 ? 'positive' : comparisonData.difference < 0 ? 'negative' : 'neutral';
+        const userValue = comparisonObj.user?.toFixed?.(1) || comparisonObj.user || 'N/A';
+        const refValue = comparisonObj.reference?.toFixed?.(1) || comparisonObj.reference || 'N/A';
+        const diff = comparisonObj.difference?.toFixed?.(1) || 'N/A';
+        const diffClass = comparisonObj.difference > 0 ? 'positive' : comparisonObj.difference < 0 ? 'negative' : 'neutral';
         
         return `
             <div class="comparison-row">
@@ -4438,11 +4443,10 @@ function displayComparisonSection(comparisonData, suggestions) {
         
         <div class="comparison-content">
             <div class="comparison-grid">
-                ${generateComparisonRowLocal('Volume Integrado (padrão streaming)', comparisonData.loudness, ' LUFS')}
-                ${generateComparisonRowLocal('Pico real (dBTP)', comparisonData.truePeak, ' dBTP')}
-                ${generateComparisonRowLocal('Dinâmica (diferença entre alto/baixo)', comparisonData.dynamics, ' dB')}
-                ${generateComparisonRowLocal('Variação de Volume (consistência)', comparisonData.volumeVariation, ' LU')}
-                ${generateComparisonRowLocal('Correlação Estéreo (largura)', comparisonData.stereo, '')}
+                ${generateComparisonRowLocal('Volume Integrado (padrão streaming)', actualData.loudness, ' LUFS')}
+                ${generateComparisonRowLocal('Pico real (dBTP)', actualData.peak || actualData.truePeak, ' dBTP')}
+                ${generateComparisonRowLocal('Dinâmica (diferença entre alto/baixo)', actualData.dynamic || actualData.dynamics, ' dB')}
+                ${generateComparisonRowLocal('Correlação Estéreo (largura)', actualData.stereo, '')}
             </div>
         </div>
     `;
@@ -4463,8 +4467,8 @@ window.displayReferenceResults = function(referenceResults) {
     try {
         const { comparisonData, referenceSuggestions, baseline_source } = referenceResults;
         
-        if (baseline_source !== 'reference') {
-            throw new Error(`Invalid baseline source: ${baseline_source}. Expected 'reference'`);
+        if (baseline_source !== 'reference' && baseline_source !== 'reference_audio') {
+            throw new Error(`Invalid baseline source: ${baseline_source}. Expected 'reference' or 'reference_audio'`);
         }
         
         if (!comparisonData) {
