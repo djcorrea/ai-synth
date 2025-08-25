@@ -1183,7 +1183,8 @@ class AudioAnalyzer {
         } catch {}
         try {
           console.log('[SCORE_DEBUG] 🔍 Tentando carregar scoring.js...');
-          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch((err)=>{
+          const cacheBuster = Date.now() + '_' + Math.random().toString(36).substring(7);
+          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + cacheBuster).catch((err)=>{
             console.error('[SCORE_DEBUG] ❌ Erro no import scoring.js:', err);
             return null;
           });
@@ -1205,6 +1206,7 @@ class AudioAnalyzer {
               console.log('🔍 [MODE_DEBUG] Final scoring skipping genre-specific ref (mode=' + mode + ')');
             }
             
+            console.log('[SCORE_DEBUG] 🎯 USANDO SISTEMA V4 BALANCED PENALTIES!');
             const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
             console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
             console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
