@@ -20,12 +20,31 @@ class AudioAnalyzer {
     // 🔬 SISTEMA DE DIAGNÓSTICO E LOGS DETALHADOS
     this._diagnosticMode = false;
     
+    // 🔬 Garantir que diagLog esteja disponível
+    this._initDiagnosticLogging();
+    
   // CAIAR: log construção
   try { (window.__caiarLog||function(){})('INIT','AudioAnalyzer instanciado'); } catch {}
     
     console.log('🎯 AudioAnalyzer V1 construído - ponte para V2 com sistema runId avançado');
     this._preloadV2();
   this._pipelineVersion = 'CAIAR_PIPELINE_1.0_DIAGNOSTIC';
+  }
+  
+  // 🔬 Sistema de logs de diagnóstico com fallback robusto
+  _initDiagnosticLogging() {
+    // Garantir que diagLog esteja sempre disponível
+    if (typeof window.diagLog !== 'function') {
+      window.diagLog = function(stage, message, context) {
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const isDiagMode = urlParams.get('diag') === '1' || window.DIAGNOSTIC_MODE === true;
+          if (isDiagMode) {
+            console.log(`🔍 [${stage}] ${message}`, context || '');
+          }
+        }
+      };
+    }
   }
 
   // 🆔 Gerador de runId único para cada análise
@@ -157,13 +176,13 @@ class AudioAnalyzer {
       // Timing da etapa anterior
       if (ctx.lastStageTime) {
         const stageTime = timestamp - ctx.lastStageTime;
-        console.log(`⏱️ [${runId}] ${ctx.lastStage} → ${stage}: ${stageTime}ms`);
+        diagLog('PIPELINE', `${ctx.lastStage} → ${stage}: ${stageTime}ms`, { runId, stageTime });
       }
       
       ctx.lastStage = stage;
       ctx.lastStageTime = timestamp;
       
-      console.log(`🔄 [${runId}] ETAPA: ${stage}${this._diagnosticMode ? ' (DIAGNOSTIC)' : ''}`);
+      diagLog('PIPELINE', `ETAPA: ${stage}${this._diagnosticMode ? ' (DIAGNOSTIC)' : ''}`, { runId, stage });
       
     } catch (error) {
       // CRÍTICO: Logging nunca pode quebrar o pipeline
@@ -185,7 +204,12 @@ class AudioAnalyzer {
         stageObj.durationMs = stageObj.finishedAt - stageObj.startedAt;
         stageObj.result = result;
         
-        console.log(`✅ [${runId}] ${stage} concluído em ${stageObj.durationMs.toFixed(1)}ms`);
+        diagLog('PIPELINE', `${stage} concluído em ${stageObj.durationMs.toFixed(1)}ms`, { 
+          runId, 
+          stage, 
+          duration: stageObj.durationMs,
+          result: typeof result === 'object' && result !== null ? Object.keys(result).length + ' propriedades' : result
+        });
       }
     } catch (error) {
       console.warn('⚠️ Erro ao finalizar stage (não crítico):', error.message);
@@ -300,9 +324,9 @@ class AudioAnalyzer {
     // Executar operações em ordem de prioridade
     for (const op of operations.sort((a, b) => a.priority - b.priority)) {
       try {
-        console.log(`⚡ [${runId}] Executando ${op.name}`);
+        diagLog('ANALYSIS', `Executando ${op.name}`, { runId, operation: op.name });
         results[op.name] = await op.operation();
-        console.log(`✅ [${runId}] ${op.name} concluído`);
+        diagLog('ANALYSIS', `${op.name} concluído`, { runId, operation: op.name });
       } catch (error) {
         console.error(`❌ [${runId}] Erro em ${op.name}:`, error);
         
@@ -344,7 +368,7 @@ class AudioAnalyzer {
       async get(key, factory, runId) {
         // 🚫 BYPASS CACHE EM MODO DIAGNÓSTICO
         if (this._shouldBypassCache()) {
-          console.log(`🚫 [${runId}] Cache bypass (modo diagnóstico) para ${key}`);
+          diagLog('CACHE', `Cache bypass (modo diagnóstico) para ${key}`, { runId, key });
           const value = await factory(runId);
           if (value && typeof value === 'object') {
             value._runId = runId;
@@ -357,19 +381,19 @@ class AudioAnalyzer {
         if (cache.has(key)) {
           const cached = cache.get(key);
           if (cached._runId) {
-            console.log(`📦 [${runId}] Cache hit para ${key} (originado em ${cached._runId})`);
+            diagLog('CACHE', `Cache hit para ${key} (originado em ${cached._runId})`, { runId, key, originRunId: cached._runId });
           }
           return cached;
         }
         
         if (locks.has(key)) {
-          console.log(`⏳ [${runId}] Aguardando computação em andamento para ${key}`);
+          diagLog('CACHE', `Aguardando computação em andamento para ${key}`, { runId, key });
           return await locks.get(key);
         }
         
         const promise = (async () => {
           try {
-            console.log(`🔄 [${runId}] Computando ${key}`);
+            diagLog('CACHE', `Computando ${key}`, { runId, key });
             const value = await factory(runId);
             if (value && typeof value === 'object') {
               value._runId = runId;

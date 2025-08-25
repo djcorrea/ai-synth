@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste DiagLog Throttling</title>
+</head>
+<body>
+    <h1>Teste do Sistema DiagLog com Throttling</h1>
+    <p>Abra o console e teste com <code>?diag=1</code> na URL</p>
+    
+    <button onclick="testDiagLog()">Teste Normal (1 log por stage)</button>
+    <button onclick="testFlood()">Teste Flood (100 logs)</button>
+    <button onclick="diagFlush()">Flush Logs</button>
+    <button onclick="diagSetEnabled(!diagEnabled)">Toggle Logging</button>
+    
+    <div id="status"></div>
+    
+    <script src="diag-log-throttle.js"></script>
+    <script>
+        let diagEnabled = window.diagLog !== undefined;
+        
+        function updateStatus() {
+            document.getElementById('status').innerHTML = `
+                <p>Sistema DiagLog: ${diagEnabled ? '✅ ATIVO' : '❌ INATIVO'}</p>
+                <p>URL com ?diag=1: ${window.location.search.includes('diag=1') ? '✅ SIM' : '❌ NÃO'}</p>
+            `;
+        }
+        
+        function testDiagLog() {
+            console.log('🧪 Teste normal - 1 log por stage');
+            diagLog('SCORING', 'Teste de log normal', { test: true });
+            diagLog('PIPELINE', 'Outra etapa', { stage: 'test' });
+            diagLog('CACHE', 'Cache test', { key: 'test-key' });
+        }
+        
+        function testFlood() {
+            console.log('🌊 Teste de flood - 100 logs em loop');
+            for (let i = 0; i < 100; i++) {
+                diagLog('FLOOD_TEST', `Log ${i} - deveria ser throttled`, { iteration: i });
+                diagLog('SCORING', `Score calculation ${i}`, { score: Math.random() * 100 });
+                diagLog('SPECTRAL', `Spectral frame ${i}`, { frame: i });
+            }
+            console.log('🔚 Flood test concluído - verifique throttling no console');
+        }
+        
+        // Atualizar status a cada segundo
+        setInterval(updateStatus, 1000);
+        updateStatus();
+        
+        // Testar funcionamento básico
+        setTimeout(() => {
+            console.log('🔬 Teste automático iniciado');
+            testDiagLog();
+        }, 1000);
+    </script>
+</body>
+</html>
