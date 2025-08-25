@@ -1183,16 +1183,31 @@ class AudioAnalyzer {
         } catch {}
         try {
           console.log('[SCORE_DEBUG] 🔍 Tentando carregar scoring.js...');
-          const cacheBuster = Date.now() + '_' + Math.random().toString(36).substring(7);
-          const scorerMod = await import('/lib/audio/features/scoring.js?v=' + cacheBuster).catch((err)=>{
-            console.error('[SCORE_DEBUG] ❌ Erro no import scoring.js:', err);
-            return null;
-          });
+          // CACHE BUSTER SUPER AGRESSIVO
+          const timestamp = Date.now();
+          const random = Math.random().toString(36).substring(7);
+          const moduleUrl = `/lib/audio/features/scoring.js?v=V4_${timestamp}_${random}&cache=false&reload=true`;
+          console.log('[SCORE_DEBUG] 🔄 URL do módulo:', moduleUrl);
+          
+          // Tentar import múltiplas vezes se necessário
+          let scorerMod = null;
+          for (let i = 0; i < 3; i++) {
+            try {
+              scorerMod = await import(moduleUrl + `&attempt=${i}`);
+              console.log(`[SCORE_DEBUG] ✅ Import bem-sucedido na tentativa ${i + 1}`);
+              break;
+            } catch (err) {
+              console.warn(`[SCORE_DEBUG] ⚠️ Tentativa ${i + 1} falhou:`, err);
+              if (i === 2) throw err;
+            }
+          }
+          
           console.log('[SCORE_DEBUG] scoring.js carregado:', !!scorerMod);
           console.log('[SCORE_DEBUG] computeMixScore disponível:', !!(scorerMod && typeof scorerMod.computeMixScore === 'function'));
           
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
             console.log('[SCORE_DEBUG] ✅ scoring.js válido, executando...');
+            console.log('[SCORE_DEBUG] 🎯 CONFIRMAÇÃO: Sistema V4 Balanced Penalties ativo!');
             // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
             let genreSpecificRef = null;
             if (mode === 'genre' && activeRef) {
@@ -1273,8 +1288,12 @@ class AudioAnalyzer {
     
     // 🎯 GARANTIR QUE SEMPRE TEMOS UM SCORE VÁLIDO
     if (!Number.isFinite(baseAnalysis.qualityOverall)) {
-      console.log('[SCORE_DEBUG] ⚠️ qualityOverall inválido, aplicando fallback final');
+      console.log('[SCORE_DEBUG] ⚠️ qualityOverall inválido:', baseAnalysis.qualityOverall);
+      console.log('[SCORE_DEBUG] 🔍 Verificando se scoring.js foi executado corretamente...');
+      console.log('[SCORE_DEBUG] ❌ FALLBACK SENDO APLICADO - scoring.js pode não ter funcionado!');
       this._applyWeightedScoreFallback(baseAnalysis);
+    } else {
+      console.log('[SCORE_DEBUG] ✅ qualityOverall válido, V4 system funcionou:', baseAnalysis.qualityOverall);
     }
     
     console.log('[SCORE_DEBUG] 🎯 Score final definido:', baseAnalysis.qualityOverall);
