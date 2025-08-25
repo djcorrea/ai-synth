@@ -3823,6 +3823,16 @@ function renderReferenceComparisons(analysis) {
     const container = document.getElementById('referenceComparisons');
     if (!container) return;
     
+    // 🔧 DEBUG: Log para diagnosticar problema
+    console.log('🔍 renderReferenceComparisons DEBUG:', {
+        analysis: !!analysis,
+        __activeRefData: !!__activeRefData,
+        PROD_AI_REF_DATA: !!window.PROD_AI_REF_DATA,
+        PROD_AI_REF_GENRE: window.PROD_AI_REF_GENRE,
+        analysisMode: analysis?.analysisMode,
+        technicalData: !!analysis?.technicalData
+    });
+    
     // 🎯 DETECÇÃO DE MODO REFERÊNCIA - Usar dados da referência em vez de gênero
     const isReferenceMode = analysis.analysisMode === 'reference' || 
                            analysis.baseline_source === 'reference' ||
@@ -3850,13 +3860,34 @@ function renderReferenceComparisons(analysis) {
         // Modo gênero: usar targets de gênero como antes
         ref = __activeRefData;
         titleText = window.PROD_AI_REF_GENRE;
+        
+        // 🔥 CORREÇÃO CRÍTICA: Se __activeRefData não existe, usar window.PROD_AI_REF_DATA
+        if (!ref && window.PROD_AI_REF_DATA && window.PROD_AI_REF_GENRE) {
+            const genreData = window.PROD_AI_REF_DATA[window.PROD_AI_REF_GENRE];
+            if (genreData && genreData.legacy_compatibility) {
+                ref = genreData.legacy_compatibility;
+                console.log('🔧 RECUPERAÇÃO: Usando window.PROD_AI_REF_DATA para comparação:', window.PROD_AI_REF_GENRE);
+            }
+        }
+        
         if (!ref) { 
+            console.error('❌ ERRO: Nenhuma referência encontrada para comparação');
             container.innerHTML = '<div style="font-size:12px;opacity:.6">Referências não carregadas</div>'; 
             return; 
         }
     }
     
     const tech = analysis.technicalData || {};
+    
+    // 🔧 DEBUG: Log para verificar métricas disponíveis
+    console.log('🔍 Métricas disponíveis:', {
+        tech_keys: Object.keys(tech),
+        lufsIntegrated: tech.lufsIntegrated,
+        truePeakDbtp: tech.truePeakDbtp,
+        dynamicRange: tech.dynamicRange,
+        stereoCorrelation: tech.stereoCorrelation
+    });
+    
     // Mapeamento de métricas
     const rows = [];
     const nf = (n, d=2) => Number.isFinite(n) ? n.toFixed(d) : '—';

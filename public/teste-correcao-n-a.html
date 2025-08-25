@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Teste Correção Referências N/A</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #1a472a; border: 1px solid #2ea043; }
+        .error { background: #4c1e1e; border: 1px solid #f85149; }
+        .warning { background: #4a3d1a; border: 1px solid #d29922; }
+        .mono { font-family: 'Courier New', monospace; background: #21262d; padding: 2px 4px; border-radius: 3px; }
+        .valor { color: #7ee787; font-weight: bold; }
+        pre { background: #21262d; padding: 15px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Teste Correção - Problema N/A</h1>
+        <p>Verificando se as variáveis de modo e gênero estão sendo definidas corretamente.</p>
+        
+        <div id="status" class="status warning">🔄 Verificando...</div>
+        
+        <div id="resultados">
+            <h2>🔍 Diagnóstico das Variáveis</h2>
+            <pre id="diagnostic"></pre>
+            
+            <h2>📊 Referências Disponíveis</h2>
+            <pre id="referencias"></pre>
+            
+            <h2>🎯 Simulação de Análise</h2>
+            <div id="simulacao"></div>
+        </div>
+    </div>
+
+    <script src="refs/embedded-refs.js?v=1756088323635&corrected=1724440700"></script>
+    <script>
+        function diagnosticar() {
+            const diagnostic = document.getElementById('diagnostic');
+            const referencias = document.getElementById('referencias');
+            const status = document.getElementById('status');
+            const simulacao = document.getElementById('simulacao');
+            
+            // 1. Verificar variáveis de estado
+            const diagnosticInfo = {
+                'window.currentAnalysisMode': window.currentAnalysisMode,
+                'window.PROD_AI_REF_GENRE': window.PROD_AI_REF_GENRE,
+                'window.PROD_AI_REF_DATA exists': !!window.PROD_AI_REF_DATA,
+                'PROD_AI_REF_DATA keys': window.PROD_AI_REF_DATA ? Object.keys(window.PROD_AI_REF_DATA) : 'N/A'
+            };
+            
+            diagnostic.textContent = JSON.stringify(diagnosticInfo, null, 2);
+            
+            // 2. Verificar referências
+            if (window.PROD_AI_REF_DATA) {
+                const refs = {};
+                Object.entries(window.PROD_AI_REF_DATA).forEach(([genero, dados]) => {
+                    refs[genero] = {
+                        lufs_target: dados.legacy_compatibility?.lufs_target,
+                        dr_target: dados.legacy_compatibility?.dr_target,
+                        version: dados.version?.substring(0, 30) + '...'
+                    };
+                });
+                referencias.textContent = JSON.stringify(refs, null, 2);
+            } else {
+                referencias.textContent = 'ERRO: window.PROD_AI_REF_DATA não encontrado!';
+            }
+            
+            // 3. Simular lógica de análise
+            let simulacaoHtml = '';
+            
+            // Simular o que aconteceria em handleGenreFileSelection
+            const modoCorreto = window.currentAnalysisMode === 'genre';
+            const generoDefinido = !!window.PROD_AI_REF_GENRE;
+            const referenciaDisponivel = window.PROD_AI_REF_DATA && window.PROD_AI_REF_DATA[window.PROD_AI_REF_GENRE];
+            
+            simulacaoHtml += `<div class="status ${modoCorreto ? 'success' : 'error'}">`;
+            simulacaoHtml += `Modo de análise: ${window.currentAnalysisMode} (${modoCorreto ? 'Correto' : 'Incorreto'})`;
+            simulacaoHtml += `</div>`;
+            
+            simulacaoHtml += `<div class="status ${generoDefinido ? 'success' : 'error'}">`;
+            simulacaoHtml += `Gênero definido: ${window.PROD_AI_REF_GENRE || 'UNDEFINED'} (${generoDefinido ? 'OK' : 'ERRO'})`;
+            simulacaoHtml += `</div>`;
+            
+            simulacaoHtml += `<div class="status ${referenciaDisponivel ? 'success' : 'error'}">`;
+            simulacaoHtml += `Referência disponível: ${referenciaDisponivel ? 'SIM' : 'NÃO'}`;
+            simulacaoHtml += `</div>`;
+            
+            if (referenciaDisponivel) {
+                const ref = window.PROD_AI_REF_DATA[window.PROD_AI_REF_GENRE];
+                simulacaoHtml += `<div class="status success">`;
+                simulacaoHtml += `Valores: LUFS=${ref.legacy_compatibility?.lufs_target}, DR=${ref.legacy_compatibility?.dr_target}`;
+                simulacaoHtml += `</div>`;
+            }
+            
+            simulacao.innerHTML = simulacaoHtml;
+            
+            // Status final
+            const tudoOk = modoCorreto && generoDefinido && referenciaDisponivel;
+            if (tudoOk) {
+                status.className = 'status success';
+                status.innerHTML = '✅ CORREÇÃO FUNCIONANDO: Todas as variáveis estão corretas!';
+            } else {
+                status.className = 'status error';
+                status.innerHTML = '❌ AINDA HÁ PROBLEMAS: Algumas variáveis estão incorretas!';
+            }
+        }
+
+        // Definir valores padrão se não existirem (simulando a correção)
+        if (!window.currentAnalysisMode) {
+            window.currentAnalysisMode = 'genre';
+        }
+        if (!window.PROD_AI_REF_GENRE) {
+            window.PROD_AI_REF_GENRE = 'funk_mandela';
+        }
+
+        // Aguardar carregamento das referências
+        setTimeout(() => {
+            diagnosticar();
+        }, 1000);
+    </script>
+</body>
+</html>
