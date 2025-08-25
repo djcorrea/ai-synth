@@ -30,6 +30,7 @@ let __refDerivedStats = {}; // estatísticas agregadas (ex: média stereo) por g
 
 // 🎯 MODO REFERÊNCIA - Variáveis globais
 let currentAnalysisMode = 'genre'; // 'genre' | 'reference'
+window.currentAnalysisMode = 'genre'; // Disponível globalmente também
 let referenceStepState = {
     currentStep: 'userAudio', // 'userAudio' | 'referenceAudio' | 'analysis'
     userAudioFile: null,
@@ -944,7 +945,33 @@ async function loadReferenceData(genre) {
             console.log('🔄 Fallback para embedded refs...');
         }
         
-        // 2) Fallback para referências embutidas (embedded)
+        // 2.5) Fallback para PROD_AI_REF_DATA já carregado
+        if (typeof window !== 'undefined' && window.PROD_AI_REF_DATA && window.PROD_AI_REF_DATA[genre]) {
+            const data = window.PROD_AI_REF_DATA[genre];
+            if (data && typeof data === 'object' && data.legacy_compatibility) {
+                const enriched = enrichReferenceObject(structuredClone(data), genre);
+                __refDataCache[genre] = enriched;
+                __activeRefData = enriched;
+                __activeRefGenre = genre;
+                
+                console.log('🎯 REFS DIAGNOSTIC:', {
+                    genre,
+                    source: 'PROD_AI_REF_DATA',
+                    path: 'window.PROD_AI_REF_DATA',
+                    version: data.version || 'loaded',
+                    num_tracks: data.num_tracks || data.legacy_compatibility?.num_tracks,
+                    lufs_target: data.legacy_compatibility.lufs_target,
+                    true_peak_target: data.legacy_compatibility.true_peak_target,
+                    stereo_target: data.legacy_compatibility.stereo_target
+                });
+                
+                updateRefStatus('✔ referências carregadas', '#0d6efd');
+                try { buildAggregatedRefStats(); } catch {}
+                return enriched;
+            }
+        }
+        
+        // 3) Fallback para referências embutidas (embedded)
         const embWin = (typeof window !== 'undefined' && window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre && window.__EMBEDDED_REFS__.byGenre[genre]) || null;
         const embInline = __INLINE_EMBEDDED_REFS__?.byGenre?.[genre] || null;
         const useData = embWin || embInline;
@@ -1193,6 +1220,12 @@ function initializeAudioAnalyzerIntegration() {
             if (rg && !window.PROD_AI_REF_GENRE) {
                 window.PROD_AI_REF_GENRE = String(rg).trim().toLowerCase();
                 __dbg(`[REF-GÊNERO] Ativado via URL: ${window.PROD_AI_REF_GENRE}`);
+            }
+            
+            // 🎯 CORREÇÃO: Definir gênero padrão se não existir
+            if (!window.PROD_AI_REF_GENRE) {
+                window.PROD_AI_REF_GENRE = 'funk_mandela';
+                __dbg(`[REF-GÊNERO] Definido padrão: ${window.PROD_AI_REF_GENRE}`);
             }
             // Flags de controle por URL (não alteram CSS)
             if (params.has('surgical')) {
@@ -1614,6 +1647,7 @@ async function handleModalFileSelection(file) {
             
             setTimeout(() => {
                 currentAnalysisMode = 'genre';
+                window.currentAnalysisMode = 'genre';
                 configureModalForMode('genre');
                 handleGenreFileSelection(file);
             }, 2000);
