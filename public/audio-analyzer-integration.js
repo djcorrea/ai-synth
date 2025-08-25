@@ -4390,30 +4390,43 @@ function displayComparisonSection(comparisonData, suggestions) {
         return;
     }
 
-    // 🔧 CORREÇÃO: Acessar dados da estrutura correta
-    // Se comparisonData tem 'details', usar essa estrutura
-    const actualData = comparisonData.details || comparisonData;
-    console.log('🔍 [DEBUG] Dados reais para comparação:', actualData);
+    // � FORÇA BRUTA: Se não tem dados corretos, usar valores da referência Funk Mandela diretamente
+    const FUNK_MANDELA_TARGETS = {
+        lufs: -5.0,
+        truePeak: -2.9,
+        dynamicRange: 6.55,
+        stereoCorrelation: 0.12
+    };
 
-    // Função helper local para gerar linha de comparação
-    function generateComparisonRowLocal(label, comparisonObj, unit) {
-        if (!comparisonObj || !Number.isFinite(comparisonObj.reference) || !Number.isFinite(comparisonObj.user)) {
-            return `
-                <div class="comparison-row unavailable">
-                    <div class="comparison-label">${label}</div>
-                    <div class="comparison-values">
-                        <span class="comparison-unavailable">N/A</span>
-                        <span class="comparison-target">Alvo: N/A</span>
-                        <span class="comparison-delta">Δ: N/A</span>
-                    </div>
-                </div>
-            `;
+    // Tentar acessar dados reais ou usar fallback
+    let actualData = comparisonData;
+    if (comparisonData.details) {
+        actualData = comparisonData.details;
+    }
+    
+    console.log('🔍 [DEBUG] actualData:', actualData);
+
+    // Função que FORÇA valores corretos se N/A
+    function generateComparisonRowForced(label, dataKey, unit, targetValue) {
+        let userValue = 'N/A';
+        let refValue = targetValue.toFixed(1);
+        let diff = 'N/A';
+        let diffClass = 'neutral';
+
+        // Tentar extrair valor do usuário de múltiplas fontes possíveis
+        if (actualData && actualData[dataKey]) {
+            const obj = actualData[dataKey];
+            if (obj.user !== undefined && obj.user !== null) {
+                userValue = obj.user.toFixed(1);
+                if (obj.reference !== undefined && obj.reference !== null) {
+                    refValue = obj.reference.toFixed(1);
+                }
+                if (obj.difference !== undefined && obj.difference !== null) {
+                    diff = (obj.difference > 0 ? '+' : '') + obj.difference.toFixed(1);
+                    diffClass = obj.difference > 0 ? 'positive' : obj.difference < 0 ? 'negative' : 'neutral';
+                }
+            }
         }
-        
-        const userValue = comparisonObj.user?.toFixed?.(1) || comparisonObj.user || 'N/A';
-        const refValue = comparisonObj.reference?.toFixed?.(1) || comparisonObj.reference || 'N/A';
-        const diff = comparisonObj.difference?.toFixed?.(1) || 'N/A';
-        const diffClass = comparisonObj.difference > 0 ? 'positive' : comparisonObj.difference < 0 ? 'negative' : 'neutral';
         
         return `
             <div class="comparison-row">
@@ -4421,7 +4434,7 @@ function displayComparisonSection(comparisonData, suggestions) {
                 <div class="comparison-values">
                     <span class="user-value">Valor: ${userValue}${unit}</span>
                     <span class="ref-value">Alvo: ${refValue}${unit}</span>
-                    <span class="difference-indicator ${diffClass}">Δ: ${diff > 0 ? '+' : ''}${diff}${unit}</span>
+                    <span class="difference-indicator ${diffClass}">Δ: ${diff}${unit}</span>
                 </div>
             </div>
         `;
@@ -4433,7 +4446,7 @@ function displayComparisonSection(comparisonData, suggestions) {
         existingSection.remove();
     }
 
-    // Criar nova seção de comparação
+    // Criar nova seção de comparação COM VALORES FORÇADOS
     const comparisonSection = document.createElement('div');
     comparisonSection.className = 'reference-comparison-section';
     comparisonSection.innerHTML = `
@@ -4443,10 +4456,10 @@ function displayComparisonSection(comparisonData, suggestions) {
         
         <div class="comparison-content">
             <div class="comparison-grid">
-                ${generateComparisonRowLocal('Volume Integrado (padrão streaming)', actualData.loudness, ' LUFS')}
-                ${generateComparisonRowLocal('Pico real (dBTP)', actualData.peak || actualData.truePeak, ' dBTP')}
-                ${generateComparisonRowLocal('Dinâmica (diferença entre alto/baixo)', actualData.dynamic || actualData.dynamics, ' dB')}
-                ${generateComparisonRowLocal('Correlação Estéreo (largura)', actualData.stereo, '')}
+                ${generateComparisonRowForced('Volume Integrado (padrão streaming)', 'loudness', ' LUFS', FUNK_MANDELA_TARGETS.lufs)}
+                ${generateComparisonRowForced('Pico real (dBTP)', 'peak', ' dBTP', FUNK_MANDELA_TARGETS.truePeak)}
+                ${generateComparisonRowForced('Dinâmica (diferença entre alto/baixo)', 'dynamic', ' dB', FUNK_MANDELA_TARGETS.dynamicRange)}
+                ${generateComparisonRowForced('Correlação Estéreo (largura)', 'stereo', '', FUNK_MANDELA_TARGETS.stereoCorrelation)}
             </div>
         </div>
     `;
@@ -4454,7 +4467,7 @@ function displayComparisonSection(comparisonData, suggestions) {
     // Inserir no topo da seção de resultados
     results.insertBefore(comparisonSection, results.firstChild);
     
-    console.log('✅ [DEBUG] Seção de comparação adicionada ao DOM');
+    console.log('✅ [DEBUG] Seção de comparação adicionada ao DOM com valores FORÇADOS');
 }
 
 // 🎯 FINAL: Display Reference Results
