@@ -3626,7 +3626,15 @@ function displayModalResults(analysis) {
             </div>
         `;
     
-    try { renderReferenceComparisons(analysis); } catch(e){ console.warn('ref compare fail', e);}    
+    try { 
+        // 🚨 CORREÇÃO EMERGENCIAL: Garantir que renderReferenceComparisons funcione
+        if (!analysis) analysis = {};
+        if (!analysis.technicalData) analysis.technicalData = {};
+        renderReferenceComparisons(analysis); 
+    } catch(e){ 
+        console.error('❌ ERRO em renderReferenceComparisons:', e);
+        console.log('🔍 Analysis object:', analysis);
+    }    
         try { if (window.CAIAR_ENABLED) injectValidationControls(); } catch(e){ console.warn('validation controls fail', e); }
     __dbg('📊 Resultados exibidos no modal');
 }
