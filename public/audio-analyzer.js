@@ -120,7 +120,7 @@ class AudioAnalyzer {
           console.log('🧹 Garbage Collection forçado (dev mode)');
         } else {
           // Simular pressão de memória para encorajar GC
-          const dummy = new ArrayBuffer(1024 * 1024); // 1MB
+          let dummy = new ArrayBuffer(1024 * 1024); // 1MB
           setTimeout(() => dummy = null, 0);
         }
         this._memoryManager.lastGC = Date.now();
