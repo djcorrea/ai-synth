@@ -4380,6 +4380,79 @@ if (typeof window !== 'undefined' && !window.__testConsistency) {
     };
 }
 
+// 🎯 IMPLEMENTAÇÃO FALTANTE: Display Comparison Section
+function displayComparisonSection(comparisonData, suggestions) {
+    console.log('🔍 [DEBUG] displayComparisonSection chamada com:', { comparisonData, suggestions });
+    
+    const results = document.getElementById('results');
+    if (!results) {
+        console.error('❌ Results container não encontrado');
+        return;
+    }
+
+    // Função helper local para gerar linha de comparação
+    function generateComparisonRowLocal(label, comparisonData, unit) {
+        if (!comparisonData || comparisonData.difference === null || comparisonData.difference === undefined) {
+            return `
+                <div class="comparison-row unavailable">
+                    <div class="comparison-label">${label}</div>
+                    <div class="comparison-values">
+                        <span class="comparison-unavailable">N/A</span>
+                        <span class="comparison-target">Alvo: N/A</span>
+                        <span class="comparison-delta">Δ: N/A</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        const userValue = comparisonData.user?.toFixed?.(1) || comparisonData.user || 'N/A';
+        const refValue = comparisonData.reference?.toFixed?.(1) || comparisonData.reference || 'N/A';
+        const diff = comparisonData.difference?.toFixed?.(1) || 'N/A';
+        const diffClass = comparisonData.difference > 0 ? 'positive' : comparisonData.difference < 0 ? 'negative' : 'neutral';
+        
+        return `
+            <div class="comparison-row">
+                <div class="comparison-label">${label}</div>
+                <div class="comparison-values">
+                    <span class="user-value">Valor: ${userValue}${unit}</span>
+                    <span class="ref-value">Alvo: ${refValue}${unit}</span>
+                    <span class="difference-indicator ${diffClass}">Δ: ${diff > 0 ? '+' : ''}${diff}${unit}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Remover seção anterior se existir
+    const existingSection = results.querySelector('.reference-comparison-section');
+    if (existingSection) {
+        existingSection.remove();
+    }
+
+    // Criar nova seção de comparação
+    const comparisonSection = document.createElement('div');
+    comparisonSection.className = 'reference-comparison-section';
+    comparisonSection.innerHTML = `
+        <div class="comparison-header">
+            <h4>🎯 COMPARAÇÃO DE REFERÊNCIA (FUNK_MANDELA)</h4>
+        </div>
+        
+        <div class="comparison-content">
+            <div class="comparison-grid">
+                ${generateComparisonRowLocal('Volume Integrado (padrão streaming)', comparisonData.loudness, ' LUFS')}
+                ${generateComparisonRowLocal('Pico real (dBTP)', comparisonData.truePeak, ' dBTP')}
+                ${generateComparisonRowLocal('Dinâmica (diferença entre alto/baixo)', comparisonData.dynamics, ' dB')}
+                ${generateComparisonRowLocal('Variação de Volume (consistência)', comparisonData.volumeVariation, ' LU')}
+                ${generateComparisonRowLocal('Correlação Estéreo (largura)', comparisonData.stereo, '')}
+            </div>
+        </div>
+    `;
+
+    // Inserir no topo da seção de resultados
+    results.insertBefore(comparisonSection, results.firstChild);
+    
+    console.log('✅ [DEBUG] Seção de comparação adicionada ao DOM');
+}
+
 // 🎯 FINAL: Display Reference Results
 window.displayReferenceResults = function(referenceResults) {
     window.logReferenceEvent('displaying_reference_results', {
