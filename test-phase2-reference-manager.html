@@ -38,7 +38,7 @@
             try {
                 log('🔄 Carregando AudioAnalyzer com Phase 2...', 'info');
                 
-                await loadScript(`audio-analyzer.js?cb=${Date.now()}`);
+                await loadScript(`public/audio-analyzer.js?cb=${Date.now()}`);
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 if (typeof window.audioAnalyzer === 'undefined') {

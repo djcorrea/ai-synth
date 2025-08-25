@@ -6255,3 +6255,313 @@ if (typeof window !== 'undefined' && window.audioAnalyzer) {
   
   console.log('✅ Phase 2 - Reference Manager initialized safely');
 }
+
+// 🚨 PHASE 3: CACHE INVALIDATION - IMPLEMENTAÇÃO SEGURA
+// 🧹 Sistema inteligente de invalidação de cache com políticas TTL e limpeza automática  
+// 🔒 COMPATIBILIDADE: 100% compatível com sistemas existentes de cache
+if (typeof window !== 'undefined' && window.audioAnalyzer) {
+  
+  // 🧹 CACHE INVALIDATION - Métodos seguros integrados ao AudioAnalyzer
+  Object.assign(window.audioAnalyzer, {
+    
+    /**
+     * 🕐 CACHE TTL MANAGER
+     * Gerencia Time-To-Live de diferentes tipos de cache
+     */
+    _manageCacheTTL() {
+      try {
+        const now = Date.now();
+        const policies = {
+          analysis: 15 * 60 * 1000,     // 15 minutos para análises
+          references: 30 * 60 * 1000,   // 30 minutos para referências  
+          ui_state: 5 * 60 * 1000,      // 5 minutos para estados UI
+          temp_files: 2 * 60 * 1000     // 2 minutos para arquivos temporários
+        };
+        
+        const invalidated = {
+          analysis: 0,
+          references: 0,
+          ui_state: 0,
+          temp_files: 0
+        };
+        
+        // Invalidar cache de análises (__AUDIO_ANALYSIS_CACHE__)
+        const analysisCache = window.__AUDIO_ANALYSIS_CACHE__;
+        if (analysisCache instanceof Map) {
+          for (const [key, entry] of analysisCache.entries()) {
+            if (entry._ts && (now - entry._ts) > policies.analysis) {
+              analysisCache.delete(key);
+              invalidated.analysis++;
+            }
+          }
+        }
+        
+        // Invalidar cache de referências (__refDataCache)
+        const refCache = window.__refDataCache || {};
+        Object.keys(refCache).forEach(key => {
+          const entry = refCache[key];
+          if (entry._cacheTimestamp && (now - entry._cacheTimestamp) > policies.references) {
+            delete refCache[key];
+            invalidated.references++;
+          }
+        });
+        
+        // Invalidar cache UI/temporário (localStorage com prefixo 'prodai_')
+        if (typeof localStorage !== 'undefined') {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('prodai_temp_')) {
+              try {
+                const data = JSON.parse(localStorage.getItem(key));
+                if (data._ts && (now - data._ts) > policies.temp_files) {
+                  localStorage.removeItem(key);
+                  invalidated.temp_files++;
+                }
+              } catch (e) {
+                // Remove entrada inválida
+                localStorage.removeItem(key);
+                invalidated.temp_files++;
+              }
+            }
+          }
+        }
+        
+        return {
+          timestamp: new Date().toISOString(),
+          policies,
+          invalidated,
+          totalInvalidated: Object.values(invalidated).reduce((sum, count) => sum + count, 0)
+        };
+      } catch (error) {
+        console.warn('⚠️ Cache TTL management error:', error.message);
+        return { error: error.message };
+      }
+    },
+    
+    /**
+     * 🔄 CACHE INVALIDATION BY TYPE
+     * Invalida cache específico por tipo com segurança
+     */
+    _invalidateCacheByType(type = 'all') {
+      try {
+        const results = { invalidated: 0, errors: [] };
+        
+        switch (type) {
+          case 'analysis':
+            const analysisCache = window.__AUDIO_ANALYSIS_CACHE__;
+            if (analysisCache instanceof Map) {
+              const size = analysisCache.size;
+              analysisCache.clear();
+              results.invalidated = size;
+            }
+            break;
+            
+          case 'references':
+            const refCache = window.__refDataCache || {};
+            const refKeys = Object.keys(refCache);
+            refKeys.forEach(key => delete refCache[key]);
+            results.invalidated = refKeys.length;
+            // Limpar dados ativos também
+            window.__activeRefData = null;
+            window.__activeRefGenre = null;
+            break;
+            
+          case 'memory':
+            // Forçar limpeza dos Memory Management caches
+            if (typeof this._cleanupLRUCache === 'function') {
+              this._cleanupLRUCache();
+            }
+            if (typeof this._cleanupAudioBuffer === 'function') {
+              this._cleanupAudioBuffer();
+            }
+            if (typeof this._cleanupStemsArrays === 'function') {
+              this._cleanupStemsArrays();
+            }
+            results.invalidated = 1; // Simbólico
+            break;
+            
+          case 'localStorage':
+            if (typeof localStorage !== 'undefined') {
+              let count = 0;
+              for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('prodai_') || key.startsWith('audio_'))) {
+                  localStorage.removeItem(key);
+                  count++;
+                }
+              }
+              results.invalidated = count;
+            }
+            break;
+            
+          case 'all':
+            // Invalidar tudo recursivamente
+            const allResults = [
+              this._invalidateCacheByType('analysis'),
+              this._invalidateCacheByType('references'),
+              this._invalidateCacheByType('memory'),
+              this._invalidateCacheByType('localStorage')
+            ];
+            results.invalidated = allResults.reduce((sum, r) => sum + r.invalidated, 0);
+            results.errors = allResults.flatMap(r => r.errors || []);
+            break;
+            
+          default:
+            throw new Error(`Tipo de cache inválido: ${type}`);
+        }
+        
+        console.log(`🧹 Cache invalidation [${type}]: ${results.invalidated} entradas removidas`);
+        return results;
+      } catch (error) {
+        console.error('❌ Cache invalidation error:', error.message);
+        return { invalidated: 0, errors: [error.message] };
+      }
+    },
+    
+    /**
+     * 🎯 SMART CACHE INVALIDATION
+     * Invalidação inteligente baseada em uso e padrões
+     */
+    _smartCacheInvalidation(options = {}) {
+      try {
+        const {
+          maxAnalysisEntries = 20,
+          maxReferenceEntries = 5,
+          maxMemoryUsageMB = 100,
+          aggressiveCleanup = false
+        } = options;
+        
+        const stats = {
+          before: {},
+          after: {},
+          cleaned: {
+            analysis: 0,
+            references: 0,
+            memory: 0
+          }
+        };
+        
+        // Capturar estado inicial
+        const analysisCache = window.__AUDIO_ANALYSIS_CACHE__;
+        const refCache = window.__refDataCache || {};
+        stats.before.analysis = analysisCache instanceof Map ? analysisCache.size : 0;
+        stats.before.references = Object.keys(refCache).length;
+        
+        // 1. Limpeza inteligente de análises
+        if (analysisCache instanceof Map && analysisCache.size > maxAnalysisEntries) {
+          const entries = Array.from(analysisCache.entries());
+          // Ordenar por timestamp (mais antigo primeiro)
+          entries.sort((a, b) => (a[1]._ts || 0) - (b[1]._ts || 0));
+          
+          const toRemove = entries.slice(0, analysisCache.size - maxAnalysisEntries);
+          toRemove.forEach(([key]) => {
+            analysisCache.delete(key);
+            stats.cleaned.analysis++;
+          });
+        }
+        
+        // 2. Limpeza inteligente de referências (via Phase 2)
+        if (typeof this._manageReferenceCache === 'function') {
+          const refResult = this._manageReferenceCache();
+          stats.cleaned.references = refResult.cleanedEntries || 0;
+        }
+        
+        // 3. Limpeza de memória agressiva se solicitada
+        if (aggressiveCleanup) {
+          if (typeof this._forceGarbageCollection === 'function') {
+            this._forceGarbageCollection();
+            stats.cleaned.memory++;
+          }
+        }
+        
+        // Capturar estado final
+        stats.after.analysis = analysisCache instanceof Map ? analysisCache.size : 0;
+        stats.after.references = Object.keys(window.__refDataCache || {}).length;
+        
+        return {
+          timestamp: new Date().toISOString(),
+          mode: aggressiveCleanup ? 'aggressive' : 'smart',
+          stats,
+          success: true
+        };
+      } catch (error) {
+        console.error('❌ Smart cache invalidation error:', error.message);
+        return { success: false, error: error.message };
+      }
+    },
+    
+    /**
+     * 📊 CACHE HEALTH MONITOR
+     * Monitora saúde geral do sistema de cache
+     */
+    _monitorCacheHealth() {
+      try {
+        const health = {
+          timestamp: new Date().toISOString(),
+          analysis: { status: 'unknown', size: 0, oldestEntry: null },
+          references: { status: 'unknown', size: 0, genres: [] },
+          memory: { status: 'unknown', stats: null },
+          localStorage: { status: 'unknown', prodaiEntries: 0 },
+          overall: 'unknown'
+        };
+        
+        // Análise do cache de análises
+        const analysisCache = window.__AUDIO_ANALYSIS_CACHE__;
+        if (analysisCache instanceof Map) {
+          health.analysis.size = analysisCache.size;
+          health.analysis.status = analysisCache.size > 30 ? 'warning' : 'healthy';
+          
+          // Encontrar entrada mais antiga
+          let oldestTs = Date.now();
+          for (const [key, entry] of analysisCache.entries()) {
+            if (entry._ts && entry._ts < oldestTs) {
+              oldestTs = entry._ts;
+            }
+          }
+          health.analysis.oldestEntry = oldestTs < Date.now() ? new Date(oldestTs).toISOString() : null;
+        }
+        
+        // Análise do cache de referências
+        const refCache = window.__refDataCache || {};
+        health.references.size = Object.keys(refCache).length;
+        health.references.genres = Object.keys(refCache);
+        health.references.status = health.references.size > 8 ? 'warning' : 'healthy';
+        
+        // Análise da memória (via Phase 1)
+        if (typeof this._getMemoryStats === 'function') {
+          health.memory.stats = this._getMemoryStats();
+          health.memory.status = 'monitored';
+        }
+        
+        // Análise do localStorage
+        if (typeof localStorage !== 'undefined') {
+          let prodaiCount = 0;
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('prodai_')) {
+              prodaiCount++;
+            }
+          }
+          health.localStorage.prodaiEntries = prodaiCount;
+          health.localStorage.status = prodaiCount > 50 ? 'warning' : 'healthy';
+        }
+        
+        // Status geral
+        const statuses = [health.analysis.status, health.references.status, health.localStorage.status];
+        health.overall = statuses.includes('warning') ? 'warning' : 'healthy';
+        
+        console.log('📊 Cache Health Report:', health);
+        return health;
+      } catch (error) {
+        console.error('❌ Cache health monitoring error:', error.message);
+        return { 
+          timestamp: new Date().toISOString(),
+          overall: 'error', 
+          error: error.message 
+        };
+      }
+    }
+  });
+  
+  console.log('✅ Phase 3 - Cache Invalidation initialized safely');
+}
