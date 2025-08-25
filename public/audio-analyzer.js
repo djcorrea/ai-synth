@@ -1222,9 +1222,14 @@ class AudioAnalyzer {
             }
             
             console.log('[SCORE_DEBUG] 🎯 USANDO SISTEMA V4 BALANCED PENALTIES!');
+            console.log('[SCORE_DEBUG] 📊 Dados enviados para scoring:', Object.keys(tdFinal));
             const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
             console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
             console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
+            console.log('[SCORE_DEBUG] 🎯 Final score é válido?', !!(finalScore && finalScore.scorePct));
+            
+            if (finalScore && Number.isFinite(finalScore.scorePct)) {
+              console.log('[SCORE_DEBUG] ✅ V4 Score válido, aplicando:', finalScore.scorePct);
             
             // TESTE MANUAL COM DADOS CONHECIDOS
             const testData = {
