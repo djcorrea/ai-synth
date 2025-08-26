@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Teste Deploy Vercel - Correção Score</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            line-height: 1.6;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .success { background: rgba(46, 204, 113, 0.3); border-left: 4px solid #2ecc71; }
+        .warning { background: rgba(241, 196, 15, 0.3); border-left: 4px solid #f1c40f; }
+        .error { background: rgba(231, 76, 60, 0.3); border-left: 4px solid #e74c3c; }
+        .info { background: rgba(52, 152, 219, 0.3); border-left: 4px solid #3498db; }
+        button {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        #results {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Teste de Deploy Vercel - Correção Score</h1>
+        
+        <div class="info">
+            <strong>🎯 OBJETIVO:</strong> Verificar se a correção da ordem de execução do score foi deployada corretamente na Vercel.
+        </div>
+        
+        <div class="warning">
+            <strong>⏱️ AGUARDE:</strong> O deploy pode levar alguns minutos para ser processado pela Vercel.
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <button onclick="testarDeployVercel()">🔍 Testar Deploy Vercel</button>
+            <button onclick="verificarCorrecao()">✅ Verificar Correção</button>
+            <button onclick="testarCompleto()">🚀 Teste Completo</button>
+            <button onclick="limparResultados()">🗑️ Limpar</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+            resultsDiv.textContent += `[${timestamp}] ${icon} ${message}\n`;
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        function limparResultados() {
+            resultsDiv.textContent = '';
+            log('Log limpo - pronto para novos testes');
+        }
+        
+        function testarDeployVercel() {
+            log('🔍 Iniciando teste de deploy na Vercel...');
+            
+            // Verificar ambiente
+            const isVercel = window.location.hostname !== 'localhost' && 
+                           window.location.hostname !== '127.0.0.1' &&
+                           !window.location.hostname.includes('3000');
+            
+            log(`🌐 Ambiente detectado: ${isVercel ? 'VERCEL (Produção)' : 'LOCALHOST (Desenvolvimento)'}`);
+            
+            if (isVercel) {
+                log('✅ Está rodando na Vercel!', 'success');
+            } else {
+                log('⚠️ Está rodando localmente - teste na URL da Vercel', 'warning');
+            }
+            
+            // Verificar commit
+            log('📋 Verificando informações de deploy...');
+            log('🔖 Commit esperado: dfd8678');
+            log('🕐 Deploy timestamp: 2025-08-25T21:42:35');
+            
+            return isVercel;
+        }
+        
+        function verificarCorrecao() {
+            log('🎯 Verificando se a correção foi aplicada...');
+            
+            // Verificar se o script foi carregado
+            if (typeof window.aplicarCorrecaoOrdemExecucao === 'function') {
+                log('✅ Script solucao-definitiva-score.js carregado', 'success');
+                
+                // Verificar se a correção foi aplicada
+                if (window.__SCORE_ORDER_FIX_APPLIED) {
+                    log('✅ Correção aplicada automaticamente', 'success');
+                    log(`📊 Versão: ${window.__SCORE_ORDER_FIX_VERSION}`);
+                    log(`🕐 Timestamp: ${window.__SCORE_ORDER_FIX_TIMESTAMP}`);
+                    
+                    // Testar função de status
+                    try {
+                        const status = window.controlarCorrecaoOrdem('status');
+                        log(`📈 Status da correção: ${status.message}`, 'success');
+                        return true;
+                    } catch (error) {
+                        log(`❌ Erro ao verificar status: ${error.message}`, 'error');
+                        return false;
+                    }
+                } else {
+                    log('⚠️ Script carregado mas correção não aplicada ainda', 'warning');
+                    log('💡 Aguarde a inicialização completa ou aplique manualmente');
+                    return false;
+                }
+            } else {
+                log('❌ Script de correção NÃO foi carregado', 'error');
+                log('💭 Possíveis causas: deploy não concluído, cache, erro de carregamento');
+                return false;
+            }
+        }
+        
+        function testarCompleto() {
+            log('🚀 Executando teste completo...');
+            log('==========================================');
+            
+            const isVercel = testarDeployVercel();
+            
+            setTimeout(() => {
+                const correcaoOk = verificarCorrecao();
+                
+                setTimeout(() => {
+                    // Teste da função de validação se existir
+                    if (typeof window.validarDeployScore === 'function') {
+                        log('🔧 Executando validação automática...');
+                        try {
+                            const validacao = window.validarDeployScore();
+                            log(`📊 Resultado da validação: ${validacao.status}`, validacao.status === 'SUCCESS' ? 'success' : 'error');
+                            log(`🌐 Ambiente: ${validacao.ambiente}`);
+                            log(`📁 Arquivos: ${validacao.arquivosCarregados ? 'OK' : 'FALHA'}`);
+                            log(`🎯 Correção: ${validacao.correcaoAplicada ? 'OK' : 'FALHA'}`);
+                        } catch (error) {
+                            log(`❌ Erro na validação: ${error.message}`, 'error');
+                        }
+                    }
+                    
+                    // Resultado final
+                    log('==========================================');
+                    if (isVercel && correcaoOk) {
+                        log('🎉 TESTE COMPLETO: SUCESSO! Deploy funcionando na Vercel', 'success');
+                    } else if (!isVercel) {
+                        log('⚠️ TESTE PARCIAL: Funciona localmente, testar na Vercel', 'warning');
+                    } else {
+                        log('❌ TESTE FALHOU: Problemas no deploy ou correção', 'error');
+                    }
+                }, 1000);
+            }, 500);
+        }
+        
+        // Auto-execução inicial
+        setTimeout(() => {
+            log('🎯 Página carregada - Sistema de teste pronto');
+            log('💡 Use os botões acima para testar o deploy');
+            log('🚀 Para teste automático completo, clique em "Teste Completo"');
+        }, 500);
+    </script>
+</body>
+</html>
