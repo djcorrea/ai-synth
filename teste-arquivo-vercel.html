@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Teste Arquivo Vercel</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31,38,135,0.37);
+        }
+        h1 { text-align: center; margin-bottom: 30px; }
+        .btn {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .result {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #4ECDC4;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error { border-left-color: #FF6B6B; }
+        .success { border-left-color: #51CF66; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Teste de Acessibilidade de Arquivos Vercel</h1>
+        <p>Testa se os arquivos de referência estão acessíveis na Vercel</p>
+        
+        <button class="btn" onclick="testarArquivos()">🚀 Testar Arquivos</button>
+        <button class="btn" onclick="clearLog()">🧹 Limpar</button>
+        
+        <div id="log" class="result">Clique em "Testar Arquivos" para começar...</div>
+    </div>
+
+    <script>
+        const logElement = document.getElementById('log');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}\n`;
+            
+            if (type === 'error') {
+                logElement.className = 'result error';
+            } else if (type === 'success') {
+                logElement.className = 'result success';
+            }
+            
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        function clearLog() {
+            logElement.innerHTML = 'Log limpo. Clique em "Testar Arquivos" para começar...\n';
+            logElement.className = 'result';
+        }
+        
+        async function testarArquivos() {
+            clearLog();
+            log('🔍 Iniciando teste de acessibilidade de arquivos...');
+            
+            // URLs para testar
+            const baseUrl = location.origin;
+            const arquivos = [
+                '/refs/out/funk_mandela.json',
+                '/refs/out/funk_mandela.json?v=' + Date.now(),
+                '/public/refs/out/funk_mandela.json',
+                '/adaptador-compatibilidade.js',
+                '/diagnostico-scoring.js',
+                '/auditoria-completa-sistema.js'
+            ];
+            
+            log(`🌐 URL base: ${baseUrl}`);
+            
+            for (const arquivo of arquivos) {
+                const url = baseUrl + arquivo;
+                log(`\n📁 Testando: ${arquivo}`);
+                
+                try {
+                    const response = await fetch(url);
+                    
+                    if (response.ok) {
+                        const contentType = response.headers.get('content-type');
+                        const size = response.headers.get('content-length');
+                        
+                        // Para JSON, tentar parse
+                        if (arquivo.endsWith('.json')) {
+                            try {
+                                const data = await response.json();
+                                log(`✅ SUCESSO: ${response.status} | Tipo: ${contentType} | Tamanho: ${size} bytes`, 'success');
+                                log(`📊 Dados JSON: ${Object.keys(data).length} propriedades principais`);
+                                
+                                if (data.funk_mandela) {
+                                    log(`🎯 funk_mandela encontrado com: ${Object.keys(data.funk_mandela).join(', ')}`);
+                                }
+                                
+                            } catch (jsonError) {
+                                log(`⚠️ PARCIAL: Arquivo existe mas JSON inválido: ${jsonError.message}`);
+                            }
+                        } else {
+                            log(`✅ SUCESSO: ${response.status} | Tipo: ${contentType} | Tamanho: ${size} bytes`, 'success');
+                        }
+                        
+                    } else {
+                        log(`❌ ERRO: ${response.status} ${response.statusText}`, 'error');
+                        
+                        if (response.status === 404) {
+                            log(`💡 Arquivo não encontrado - isso explica os erros de carregamento!`);
+                        }
+                    }
+                    
+                } catch (error) {
+                    log(`💥 FALHA: ${error.message}`, 'error');
+                }
+                
+                // Pequena pausa entre requests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            log('\n🎯 DIAGNÓSTICO CONCLUÍDO');
+            log('💡 Se funk_mandela.json não está acessível, isso explica os scores zerados!');
+        }
+    </script>
+</body>
+</html>
