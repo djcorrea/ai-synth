@@ -1169,10 +1169,8 @@ if (typeof window !== 'undefined' && !window.__runAcceptanceAudioTests) {
     };
 }
 
-// Inicializar quando DOM carregar
-document.addEventListener('DOMContentLoaded', function() {
-    initializeAudioAnalyzerIntegration();
-});
+// ⚠️ REMOVIDO: Inicialização duplicada que causava race conditions
+// Este DOMContentLoaded foi removido pois há outro idêntico no final do arquivo
 
 
 function initializeAudioAnalyzerIntegration() {

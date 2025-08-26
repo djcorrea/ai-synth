@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚨 DIAGNÓSTICO EMERGENCIAL AI-SYNTH</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; background: #2a2a2a; }
+        .success { border-color: #28a745; background: #1e4620; }
+        .error { border-color: #dc3545; background: #4d1f1f; }
+        .warning { border-color: #ffc107; background: #4d4020; }
+        .test { margin: 10px 0; padding: 10px; background: #333; }
+        .log { font-size: 12px; color: #ccc; margin: 5px 0; }
+        button { padding: 10px 20px; margin: 10px 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        h2 { color: #ffc107; }
+        h3 { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>🚨 DIAGNÓSTICO EMERGENCIAL AI-SYNTH</h1>
+    <p>Sistema de diagnóstico completo para identificar todos os problemas</p>
+    
+    <button onclick="executarDiagnosticoCompleto()">🔍 EXECUTAR DIAGNÓSTICO COMPLETO</button>
+    <button onclick="limparResultados()">🧹 LIMPAR RESULTADOS</button>
+    
+    <div id="resultados"></div>
+
+    <script>
+        const resultados = document.getElementById('resultados');
+        
+        function log(msg, tipo = 'info') {
+            console.log(`[DIAGNÓSTICO] ${msg}`);
+            const div = document.createElement('div');
+            div.className = `log ${tipo}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            return div;
+        }
+        
+        function criarSecao(titulo, tipo = 'info') {
+            const section = document.createElement('div');
+            section.className = `section ${tipo}`;
+            section.innerHTML = `<h3>${titulo}</h3>`;
+            return section;
+        }
+        
+        async function testar404(url, nome) {
+            try {
+                const response = await fetch(url, { 
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+                
+                const resultado = {
+                    url: url,
+                    status: response.status,
+                    ok: response.ok,
+                    size: response.headers.get('content-length') || 'unknown'
+                };
+                
+                if (response.ok) {
+                    console.log(`✅ ${nome}: OK (${response.status})`);
+                } else {
+                    console.log(`❌ ${nome}: ERRO ${response.status}`);
+                }
+                
+                return resultado;
+            } catch (error) {
+                console.log(`💥 ${nome}: EXCEÇÃO - ${error.message}`);
+                return { url, error: error.message, ok: false };
+            }
+        }
+        
+        async function diagnosticarPaths() {
+            const secao = criarSecao('🔗 TESTE DE PATHS CRÍTICOS');
+            resultados.appendChild(secao);
+            
+            const paths = [
+                ['/refs/embedded-refs-new.js', 'Embedded Refs New'],
+                ['/refs/embedded-refs.js', 'Embedded Refs'],
+                ['/refs/out/funk_mandela.json', 'Funk Mandela JSON'],
+                ['/refs/out/trance.json', 'Trance JSON'],
+                ['/refs/out/eletronico.json', 'Eletrônico JSON'],
+                ['/refs/out/genres.json', 'Genres JSON'],
+                ['refs/embedded-refs-new.js', 'Embedded Refs (path relativo)'],
+                ['/public/refs/embedded-refs-new.js', 'Embedded Refs (path public)'],
+                ['/audio-analyzer.js', 'Audio Analyzer JS'],
+                ['/audio-analyzer-integration.js', 'Audio Analyzer Integration']
+            ];
+            
+            const testes = [];
+            for (const [url, nome] of paths) {
+                const resultado = await testar404(url, nome);
+                const div = document.createElement('div');
+                div.className = `test ${resultado.ok ? 'success' : 'error'}`;
+                div.innerHTML = `
+                    <strong>${nome}</strong><br>
+                    URL: ${resultado.url}<br>
+                    Status: ${resultado.status || 'ERRO'}<br>
+                    Size: ${resultado.size || 'N/A'}<br>
+                    ${resultado.error ? `Erro: ${resultado.error}` : ''}
+                `;
+                secao.appendChild(div);
+                testes.push(resultado);
+            }
+            
+            return testes;
+        }
+        
+        function diagnosticarGlobais() {
+            const secao = criarSecao('🌍 VARIÁVEIS GLOBAIS');
+            resultados.appendChild(secao);
+            
+            const globais = [
+                'window.REFS_ALLOW_NETWORK',
+                'window.__EMBEDDED_REFS__',
+                'window.FEATURE_FLAGS',
+                'window.USE_TT_DR',
+                'window.SCORING_V2',
+                'window.DEBUG_ANALYZER',
+                'window.REFS_BYPASS_CACHE'
+            ];
+            
+            globais.forEach(varName => {
+                const valor = eval(varName);
+                const div = document.createElement('div');
+                div.className = `test ${valor !== undefined ? 'success' : 'warning'}`;
+                div.innerHTML = `<strong>${varName}:</strong> ${JSON.stringify(valor)}`;
+                secao.appendChild(div);
+            });
+        }
+        
+        function diagnosticarErros() {
+            const secao = criarSecao('🚨 ERROS NO CONSOLE');
+            resultados.appendChild(secao);
+            
+            // Interceptar erros
+            const errosCapturados = [];
+            const originalError = console.error;
+            console.error = function(...args) {
+                errosCapturados.push(args.join(' '));
+                originalError.apply(console, args);
+            };
+            
+            // Mostrar erros já capturados (se houver)
+            if (window.__captured_errors && window.__captured_errors.length > 0) {
+                window.__captured_errors.forEach(erro => {
+                    const div = document.createElement('div');
+                    div.className = 'test error';
+                    div.innerHTML = `<strong>Erro capturado:</strong> ${erro}`;
+                    secao.appendChild(div);
+                });
+            } else {
+                const div = document.createElement('div');
+                div.className = 'test success';
+                div.innerHTML = 'Nenhum erro capturado ainda';
+                secao.appendChild(div);
+            }
+        }
+        
+        function diagnosticarDOM() {
+            const secao = criarSecao('📄 ELEMENTOS DOM');
+            resultados.appendChild(secao);
+            
+            const elementos = [
+                'audioRefGenreSelect',
+                'audioFileInput',
+                'analyzeButton'
+            ];
+            
+            elementos.forEach(id => {
+                const elemento = document.getElementById(id);
+                const div = document.createElement('div');
+                div.className = `test ${elemento ? 'success' : 'error'}`;
+                div.innerHTML = `<strong>#${id}:</strong> ${elemento ? 'EXISTE' : 'NÃO ENCONTRADO'}`;
+                secao.appendChild(div);
+            });
+        }
+        
+        async function executarDiagnosticoCompleto() {
+            limparResultados();
+            
+            // Capturar erros
+            window.__captured_errors = [];
+            const originalError = console.error;
+            console.error = function(...args) {
+                window.__captured_errors.push(args.join(' '));
+                originalError.apply(console, args);
+            };
+            
+            const inicio = criarSecao('🚀 INICIANDO DIAGNÓSTICO COMPLETO', 'warning');
+            resultados.appendChild(inicio);
+            
+            try {
+                await diagnosticarPaths();
+                diagnosticarGlobais();
+                diagnosticarErros();
+                diagnosticarDOM();
+                
+                const fim = criarSecao('✅ DIAGNÓSTICO CONCLUÍDO', 'success');
+                resultados.appendChild(fim);
+                
+            } catch (error) {
+                const erro = criarSecao(`💥 ERRO NO DIAGNÓSTICO: ${error.message}`, 'error');
+                resultados.appendChild(erro);
+            }
+        }
+        
+        function limparResultados() {
+            resultados.innerHTML = '';
+        }
+        
+        // Auto-executar ao carregar
+        window.addEventListener('load', () => {
+            console.log('🔍 DIAGNÓSTICO EMERGENCIAL CARREGADO');
+        });
+    </script>
+</body>
+</html>
