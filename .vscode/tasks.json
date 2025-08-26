@@ -4,7 +4,7 @@
 		{
 			"label": "Servir projeto PROD.AI",
 			"type": "shell",
-			"command": "cd public && python -m http.server 3000",
+			"command": "cd public; python -m http.server 3000",
 			"group": "build",
 			"isBackground": true,
 			"problemMatcher": [],
