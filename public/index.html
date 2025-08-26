@@ -336,8 +336,53 @@
     
     <!-- 🎵 AUDIO ANALYZER - Carregar os scripts -->
     <script src="audio-analyzer.js?v=20250825-memory-fix" defer></script>
-    <!-- Opcional: o integrador possui fallback inline; permita rede setando window.REFS_ALLOW_NETWORK=true antes do load -->
-    <script src="/refs/embedded-refs-new.js?v=20250825&timestamp=1756249070000" defer></script>
+    <!-- EMBEDDED REFS COM FALLBACK MÚLTIPLO PARA VERCEL -->
+    <script>
+        // 🚀 CARREGAMENTO INTELIGENTE DE EMBEDDED REFS
+        (function() {
+            const fallbackPaths = [
+                '/refs/embedded-refs-new.js?v=20250825&timestamp=1756249070000',
+                'refs/embedded-refs-new.js?v=20250825&timestamp=1756249070000',
+                './refs/embedded-refs-new.js?v=20250825&timestamp=1756249070000'
+            ];
+            
+            function loadEmbeddedRefs() {
+                let currentIndex = 0;
+                
+                function tryNextPath() {
+                    if (currentIndex >= fallbackPaths.length) {
+                        console.warn('🚨 Todos os paths para embedded-refs falharam');
+                        return;
+                    }
+                    
+                    const script = document.createElement('script');
+                    script.src = fallbackPaths[currentIndex];
+                    script.defer = true;
+                    
+                    script.onload = function() {
+                        console.log(`✅ Embedded refs carregado: ${fallbackPaths[currentIndex]}`);
+                    };
+                    
+                    script.onerror = function() {
+                        console.warn(`❌ Falha ao carregar: ${fallbackPaths[currentIndex]}`);
+                        currentIndex++;
+                        tryNextPath();
+                    };
+                    
+                    document.head.appendChild(script);
+                }
+                
+                tryNextPath();
+            }
+            
+            // Carregar quando DOM estiver pronto
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadEmbeddedRefs);
+            } else {
+                loadEmbeddedRefs();
+            }
+        })();
+    </script>
     <script src="suggestion-text-generator.js?v=20250815" defer></script>
     <script src="audio-analyzer-integration.js?v=20250825&final_fix=1756249070000" defer></script>
     

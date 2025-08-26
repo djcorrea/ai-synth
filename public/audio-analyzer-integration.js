@@ -771,7 +771,29 @@ async function ensureEmbeddedRefsReady(timeoutMs = 2500) {
 // Helper: buscar JSON tentando múltiplos caminhos (resiliente a diferenças local x produção)
 async function fetchRefJsonWithFallback(paths) {
     let lastErr = null;
+    
+    // 🚀 EXPANDIR PATHS PARA VERCEL - Adicionar variações automáticas
+    const allPaths = [];
     for (const p of paths) {
+        if (!p) continue;
+        allPaths.push(p); // Path original
+        
+        // Adicionar variações para Vercel
+        if (p.includes('/refs/out/')) {
+            const filename = p.split('/refs/out/')[1];
+            allPaths.push(`./refs/out/${filename}`);
+            allPaths.push(`refs/out/${filename}`);
+        }
+        if (p.includes('/refs/') && !p.includes('/refs/out/')) {
+            const filename = p.split('/refs/')[1];
+            allPaths.push(`./refs/${filename}`);
+            allPaths.push(`refs/${filename}`);
+        }
+    }
+    
+    console.log('[refs] 🎯 VERCEL ENHANCED - Testando paths:', allPaths);
+    
+    for (const p of allPaths) {
         if (!p) continue;
         try {
             // Cache-busting para evitar CDN retornar 404 ou versões antigas
@@ -783,7 +805,7 @@ async function fetchRefJsonWithFallback(paths) {
                 headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
             });
             if (res.ok) {
-                if (__DEBUG_ANALYZER__) console.log('[refs] OK:', p);
+                if (__DEBUG_ANALYZER__) console.log('[refs] ✅ SUCESSO:', p);
                 
                 // Verificar se a resposta tem conteúdo JSON válido
                 const text = await res.text();
