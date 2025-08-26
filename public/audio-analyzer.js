@@ -6749,3 +6749,18 @@ if (typeof window !== 'undefined' && window.audioAnalyzer) {
   
   console.log('✅ Phase 3 - Cache Invalidation initialized safely');
 }
+
+// 🚀 EXPORTS PARA MÓDULO ES6 - CORREÇÃO CRÍTICA
+// Expor as principais funções para uso como módulo
+if (typeof window !== 'undefined') {
+  // No browser, manter funcionamento atual
+  window.AudioAnalyzer = AudioAnalyzer;
+} else {
+  // Para imports ES6
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { AudioAnalyzer };
+  }
+}
+
+// Export ES6 para dynamic imports
+export { AudioAnalyzer };
