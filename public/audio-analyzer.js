@@ -1928,122 +1928,7 @@ class AudioAnalyzer {
               console.log('🔍 [MODE_DEBUG] Final scoring skipping genre-specific ref (mode=' + mode + ')');
             }
             
-            // 🔧 SCORING PATCH - Execução aprimorada para Vercel
-            console.log('[SCORING_VERCEL] 🚀 Executando scoring unificado...');
-            console.log('[SCORING_VERCEL] 📊 tdFinal keys:', Object.keys(tdFinal || {}));
-            console.log('[SCORING_VERCEL] 📋 genreSpecificRef inicial:', genreSpecificRef);
-            
-            // 🎯 CORREÇÃO CRÍTICA: Forçar carregamento de referência se estiver null
-            if (!genreSpecificRef && mode === 'genre') {
-              const activeGenre = window.PROD_AI_REF_GENRE || 'funk_mandela';
-              console.log('[SCORING_VERCEL] ⚠️ genreSpecificRef null, carregando:', activeGenre);
-              
-              try {
-                // Tentar carregar referência diretamente
-                const refResponse = await fetch(`/refs/out/${activeGenre}.json?v=${Date.now()}`, {
-                  cache: 'no-store',
-                  headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                });
-                if (refResponse.ok) {
-                  const refData = await refResponse.json();
-                  genreSpecificRef = refData[activeGenre] || refData;
-                  console.log('[SCORING_VERCEL] ✅ Referência carregada via fetch:', genreSpecificRef);
-                } else {
-                  // Fallback com referências hardcoded
-                  const fallbackRefs = {
-                    funk_mandela: {
-                      lufs_target: -11.5, tol_lufs: 1.8,
-                      true_peak_target: -0.8, tol_true_peak: 1,
-                      dr_target: 7.2, tol_dr: 2,
-                      stereo_target: 0.38, tol_stereo: 0.15
-                    },
-                    trance: {
-                      lufs_target: -12.8, tol_lufs: 1.9,
-                      true_peak_target: -0.8, tol_true_peak: 1,
-                      dr_target: 9.2, tol_dr: 2.5,
-                      stereo_target: 0.35, tol_stereo: 0.4
-                    },
-                    eletronico: {
-                      lufs_target: -13.2, tol_lufs: 2.0,
-                      true_peak_target: -0.8, tol_true_peak: 1,
-                      dr_target: 8.5, tol_dr: 2.2,
-                      stereo_target: 0.3, tol_stereo: 0.35
-                    }
-                  };
-                  genreSpecificRef = fallbackRefs[activeGenre] || fallbackRefs.funk_mandela;
-                  console.log('[SCORING_VERCEL] 🔄 Usando fallback para:', activeGenre, genreSpecificRef);
-                }
-              } catch (refError) {
-                console.error('[SCORING_VERCEL] ❌ Erro ao carregar ref:', refError);
-                // Fallback final por gênero
-                const finalFallbacks = {
-                  funk_mandela: {
-                    lufs_target: -11.5, tol_lufs: 1.8,
-                    true_peak_target: -0.8, tol_true_peak: 1,
-                    dr_target: 7.2, tol_dr: 2,
-                    stereo_target: 0.38, tol_stereo: 0.15
-                  },
-                  trance: {
-                    lufs_target: -12.8, tol_lufs: 1.9,
-                    true_peak_target: -0.8, tol_true_peak: 1,
-                    dr_target: 9.2, tol_dr: 2.5,
-                    stereo_target: 0.35, tol_stereo: 0.4
-                  },
-                  eletronico: {
-                    lufs_target: -13.2, tol_lufs: 2.0,
-                    true_peak_target: -0.8, tol_true_peak: 1,
-                    dr_target: 8.5, tol_dr: 2.2,
-                    stereo_target: 0.3, tol_stereo: 0.35
-                  }
-                };
-                genreSpecificRef = finalFallbacks[activeGenre] || finalFallbacks.funk_mandela;
-                console.log('[SCORING_VERCEL] 🔄 Usando fallback final para:', activeGenre, genreSpecificRef);
-              }
-            }
-            
-            console.log('[SCORING_VERCEL] 📋 genreSpecificRef final:', genreSpecificRef);
-            
-            let finalScore = null;
-            try {
-              // Cache bust agressivo
-              const cacheBust = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-              console.log('[SCORING_VERCEL] 🔄 Cache bust:', cacheBust);
-              
-              // Forçar reload do módulo
-              delete window.scoringModuleCache;
-              const freshScoringModule = await import('/lib/audio/features/scoring.js?v=' + cacheBust);
-              console.log('[SCORING_VERCEL] ✅ Fresh module loaded:', !!freshScoringModule);
-              
-              if (freshScoringModule && typeof freshScoringModule.computeMixScore === 'function') {
-                console.log('[SCORING_VERCEL] 🎯 Chamando computeMixScore...');
-                
-                // Interceptar logs internos
-                const originalConsoleLog = console.log;
-                console.log = function(...args) {
-                  originalConsoleLog.apply(console, ['[VERCEL_LOG]', ...args]);
-                };
-                
-                finalScore = freshScoringModule.computeMixScore(tdFinal, genreSpecificRef);
-                
-                // Restaurar console
-                console.log = originalConsoleLog;
-                
-                console.log('[SCORING_VERCEL] 📊 finalScore result:', finalScore);
-                console.log('[SCORING_VERCEL] 📊 Score value:', finalScore?.score || finalScore?.scorePct);
-                console.log('[SCORING_VERCEL] 🔧 Method:', finalScore?.method || finalScore?.scoringMethod);
-                console.log('[SCORING_VERCEL] 🔢 Engine:', finalScore?.engineVersion);
-                console.log('[SCORING_VERCEL] ✅ Unified:', finalScore?.unifiedScoring);
-                
-              } else {
-                console.error('[SCORING_VERCEL] ❌ computeMixScore não disponível');
-              }
-              
-            } catch (scoringError) {
-              console.error('[SCORING_VERCEL] ❌ Erro no scoring:', scoringError);
-              console.error('[SCORING_VERCEL] ❌ Stack:', scoringError.stack);
-              finalScore = null;
-            }
-            
+            const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
             console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
             console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
             
@@ -2069,7 +1954,7 @@ class AudioAnalyzer {
               testGenreSpecificRef = activeRef[activeGenre] || null;
             }
             
-            const testScore = freshScoringModule ? freshScoringModule.computeMixScore(testData, testGenreSpecificRef) : null;
+            const testScore = scorerMod.computeMixScore(testData, testGenreSpecificRef);
             console.log('[COLOR_RATIO_V2_TEST] Manual test G=5, Y=4, R=3, T=12 should be 59:', testScore);
             // O scoring.js agora está correto, não precisa de override
             baseAnalysis.mixScore = finalScore;

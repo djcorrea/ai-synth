@@ -526,7 +526,7 @@ window.diagnosRefSources = function(genre = null) {
     });
     
     // Test fetch do JSON externo
-    const testUrl = `/refs/out/${targetGenre}.json?v=diagnostic`;
+    const testUrl = `/public/refs/out/${targetGenre}.json?v=diagnostic`;
     fetch(testUrl).then(r => r.json()).then(j => {
         const data = j[targetGenre];
         console.log('🌐 EXTERNAL JSON TEST:', {
@@ -771,53 +771,7 @@ async function ensureEmbeddedRefsReady(timeoutMs = 2500) {
 // Helper: buscar JSON tentando múltiplos caminhos (resiliente a diferenças local x produção)
 async function fetchRefJsonWithFallback(paths) {
     let lastErr = null;
-    
-    // � VERIFICAR MODO EMERGENCIAL PRIMEIRO
-    if (window.__EMERGENCY_VERCEL_REFS__ && window.getEmergencyGenreData && paths.length > 0) {
-        console.log('🚨 MODO EMERGENCIAL ATIVO - tentando fallback direto');
-        
-        // Extrair nome do gênero do primeiro path
-        const firstPath = paths[0];
-        let genreName = null;
-        
-        if (firstPath.includes('funk_mandela')) genreName = 'funk_mandela';
-        else if (firstPath.includes('trance')) genreName = 'trance';
-        else if (firstPath.includes('eletronico')) genreName = 'eletronico';
-        else if (firstPath.includes('trap')) genreName = 'trap';
-        
-        if (genreName) {
-            try {
-                const data = window.getEmergencyGenreData(genreName);
-                console.log(`✅ EMERGENCY SUCCESS: ${genreName} carregado via fallback`);
-                return data;
-            } catch (error) {
-                console.log(`⚠️ Emergency fallback falhou para ${genreName}, continuando com fetch normal`);
-            }
-        }
-    }
-    
-    // �🚀 EXPANDIR PATHS PARA VERCEL - Adicionar variações automáticas
-    const allPaths = [];
     for (const p of paths) {
-        if (!p) continue;
-        allPaths.push(p); // Path original
-        
-        // Adicionar variações para Vercel
-        if (p.includes('/refs/out/')) {
-            const filename = p.split('/refs/out/')[1];
-            allPaths.push(`./refs/out/${filename}`);
-            allPaths.push(`refs/out/${filename}`);
-        }
-        if (p.includes('/refs/') && !p.includes('/refs/out/')) {
-            const filename = p.split('/refs/')[1];
-            allPaths.push(`./refs/${filename}`);
-            allPaths.push(`refs/${filename}`);
-        }
-    }
-    
-    console.log('[refs] 🎯 VERCEL ENHANCED - Testando paths:', allPaths);
-    
-    for (const p of allPaths) {
         if (!p) continue;
         try {
             // Cache-busting para evitar CDN retornar 404 ou versões antigas
@@ -829,7 +783,7 @@ async function fetchRefJsonWithFallback(paths) {
                 headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
             });
             if (res.ok) {
-                if (__DEBUG_ANALYZER__) console.log('[refs] ✅ SUCESSO:', p);
+                if (__DEBUG_ANALYZER__) console.log('[refs] OK:', p);
                 
                 // Verificar se a resposta tem conteúdo JSON válido
                 const text = await res.text();
@@ -870,10 +824,11 @@ async function loadGenreManifest() {
     // 2) Se permitido, tentar rede
     if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
         try {
-            console.log('🔄 VERCEL DEBUG: Tentando carregar genres.json...');
             const json = await fetchRefJsonWithFallback([
-                `/refs/out/genres.json?v=${Date.now()}&nocache=1`,
-                `/refs/out/genres.json?cb=${Date.now()}&t=${Math.random()}`
+                `/public/refs/out/genres.json`,
+                `/refs/out/genres.json`,
+                `refs/out/genres.json`,
+                `../refs/out/genres.json`
             ]);
             if (json && Array.isArray(json.genres)) { __genreManifest = json.genres; return __genreManifest; }
         } catch (e) { __dwrn('Manifesto via rede indisponível:', e.message || e); }
@@ -948,14 +903,16 @@ async function loadReferenceData(genre) {
         
         console.log('🔍 DEBUG loadReferenceData início:', { genre, bypassCache });
         
+        // PRIORIDADE CORRIGIDA: external > embedded > fallback
         // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
         console.log('🌐 Tentando carregar JSON externo primeiro...');
         try {
             const version = Date.now(); // Force cache bust
-            console.log(`🔄 VERCEL DEBUG: Tentando carregar ${genre} com cache bust: ${version}`);
             const json = await fetchRefJsonWithFallback([
-                `/refs/out/${genre}.json?v=${version}&nocache=1`,
-                `/refs/out/${genre}.json?cb=${version}&t=${Math.random()}`
+                `/public/refs/out/${genre}.json?v=${version}`,
+                `/refs/out/${genre}.json?v=${version}`,
+                `refs/out/${genre}.json?v=${version}`,
+                `../refs/out/${genre}.json?v=${version}`
             ]);
             const rootKey = Object.keys(json)[0];
             const data = json[rootKey];
@@ -970,7 +927,7 @@ async function loadReferenceData(genre) {
                 console.log('🎯 REFS DIAGNOSTIC:', {
                     genre,
                     source: 'external',
-                    path: `/refs/out/${genre}.json`,
+                    path: `/public/refs/out/${genre}.json`,
                     version: data.version,
                     num_tracks: data.num_tracks,
                     lufs_target: data.lufs_target,
@@ -1215,8 +1172,10 @@ if (typeof window !== 'undefined' && !window.__runAcceptanceAudioTests) {
     };
 }
 
-// ⚠️ REMOVIDO: Inicialização duplicada que causava race conditions
-// Este DOMContentLoaded foi removido pois há outro idêntico no final do arquivo
+// Inicializar quando DOM carregar
+document.addEventListener('DOMContentLoaded', function() {
+    initializeAudioAnalyzerIntegration();
+});
 
 
 function initializeAudioAnalyzerIntegration() {

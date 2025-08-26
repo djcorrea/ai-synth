@@ -4,16 +4,24 @@
 		{
 			"label": "Servir projeto PROD.AI",
 			"type": "shell",
-			"command": "cd public; python -m http.server 3000",
+			"command": "python -m http.server 3000",
 			"group": "build",
 			"isBackground": true,
-			"problemMatcher": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared"
-			}
+			"problemMatcher": []
+		},
+		{
+			"label": "Servir projeto PROD.AI",
+			"type": "shell",
+			"command": "python -m http.server 3000",
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Servir projeto PROD.AI",
+			"type": "shell",
+			"command": "python -m http.server 3000",
+			"isBackground": true,
+			"group": "build"
 		}
 	]
 }

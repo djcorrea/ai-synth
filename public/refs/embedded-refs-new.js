@@ -1,8 +1,10 @@
-// 🚨 SISTEMA EMERGENCIAL VERCEL - FALLBACK TOTAL
-console.log('🚨 CARREGANDO EMBEDDED REFS EMERGENCIAL - VERCEL FALLBACK');
+/**
+ * 🎵 REFERÊNCIAS MUSICAIS EMBEDDADAS - ATUALIZADAS
+ * Médias aritméticas recalculadas corretamente
+ * Gerado automaticamente em: 2025-08-25T02:17:11.549Z
+ */
 
-// ⚡ DADOS EMBEDDED COMPLETOS PARA RESOLVER 404s
-window.__EMERGENCY_VERCEL_REFS__ = true;
+// 🔥 NOVO SISTEMA: Referências com médias aritméticas corretas
 window.PROD_AI_REF_DATA = {
   "eletrofunk": {
     "version": "2025-08-recalc-eletrofunk-arithmetic-means",
@@ -590,75 +592,25 @@ window.PROD_AI_REF_DATA = {
   }
 };
 
-// 🎯 FUNÇÃO EMERGENCIAL - OBTER DADOS DIRETO
-window.getEmergencyGenreData = function(genre) {
-    console.log(`🚨 EMERGENCY FALLBACK: Carregando ${genre}`);
-    
-    if (window.PROD_AI_REF_DATA && window.PROD_AI_REF_DATA[genre]) {
-        console.log(`✅ ${genre} encontrado no PROD_AI_REF_DATA`);
-        return window.PROD_AI_REF_DATA[genre];
-    }
-    
-    // FALLBACK HARDCODED PARA FUNK MANDELA
-    if (genre === 'funk_mandela') {
-        console.log('🎯 USANDO FALLBACK HARDCODED FUNK MANDELA');
-        return {
-            "version": "emergency-fallback",
-            "legacy_compatibility": {
-                "lufs_target": -4.9, "tol_lufs": 1.5,
-                "true_peak_target": -11.1, "tol_true_peak": 1.3,
-                "dr_target": 7.3, "tol_dr": 2,
-                "lra_target": 9.4, "tol_lra": 1.9,
-                "stereo_target": 0.55, "tol_stereo": 0.16,
-                "bands": {
-                    "sub": { "target_db": -2.5, "tol_db": 1.5, "severity": "soft" },
-                    "low_bass": { "target_db": -1.2, "tol_db": 1.5, "severity": "soft" },
-                    "upper_bass": { "target_db": -2.9, "tol_db": 1.5, "severity": "soft" },
-                    "low_mid": { "target_db": 1.6, "tol_db": 1.5, "severity": "soft" },
-                    "mid": { "target_db": 2.9, "tol_db": 1.5, "severity": "soft" },
-                    "high_mid": { "target_db": -1.4, "tol_db": 1.5, "severity": "soft" },
-                    "brilho": { "target_db": -6.5, "tol_db": 1.5, "severity": "soft" },
-                    "presenca": { "target_db": -12.1, "tol_db": 2.4, "severity": "soft" }
-                }
-            }
-        };
-    }
-    
-    // FALLBACK GENÉRICO
-    console.log('⚠️ USANDO FALLBACK GENÉRICO');
-    return {
-        "version": "emergency-generic",
-        "legacy_compatibility": {
-            "lufs_target": -8.0, "tol_lufs": 2.0,
-            "true_peak_target": -3.0, "tol_true_peak": 1.5,
-            "dr_target": 8.0, "tol_dr": 2.5,
-            "lra_target": 8.0, "tol_lra": 2.0,
-            "stereo_target": 0.4, "tol_stereo": 0.2,
-            "bands": {
-                "sub": { "target_db": -6.0, "tol_db": 2.0, "severity": "soft" },
-                "low_bass": { "target_db": -4.0, "tol_db": 2.0, "severity": "soft" },
-                "upper_bass": { "target_db": -5.0, "tol_db": 2.0, "severity": "soft" },
-                "low_mid": { "target_db": -2.0, "tol_db": 2.0, "severity": "soft" },
-                "mid": { "target_db": 0.0, "tol_db": 2.0, "severity": "soft" },
-                "high_mid": { "target_db": -4.0, "tol_db": 2.0, "severity": "soft" },
-                "brilho": { "target_db": -8.0, "tol_db": 2.0, "severity": "soft" },
-                "presenca": { "target_db": -12.0, "tol_db": 3.0, "severity": "soft" }
-            }
-        }
-    };
-};
+// 🎯 COMPATIBILIDADE: Manter estrutura esperada pela interface
+window.EMBEDDED_REFS_LOADED = true;
+window.EMBEDDED_REFS_VERSION = "v2025.08.25-arithmetic-corrected";
 
-// ⚡ SOBRESCREVER FETCH FUNCTION GLOBAL
-window.fetchRefJsonWithFallback = async function(url, genreName) {
-    console.log(`🚨 EMERGENCY FETCH: ${url} (${genreName})`);
-    
-    // TENTAR CARREGAR DIRETO DOS DADOS EMBEDDED
-    try {
-        const data = window.getEmergencyGenreData(genreName);
-        console.log(`✅ EMERGENCY SUCCESS: ${genreName} carregado via fallback`);
-        return data;
-    } catch (error) {
-        console.error(`💥 EMERGENCY FAILED: ${error.message}`);
-        throw error;
-    }
+console.log('🎵 Referências musicais carregadas:', Object.keys(window.PROD_AI_REF_DATA));
+console.log('📊 Total de gêneros:', Object.keys(window.PROD_AI_REF_DATA).length);
+
+// 📈 VALIDAÇÃO: Verificar se todas as referências têm dados válidos
+Object.entries(window.PROD_AI_REF_DATA).forEach(([genero, dados]) => {
+    const metricas = dados.legacy_compatibility || {};
+    console.log(`✅ ${genero}: LUFS=${metricas.lufs_target}, TP=${metricas.true_peak_target}, DR=${metricas.dr_target}`);
+});
+
+// 🎯 HOOK PARA DEBUG
+window.__DEBUG_REFS = function() {
+    return {
+        loaded: window.EMBEDDED_REFS_LOADED,
+        version: window.EMBEDDED_REFS_VERSION,
+        genres: Object.keys(window.PROD_AI_REF_DATA),
+        totalTracks: Object.values(window.PROD_AI_REF_DATA).reduce((sum, ref) => sum + (ref.num_tracks || 0), 0)
+    };
 };
