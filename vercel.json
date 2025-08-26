@@ -1,8 +1,9 @@
 {
   "version": 2,
   "env": {
-    "FORCE_REBUILD": "1724440290",
-    "NODE_ENV": "production"
+    "FORCE_REBUILD": "1724442000",
+    "NODE_ENV": "production",
+    "SCORE_FIX_DEPLOY": "20250825"
   },
   "builds": [
     { "src": "api/**/*.js", "use": "@vercel/node" },
