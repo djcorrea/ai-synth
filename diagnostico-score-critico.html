@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔬 DIAGNÓSTICO CRÍTICO - Por que o Score Não Muda?</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #111;
+            border: 2px solid #00ff41;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #00ff41;
+            padding-bottom: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #1a1a1a;
+            border-left: 4px solid #ff6b35;
+            border-radius: 5px;
+        }
+        .critical {
+            border-left-color: #ff3333;
+            background: #2a1a1a;
+        }
+        .success {
+            border-left-color: #00ff41;
+            background: #1a2a1a;
+        }
+        .warning {
+            border-left-color: #ffaa00;
+            background: #2a2a1a;
+        }
+        button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #00cc33;
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .log-output {
+            background: #000;
+            color: #00ff41;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+        .hypothesis {
+            background: #2a1a2a;
+            border: 1px solid #ff66aa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .evidence {
+            background: #1a2a2a;
+            border: 1px solid #66aaff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .solution {
+            background: #2a2a1a;
+            border: 1px solid #aaff66;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .status.error { background: #ff3333; color: white; }
+        .status.warning { background: #ffaa00; color: black; }
+        .status.success { background: #00ff41; color: black; }
+        .status.info { background: #66aaff; color: black; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔬 DIAGNÓSTICO CRÍTICO</h1>
+            <h2>Por que o Score Não Muda Mesmo com as Correções?</h2>
+            <p><span class="status error">PROBLEMA</span> Score permanece em 36 pontos independente das bandas espectrais</p>
+        </div>
+
+        <div class="section critical">
+            <h3>🚨 DESCOBERTA CRÍTICA</h3>
+            <p><strong>A "correção" da ordem de execução foi DESNECESSÁRIA!</strong></p>
+            <ul>
+                <li><strong>Linha 1411:</strong> <code>if (false && enableScoring)</code> - Scoring JÁ estava desabilitado na Fase 1</li>
+                <li><strong>Linha 1931:</strong> Scoring JÁ acontece após Fase 2 com bandas calculadas</li>
+                <li><strong>Linha 3701:</strong> <code>td.bandEnergies = bandEnergies</code> - Bandas SÃO adicionadas corretamente</li>
+            </ul>
+        </div>
+
+        <div class="section warning">
+            <h3>🎯 HIPÓTESES PARA INVESTIGAÇÃO</h3>
+            <div class="hypothesis">
+                <strong>A. bandEnergies não chegam ao scoring</strong><br>
+                As bandas são calculadas mas se perdem no caminho
+            </div>
+            <div class="hypothesis">
+                <strong>B. Scoring não considera bandEnergies</strong><br>
+                A função computeMixScore ignora as bandas espectrais
+            </div>
+            <div class="hypothesis">
+                <strong>C. Referência sem targets de bandas</strong><br>
+                Não há dados de referência para comparar as bandas
+            </div>
+            <div class="hypothesis">
+                <strong>D. Cache invalidando dados</strong><br>
+                Cache está removendo bandEnergies entre cálculo e scoring
+            </div>
+            <div class="hypothesis">
+                <strong>E. Race condition temporal</strong><br>
+                Timing entre fases está causando perda de dados
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 FERRAMENTAS DE DIAGNÓSTICO</h3>
+            <div class="grid">
+                <div>
+                    <button onclick="executarDiagnosticoCompleto()">
+                        🔬 Diagnóstico Completo
+                    </button>
+                    <br><small>Analisa todas as hipóteses e coleta evidências</small>
+                </div>
+                <div>
+                    <button onclick="ativarMonitoramento()">
+                        👁️ Monitor Tempo Real
+                    </button>
+                    <br><small>Instala hooks para monitorar scoring em tempo real</small>
+                </div>
+            </div>
+            <div class="grid">
+                <div>
+                    <button onclick="testarScoringManual()">
+                        🧪 Teste Manual Scoring
+                    </button>
+                    <br><small>Testa scoring com e sem bandas para comparar</small>
+                </div>
+                <div>
+                    <button onclick="verificarVercelDeploy()">
+                        🌐 Verificar Deploy Vercel
+                    </button>
+                    <br><small>Confirma se mudanças foram aplicadas na produção</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📊 RESULTADOS DO DIAGNÓSTICO</h3>
+            <div id="resultados" class="log-output">
+                Clique em "Diagnóstico Completo" para começar a investigação...
+            </div>
+        </div>
+
+        <div class="section success">
+            <h3>💡 PRÓXIMOS PASSOS</h3>
+            <div class="solution">
+                <strong>1. Executar diagnóstico para identificar o problema real</strong><br>
+                Usar as ferramentas acima para encontrar a causa raiz
+            </div>
+            <div class="solution">
+                <strong>2. Investigar os outros 5 problemas da auditoria</strong><br>
+                Fallbacks, conversão de unidades, pesos, cache, conversão de bandas
+            </div>
+            <div class="solution">
+                <strong>3. Implementar correção baseada em evidências</strong><br>
+                Não mais "chutes" - só correções baseadas em dados reais
+            </div>
+        </div>
+    </div>
+
+    <!-- Carregar dependências -->
+    <script src="diagnostico-score-problema.js"></script>
+    
+    <script>
+        // Variável global para armazenar último diagnóstico
+        let ultimoDiagnostico = null;
+        
+        /**
+         * Executa diagnóstico completo e exibe resultados
+         */
+        async function executarDiagnosticoCompleto() {
+            const output = document.getElementById('resultados');
+            output.innerHTML = '🔄 Executando diagnóstico completo...\n';
+            
+            try {
+                // Verificar se função está disponível
+                if (typeof window.diagnosticarScoreProblema !== 'function') {
+                    throw new Error('Função de diagnóstico não carregada. Recarregue a página.');
+                }
+                
+                // Executar diagnóstico
+                ultimoDiagnostico = window.diagnosticarScoreProblema();
+                
+                // Formatar resultados
+                let resultado = '🔬 DIAGNÓSTICO COMPLETO EXECUTADO\n';
+                resultado += '='.repeat(50) + '\n\n';
+                
+                resultado += '📅 Timestamp: ' + ultimoDiagnostico.timestamp + '\n\n';
+                
+                // Evidências
+                resultado += '📊 EVIDÊNCIAS COLETADAS:\n';
+                resultado += '-'.repeat(30) + '\n';
+                for (const [key, value] of Object.entries(ultimoDiagnostico.evidencias)) {
+                    resultado += `${key}: ${JSON.stringify(value, null, 2)}\n`;
+                }
+                resultado += '\n';
+                
+                // Hipóteses
+                resultado += '🎯 HIPÓTESES IDENTIFICADAS:\n';
+                resultado += '-'.repeat(30) + '\n';
+                ultimoDiagnostico.hipoteses.forEach((h, i) => {
+                    resultado += `${i + 1}. ${h}\n`;
+                });
+                resultado += '\n';
+                
+                // Soluções
+                resultado += '💡 SOLUÇÕES PROPOSTAS:\n';
+                resultado += '-'.repeat(30) + '\n';
+                ultimoDiagnostico.solucoes.forEach((s, i) => {
+                    resultado += `${i + 1}. ${s}\n`;
+                });
+                
+                if (ultimoDiagnostico.erro) {
+                    resultado += '\n❌ ERRO: ' + ultimoDiagnostico.erro + '\n';
+                }
+                
+                output.innerHTML = resultado;
+                
+            } catch (error) {
+                output.innerHTML = '❌ ERRO no diagnóstico: ' + error.message + '\n\n' +
+                    'Possíveis causas:\n' +
+                    '1. Página não carregou completamente\n' +
+                    '2. Scripts não foram carregados\n' +
+                    '3. Sistema de áudio não inicializado\n\n' +
+                    'Recarregue a página e tente novamente.';
+                console.error('Erro no diagnóstico:', error);
+            }
+        }
+        
+        /**
+         * Ativa monitoramento em tempo real
+         */
+        function ativarMonitoramento() {
+            const output = document.getElementById('resultados');
+            
+            try {
+                if (typeof window.monitorarScoreEmTempoReal !== 'function') {
+                    throw new Error('Função de monitoramento não carregada');
+                }
+                
+                window.monitorarScoreEmTempoReal();
+                
+                output.innerHTML = '👁️ MONITORAMENTO ATIVADO\n' +
+                    '='.repeat(30) + '\n\n' +
+                    '✅ Hooks instalados em computeMixScore\n' +
+                    '📡 Logs aparecerão no console durante análises\n' +
+                    '🎯 Execute uma análise de áudio para ver os logs\n\n' +
+                    '⚠️ Abra o Console do Navegador (F12) para ver os logs detalhados';
+                
+            } catch (error) {
+                output.innerHTML = '❌ ERRO ao ativar monitoramento: ' + error.message;
+                console.error('Erro no monitoramento:', error);
+            }
+        }
+        
+        /**
+         * Testa scoring manual com dados simulados
+         */
+        async function testarScoringManual() {
+            const output = document.getElementById('resultados');
+            output.innerHTML = '🧪 Executando teste manual de scoring...\n';
+            
+            try {
+                // Dados de teste COM bandas
+                const testComBandas = {
+                    lufsIntegrated: -14.2,
+                    truePeakDbtp: -1.5,
+                    dynamicRange: 8.5,
+                    lra: 6.2,
+                    stereoCorrelation: 0.85,
+                    bandEnergies: {
+                        sub: { rms_db: -18.5, energy: 0.012, energyPct: 8.2 },
+                        low_bass: { rms_db: -12.3, energy: 0.045, energyPct: 15.1 },
+                        upper_bass: { rms_db: -10.1, energy: 0.058, energyPct: 18.7 },
+                        low_mid: { rms_db: -8.7, energy: 0.072, energyPct: 22.3 },
+                        mid: { rms_db: -9.2, energy: 0.065, energyPct: 19.8 },
+                        high_mid: { rms_db: -15.1, energy: 0.028, energyPct: 10.4 },
+                        brilho: { rms_db: -22.3, energy: 0.008, energyPct: 3.8 },
+                        presenca: { rms_db: -24.1, energy: 0.005, energyPct: 1.7 }
+                    }
+                };
+                
+                // Dados de teste SEM bandas
+                const testSemBandas = {
+                    lufsIntegrated: -14.2,
+                    truePeakDbtp: -1.5,
+                    dynamicRange: 8.5,
+                    lra: 6.2,
+                    stereoCorrelation: 0.85
+                };
+                
+                let resultado = '🧪 TESTE MANUAL DE SCORING\n';
+                resultado += '='.repeat(40) + '\n\n';
+                
+                // Verificar se scoring está disponível
+                if (typeof window !== 'undefined' && window.scoringModule && window.scoringModule.computeMixScore) {
+                    // Obter referência
+                    const ref = window.PROD_AI_REF_DATA_ACTIVE || window.PROD_AI_REF_DATA;
+                    if (!ref) {
+                        throw new Error('Referência de dados não encontrada');
+                    }
+                    
+                    const activeGenre = window.PROD_AI_REF_GENRE || 'default';
+                    const genreRef = ref[activeGenre];
+                    
+                    // Teste com bandas
+                    const scoreComBandas = window.scoringModule.computeMixScore(testComBandas, genreRef);
+                    const scoreSemBandas = window.scoringModule.computeMixScore(testSemBandas, genreRef);
+                    
+                    resultado += '📊 DADOS DE ENTRADA:\n';
+                    resultado += `Gênero ativo: ${activeGenre}\n`;
+                    resultado += `Referência tem bandas: ${!!(genreRef && genreRef.bands)}\n`;
+                    resultado += `Número de targets de bandas: ${genreRef && genreRef.bands ? Object.keys(genreRef.bands).length : 0}\n\n`;
+                    
+                    resultado += '🎯 RESULTADOS DOS TESTES:\n';
+                    resultado += `Score COM bandas: ${scoreComBandas ? scoreComBandas.scorePct : 'null'}%\n`;
+                    resultado += `Score SEM bandas: ${scoreSemBandas ? scoreSemBandas.scorePct : 'null'}%\n`;
+                    
+                    if (scoreComBandas && scoreSemBandas) {
+                        const diferenca = scoreComBandas.scorePct - scoreSemBandas.scorePct;
+                        resultado += `Diferença: ${diferenca.toFixed(2)} pontos\n\n`;
+                        
+                        if (Math.abs(diferenca) < 1) {
+                            resultado += '⚠️ PROBLEMA IDENTIFICADO: Scoring não considera bandas espectrais!\n';
+                            resultado += '   A diferença é < 1 ponto, indicando que bandEnergies são ignoradas.\n';
+                        } else {
+                            resultado += '✅ Scoring CONSIDERA bandas espectrais corretamente.\n';
+                            resultado += '   Problema deve estar em outro lugar.\n';
+                        }
+                        
+                        resultado += '\n📋 DETALHES DO SCORING:\n';
+                        resultado += `Método usado (com bandas): ${scoreComBandas.scoringMethod || 'N/A'}\n`;
+                        resultado += `Método usado (sem bandas): ${scoreSemBandas.scoringMethod || 'N/A'}\n`;
+                    }
+                    
+                } else {
+                    resultado += '❌ Módulo de scoring não disponível\n';
+                    resultado += 'Possíveis causas:\n';
+                    resultado += '1. Página não carregou completamente\n';
+                    resultado += '2. Sistema de áudio não inicializado\n';
+                    resultado += '3. Scripts de scoring não carregados\n';
+                }
+                
+                output.innerHTML = resultado;
+                
+            } catch (error) {
+                output.innerHTML = '❌ ERRO no teste manual: ' + error.message;
+                console.error('Erro no teste manual:', error);
+            }
+        }
+        
+        /**
+         * Verifica se deploy foi feito no Vercel
+         */
+        async function verificarVercelDeploy() {
+            const output = document.getElementById('resultados');
+            output.innerHTML = '🌐 Verificando deploy no Vercel...\n';
+            
+            try {
+                let resultado = '🌐 VERIFICAÇÃO DE DEPLOY VERCEL\n';
+                resultado += '='.repeat(40) + '\n\n';
+                
+                // Verificar se arquivos de correção existem
+                const arquivosCorrecao = [
+                    'solucao-definitiva-score.js',
+                    'diagnostico-score-problema.js'
+                ];
+                
+                resultado += '📁 ARQUIVOS DE CORREÇÃO:\n';
+                for (const arquivo of arquivosCorrecao) {
+                    try {
+                        const response = await fetch(arquivo);
+                        if (response.ok) {
+                            resultado += `✅ ${arquivo} - Encontrado (${response.status})\n`;
+                        } else {
+                            resultado += `❌ ${arquivo} - Não encontrado (${response.status})\n`;
+                        }
+                    } catch (error) {
+                        resultado += `❌ ${arquivo} - Erro: ${error.message}\n`;
+                    }
+                }
+                
+                resultado += '\n🔍 CACHE BUSTING:\n';
+                resultado += `Timestamp atual: ${Date.now()}\n`;
+                resultado += `Cache buster ativo: ${!!window.cacheBusterTimestamp}\n`;
+                
+                resultado += '\n⚠️ IMPORTANTE:\n';
+                resultado += 'Se os arquivos não foram encontrados:\n';
+                resultado += '1. Deploy pode não ter sido feito\n';
+                resultado += '2. Cache do Vercel pode estar ativo\n';
+                resultado += '3. Build pode ter falhado\n\n';
+                resultado += 'Verifique o dashboard do Vercel para confirmar deploy.';
+                
+                output.innerHTML = resultado;
+                
+            } catch (error) {
+                output.innerHTML = '❌ ERRO na verificação: ' + error.message;
+                console.error('Erro na verificação Vercel:', error);
+            }
+        }
+        
+        // Carregar diagnóstico automaticamente se possível
+        window.addEventListener('load', () => {
+            console.log('🔬 [DIAGNÓSTICO] Página carregada, funções disponíveis:');
+            console.log('   - executarDiagnosticoCompleto()');
+            console.log('   - ativarMonitoramento()');
+            console.log('   - testarScoringManual()');
+            console.log('   - verificarVercelDeploy()');
+        });
+    </script>
+</body>
+</html>

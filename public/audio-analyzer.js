@@ -2002,79 +2002,12 @@ class AudioAnalyzer {
     return baseAnalysis;
   }
 
-  // 🔧 MÉTODO DE FALLBACK PARA SCORE - COM CORREÇÃO AUTOMÁTICA
+  // 🔧 MÉTODO DE FALLBACK PARA SCORE
   _applyWeightedScoreFallback(baseAnalysis) {
     console.log('[SCORE_DEBUG] 📊 Aplicando fallback de score ponderado...');
     
-    // 🚨 CORREÇÃO DEFINITIVA INTEGRADA
-    if (window.USE_EQUAL_WEIGHT_V3 || window.FORCE_SCORING_V2) {
-      console.log('🎯 [AUTO-FIX] Interceptando fallback - aplicando Equal Weight V3');
-      
-      // Usar dados técnicos salvos se disponíveis
-      if (window.__LAST_TECHNICAL_DATA) {
-        const techData = window.__LAST_TECHNICAL_DATA;
-        
-        // Função de cálculo direto integrada
-        const lufs = techData.lufsIntegrated || techData.lufs_integrated || -6.2;
-        const truePeak = techData.truePeakDbtp || techData.true_peak_dbtp || -1.86;
-        const dr = techData.tt_dr || techData.dr_stat || 7.64;
-        const stereoCorr = techData.stereoCorrelation || techData.stereo_correlation || 0.198;
-        const lra = techData.lra || 4.98;
-        
-        // Cálculo Equal Weight V3 simplificado
-        let totalScore = 0;
-        let metricCount = 0;
-        
-        // LUFS score
-        const lufsScore = Math.max(30, 100 - (Math.abs(lufs - (-14)) * 8));
-        totalScore += lufsScore;
-        metricCount++;
-        
-        // True Peak score
-        const tpScore = Math.max(30, 100 - (Math.abs(truePeak - (-1)) * 10));
-        totalScore += tpScore;
-        metricCount++;
-        
-        // Dynamic Range score
-        const drScore = Math.max(30, 100 - (Math.abs(dr - 10) * 8));
-        totalScore += drScore;
-        metricCount++;
-        
-        // Stereo score
-        const stereoScore = Math.max(30, 100 - (Math.abs(stereoCorr - 0.3) * 50));
-        totalScore += stereoScore;
-        metricCount++;
-        
-        // LRA score
-        const lraScore = Math.max(30, 100 - (Math.abs(lra - 7) * 10));
-        totalScore += lraScore;
-        metricCount++;
-        
-        const finalScore = totalScore / metricCount;
-        
-        baseAnalysis.qualityOverall = parseFloat(finalScore.toFixed(1));
-        
-        // Atualizar classificação
-        if (finalScore >= 85) baseAnalysis.classification = 'Referência Mundial';
-        else if (finalScore >= 70) baseAnalysis.classification = 'Avançado';
-        else if (finalScore >= 55) baseAnalysis.classification = 'Intermediário';
-        else baseAnalysis.classification = 'Básico';
-        
-        console.log('✅ [AUTO-FIX] Score corrigido automaticamente:', baseAnalysis.qualityOverall + '%');
-        console.log('✅ [AUTO-FIX] Classificação:', baseAnalysis.classification);
-        
-        return; // Sair da função, correção aplicada
-      } else {
-        // Se não tem dados técnicos, usar score melhor que 36.55
-        baseAnalysis.qualityOverall = 68.7;
-        baseAnalysis.classification = 'Intermediário';
-        console.log('✅ [AUTO-FIX] Score padrão aplicado: 68.7%');
-        return;
-      }
-    }
-    
     try {
-      // Fallback original apenas se correção não foi aplicada
+      // Usar sistema de agregação ponderada existente
       if (!Number.isFinite(baseAnalysis.qualityOverall)) {
         console.log('[WEIGHTED_AGGREGATE] Triggered - qualityOverall was:', baseAnalysis.qualityOverall);
         
@@ -2097,14 +2030,14 @@ class AudioAnalyzer {
           console.log('[WEIGHTED_AGGREGATE] Set qualityOverall =', baseAnalysis.qualityOverall, 
                      'from', subScores.length, 'sub-scores');
         } else {
-          // 🔧 MELHORADO: Score padrão melhor que 36.55
-          baseAnalysis.qualityOverall = 65.8;
-          console.log('[WEIGHTED_AGGREGATE] No sub-scores available, using improved default 65.8');
+          // Último recurso: score padrão conservador
+          baseAnalysis.qualityOverall = 50;
+          console.log('[WEIGHTED_AGGREGATE] No sub-scores available, using default 50');
         }
       }
     } catch (fallbackError) {
       console.error('[SCORE_DEBUG] ❌ Erro no fallback:', fallbackError);
-      baseAnalysis.qualityOverall = 65.8; // Último recurso melhorado
+      baseAnalysis.qualityOverall = 50; // Último recurso
     }
     
     console.log('[SCORE_DEBUG] ✅ Fallback concluído - score:', baseAnalysis.qualityOverall);

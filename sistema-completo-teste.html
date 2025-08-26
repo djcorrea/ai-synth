@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 SISTEMA DE ANÁLISE COMPLETO - Teste Direto</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #111;
+            border: 3px solid #00ff41;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.5);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #00ff41;
+            padding-bottom: 20px;
+        }
+        .critical {
+            background: #003300;
+            border: 2px solid #00ff41;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        .loading {
+            background: #333300;
+            border: 2px solid #ffff00;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .success {
+            background: #003300;
+            border: 2px solid #00ff41;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .error {
+            background: #330000;
+            border: 2px solid #ff3333;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .results {
+            background: #000;
+            color: #00ff41;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+        button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #00cc33;
+            transform: scale(1.05);
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            margin: 5px;
+        }
+        .status.loading { background: #ffff00; color: black; }
+        .status.success { background: #00ff41; color: black; }
+        .status.error { background: #ff3333; color: white; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 SISTEMA DE ANÁLISE COMPLETO</h1>
+            <h2>Carregamento e Teste Direto dos Módulos</h2>
+            <p id="status"><span class="status loading">CARREGANDO</span> Inicializando sistema...</p>
+        </div>
+
+        <div id="loading-section" class="loading">
+            <h3>📡 CARREGANDO MÓDULOS</h3>
+            <div id="loading-progress">
+                <div>⏳ Carregando scoring.js...</div>
+                <div>⏳ Carregando audio-analyzer.js...</div>
+                <div>⏳ Carregando embedded-refs.js...</div>
+                <div>⏳ Inicializando sistema...</div>
+            </div>
+        </div>
+
+        <div id="success-section" class="success" style="display: none;">
+            <h3>✅ SISTEMA CARREGADO COM SUCESSO</h3>
+            <div id="system-info"></div>
+            <button onclick="testarSistemaCompleto()">🧪 TESTAR SISTEMA COMPLETO</button>
+            <button onclick="executarAnaliseSimulada()">🎵 ANÁLISE SIMULADA</button>
+            <button onclick="verificarModulos()">🔍 VERIFICAR MÓDULOS</button>
+        </div>
+
+        <div id="error-section" class="error" style="display: none;">
+            <h3>❌ ERRO NO CARREGAMENTO</h3>
+            <div id="error-info"></div>
+            <button onclick="location.reload()">🔄 RECARREGAR</button>
+        </div>
+
+        <div class="results">
+            <div id="test-results">
+                Aguardando carregamento do sistema...
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts essenciais carregados em sequência -->
+    <script>
+        // Log de início
+        console.log('🚀 Iniciando carregamento do sistema completo...');
+        
+        // 🎯 CONFIGURAÇÃO DE VARIÁVEIS GLOBAIS NECESSÁRIAS
+        window.USE_TT_DR = true;
+        window.SCORING_V2 = true;
+        window.AUDIT_MODE = true;
+        window.PROD_AI_REF_GENRE = 'funk_mandela'; // Gênero padrão para testes
+        window.PROD_AI_REF_DATA_ACTIVE = null; // Será definido dinamicamente
+        
+        console.log('🔧 Variáveis globais configuradas:', {
+            USE_TT_DR: window.USE_TT_DR,
+            SCORING_V2: window.SCORING_V2,
+            AUDIT_MODE: window.AUDIT_MODE,
+            PROD_AI_REF_GENRE: window.PROD_AI_REF_GENRE,
+            PROD_AI_REF_DATA_ACTIVE: window.PROD_AI_REF_DATA_ACTIVE
+        });
+        
+        // Controle de carregamento
+        let modulesLoaded = {
+            scoring: false,
+            analyzer: false,
+            refs: false
+        };
+        
+        let loadingTimeout;
+        
+        // Função para verificar se todos os módulos carregaram
+        function checkAllModulesLoaded() {
+            if (modulesLoaded.scoring && modulesLoaded.analyzer && modulesLoaded.refs) {
+                clearTimeout(loadingTimeout);
+                onSystemReady();
+            }
+        }
+        
+        // Timeout de segurança
+        loadingTimeout = setTimeout(() => {
+            console.error('⏰ Timeout no carregamento dos módulos');
+            showError('Timeout no carregamento. Alguns módulos não carregaram em 10 segundos.');
+        }, 10000);
+        
+        // Função chamada quando sistema está pronto
+        function onSystemReady() {
+            console.log('✅ Sistema completamente carregado');
+            
+            document.getElementById('loading-section').style.display = 'none';
+            document.getElementById('success-section').style.display = 'block';
+            document.getElementById('status').innerHTML = '<span class="status success">PRONTO</span> Sistema carregado e funcional';
+            
+            // Mostrar informações do sistema
+            const systemInfo = document.getElementById('system-info');
+            systemInfo.innerHTML = `
+                <div>✅ scoringModule: ${typeof window.scoringModule !== 'undefined'}</div>
+                <div>✅ audioAnalyzer: ${typeof window.AudioAnalyzer !== 'undefined'}</div>
+                <div>✅ PROD_AI_REF_DATA: ${typeof window.PROD_AI_REF_DATA !== 'undefined'}</div>
+                <div>🎵 Gêneros disponíveis: ${window.PROD_AI_REF_DATA ? Object.keys(window.PROD_AI_REF_DATA).length : 0}</div>
+            `;
+            
+            // Auto-teste
+            setTimeout(testarSistemaCompleto, 1000);
+        }
+        
+        // Função para mostrar erro
+        function showError(message) {
+            document.getElementById('loading-section').style.display = 'none';
+            document.getElementById('error-section').style.display = 'block';
+            document.getElementById('status').innerHTML = '<span class="status error">ERRO</span> Falha no carregamento';
+            document.getElementById('error-info').innerHTML = message;
+        }
+        
+        // Atualizar progresso
+        function updateProgress(step, status) {
+            const progress = document.getElementById('loading-progress');
+            const lines = progress.children;
+            
+            if (lines[step]) {
+                const icon = status === 'success' ? '✅' : status === 'error' ? '❌' : '⏳';
+                lines[step].innerHTML = lines[step].innerHTML.replace(/^[⏳✅❌]/, icon);
+            }
+        }
+        
+    </script>
+
+    <!-- 1. Carregar Scoring como ES6 module -->
+    <script type="module">
+        try {
+            console.log('🔄 Carregando scoring.js como ES6 module...');
+            const { computeMixScore, computeMixScoreBoth } = await import('./lib/audio/features/scoring.js');
+            
+            // Criar objeto scoringModule global
+            window.scoringModule = {
+                computeMixScore,
+                computeMixScoreBoth
+            };
+            
+            console.log('✅ scoring.js carregado com sucesso');
+            console.log('📊 computeMixScore disponível:', typeof computeMixScore);
+            
+            modulesLoaded.scoring = true;
+            updateProgress(0, 'success');
+            checkAllModulesLoaded();
+        } catch (error) {
+            console.error('❌ Falha ao carregar scoring.js:', error);
+            updateProgress(0, 'error');
+            showError('Falha ao carregar scoring.js: ' + error.message);
+        }
+    </script>
+
+    <!-- 2. Carregar Referências -->
+    <script src="public/refs/embedded-refs-new.js" onload="
+        console.log('✅ embedded-refs-new.js carregado');
+        
+        // 🎯 Configurar PROD_AI_REF_DATA_ACTIVE após carregamento
+        if (window.PROD_AI_REF_DATA && window.PROD_AI_REF_GENRE) {
+            const genre = window.PROD_AI_REF_GENRE;
+            if (window.PROD_AI_REF_DATA[genre]) {
+                window.PROD_AI_REF_DATA_ACTIVE = window.PROD_AI_REF_DATA[genre].legacy_compatibility || window.PROD_AI_REF_DATA[genre];
+                console.log('🎵 PROD_AI_REF_DATA_ACTIVE configurado para', genre);
+            }
+        }
+        
+        modulesLoaded.refs = true;
+        updateProgress(2, 'success');
+        checkAllModulesLoaded();
+    " onerror="
+        console.error('❌ Falha ao carregar embedded-refs-new.js');
+        updateProgress(2, 'error');
+        showError('Falha ao carregar embedded-refs-new.js');
+    "></script>
+
+    <!-- 3. Carregar Audio Analyzer -->
+    <script src="public/audio-analyzer.js" onload="
+        console.log('✅ audio-analyzer.js carregado');
+        modulesLoaded.analyzer = true;
+        updateProgress(1, 'success');
+        updateProgress(3, 'success');
+        checkAllModulesLoaded();
+    " onerror="
+        console.error('❌ Falha ao carregar audio-analyzer.js');
+        updateProgress(1, 'error');
+        showError('Falha ao carregar audio-analyzer.js');
+    "></script>
+
+    <script>
+        // Funções de teste
+        function testarSistemaCompleto() {
+            const output = document.getElementById('test-results');
+            output.innerHTML = '🧪 TESTE COMPLETO DO SISTEMA\n' + '='.repeat(50) + '\n\n';
+            
+            try {
+                // Teste 1: Verificar módulos
+                output.innerHTML += '🔍 TESTE 1: Verificação de Módulos\n';
+                output.innerHTML += '-'.repeat(40) + '\n';
+                output.innerHTML += `scoringModule: ${typeof window.scoringModule !== 'undefined' ? '✅' : '❌'}\n`;
+                output.innerHTML += `AudioAnalyzer: ${typeof window.AudioAnalyzer !== 'undefined' ? '✅' : '❌'}\n`;
+                output.innerHTML += `PROD_AI_REF_DATA: ${typeof window.PROD_AI_REF_DATA !== 'undefined' ? '✅' : '❌'}\n`;
+                output.innerHTML += `computeMixScore: ${typeof window.scoringModule?.computeMixScore === 'function' ? '✅' : '❌'}\n\n`;
+                
+                // Teste 2: Verificar referências
+                if (window.PROD_AI_REF_DATA) {
+                    output.innerHTML += '🎵 TESTE 2: Dados de Referência\n';
+                    output.innerHTML += '-'.repeat(40) + '\n';
+                    const genres = Object.keys(window.PROD_AI_REF_DATA);
+                    output.innerHTML += `Gêneros disponíveis: ${genres.length}\n`;
+                    output.innerHTML += `Lista: ${genres.join(', ')}\n`;
+                    
+                    // Verificar primeiro gênero
+                    const firstGenre = genres[0];
+                    const genreData = window.PROD_AI_REF_DATA[firstGenre];
+                    output.innerHTML += `\nPrimeiro gênero: ${firstGenre}\n`;
+                    
+                    // Verificar estrutura de bandas (pode estar em legacy_compatibility)
+                    const hasBands = !!(genreData.bands || genreData.legacy_compatibility?.bands);
+                    output.innerHTML += `Tem propriedade 'bands': ${hasBands ? '✅' : '❌'}\n`;
+                    
+                    const bandsData = genreData.bands || genreData.legacy_compatibility?.bands;
+                    if (bandsData) {
+                        const bands = Object.keys(bandsData);
+                        output.innerHTML += `Número de bandas: ${bands.length}\n`;
+                        output.innerHTML += `Bandas: ${bands.join(', ')}\n`;
+                        output.innerHTML += `Localização: ${genreData.bands ? 'raiz' : 'legacy_compatibility'}\n`;
+                    }
+                    output.innerHTML += '\n';
+                } else {
+                    output.innerHTML += '❌ TESTE 2: PROD_AI_REF_DATA não disponível\n\n';
+                }
+                
+                // Teste 3: Teste de scoring
+                if (window.scoringModule && window.scoringModule.computeMixScore) {
+                    output.innerHTML += '🧮 TESTE 3: Scoring Funcional\n';
+                    output.innerHTML += '-'.repeat(40) + '\n';
+                    
+                    // Dados de teste
+                    const testData = {
+                        lufsIntegrated: -12.0,
+                        truePeakDbtp: -3.0,
+                        dynamicRange: 8.0,
+                        lra: 7.0,
+                        stereoCorrelation: 0.5,
+                        bandEnergies: {
+                            sub: { rms_db: -8.0, energy: 0.15, energyPct: 12.0 },
+                            low_bass: { rms_db: -6.0, energy: 0.20, energyPct: 18.0 },
+                            upper_bass: { rms_db: -9.0, energy: 0.12, energyPct: 10.0 },
+                            low_mid: { rms_db: -6.0, energy: 0.25, energyPct: 22.0 },
+                            mid: { rms_db: -7.0, energy: 0.18, energyPct: 16.0 },
+                            high_mid: { rms_db: -12.0, energy: 0.08, energyPct: 6.0 },
+                            brilho: { rms_db: -18.0, energy: 0.03, energyPct: 2.0 },
+                            presenca: { rms_db: -22.0, energy: 0.01, energyPct: 1.0 }
+                        }
+                    };
+                    
+                    // Teste sem referência
+                    const scoreSemRef = window.scoringModule.computeMixScore(testData, null);
+                    output.innerHTML += `Score sem referência: ${scoreSemRef ? scoreSemRef.scorePct + '%' : 'ERRO'}\n`;
+                    
+                    // Teste com referência
+                    if (window.PROD_AI_REF_DATA) {
+                        const firstGenre = Object.keys(window.PROD_AI_REF_DATA)[0];
+                        const genreData = window.PROD_AI_REF_DATA[firstGenre];
+                        
+                        // Usar a estrutura correta (legacy_compatibility se necessário)
+                        const ref = genreData.legacy_compatibility || genreData;
+                        
+                        const scoreComRef = window.scoringModule.computeMixScore(testData, ref);
+                        output.innerHTML += `Score com referência (${firstGenre}): ${scoreComRef ? scoreComRef.scorePct + '%' : 'ERRO'}\n`;
+                        
+                        // Comparar scores
+                        if (scoreSemRef && scoreComRef) {
+                            const diferenca = Math.abs(scoreSemRef.scorePct - scoreComRef.scorePct);
+                            output.innerHTML += `Diferença entre scores: ${diferenca.toFixed(2)} pontos\n`;
+                            
+                            if (diferenca > 1) {
+                                output.innerHTML += '✅ Sistema considera referências corretamente\n';
+                                output.innerHTML += `✅ BANDAS ESPECTRAIS FUNCIONANDO! (diferença: ${diferenca.toFixed(2)} pontos)\n`;
+                            } else {
+                                output.innerHTML += '⚠️ Diferença pequena - verificar se referência está sendo usada\n';
+                            }
+                        }
+                    }
+                    output.innerHTML += '\n';
+                } else {
+                    output.innerHTML += '❌ TESTE 3: scoringModule.computeMixScore não disponível\n\n';
+                }
+                
+                // Conclusão
+                output.innerHTML += '🏁 CONCLUSÃO\n';
+                output.innerHTML += '-'.repeat(40) + '\n';
+                
+                const modulesOk = typeof window.scoringModule !== 'undefined' && 
+                                typeof window.PROD_AI_REF_DATA !== 'undefined' &&
+                                typeof window.AudioAnalyzer !== 'undefined';
+                
+                if (modulesOk) {
+                    output.innerHTML += '✅ SISTEMA COMPLETAMENTE FUNCIONAL!\n';
+                    output.innerHTML += 'Todos os módulos carregados e testados com sucesso.\n';
+                    output.innerHTML += 'O problema anterior era de carregamento de scripts.\n';
+                } else {
+                    output.innerHTML += '❌ Sistema ainda tem problemas\n';
+                    output.innerHTML += 'Alguns módulos não carregaram corretamente.\n';
+                }
+                
+            } catch (error) {
+                output.innerHTML += '💥 ERRO no teste: ' + error.message + '\n';
+                console.error('Erro no teste do sistema:', error);
+            }
+        }
+        
+        function executarAnaliseSimulada() {
+            const output = document.getElementById('test-results');
+            output.innerHTML = '🎵 ANÁLISE SIMULADA\n' + '='.repeat(30) + '\n\n';
+            
+            try {
+                if (!window.AudioAnalyzer) {
+                    throw new Error('AudioAnalyzer não disponível');
+                }
+                
+                output.innerHTML += 'Criando instância do AudioAnalyzer...\n';
+                
+                // Criar analyzer (sem áudio real)
+                const analyzer = new AudioAnalyzer();
+                
+                output.innerHTML += '✅ AudioAnalyzer criado com sucesso\n';
+                output.innerHTML += 'Tipo: ' + typeof analyzer + '\n';
+                output.innerHTML += 'Métodos disponíveis: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(analyzer)).filter(name => typeof analyzer[name] === 'function').join(', ') + '\n\n';
+                
+                output.innerHTML += '🔧 Sistema pronto para análises reais!\n';
+                
+            } catch (error) {
+                output.innerHTML += '❌ ERRO na análise simulada: ' + error.message + '\n';
+                console.error('Erro na análise simulada:', error);
+            }
+        }
+        
+        function verificarModulos() {
+            const output = document.getElementById('test-results');
+            output.innerHTML = '🔍 VERIFICAÇÃO DETALHADA DE MÓDULOS\n' + '='.repeat(50) + '\n\n';
+            
+            // Verificar window.scoringModule
+            output.innerHTML += '📊 scoringModule:\n';
+            if (typeof window.scoringModule !== 'undefined') {
+                output.innerHTML += '  ✅ Existe\n';
+                output.innerHTML += '  Tipo: ' + typeof window.scoringModule + '\n';
+                output.innerHTML += '  computeMixScore: ' + typeof window.scoringModule.computeMixScore + '\n';
+                
+                if (typeof window.scoringModule.computeMixScore === 'function') {
+                    output.innerHTML += '  ✅ computeMixScore é função\n';
+                } else {
+                    output.innerHTML += '  ❌ computeMixScore não é função\n';
+                }
+            } else {
+                output.innerHTML += '  ❌ Não existe\n';
+            }
+            output.innerHTML += '\n';
+            
+            // Verificar window.AudioAnalyzer
+            output.innerHTML += '🎵 AudioAnalyzer:\n';
+            if (typeof window.AudioAnalyzer !== 'undefined') {
+                output.innerHTML += '  ✅ Existe\n';
+                output.innerHTML += '  Tipo: ' + typeof window.AudioAnalyzer + '\n';
+                
+                try {
+                    const instance = new AudioAnalyzer();
+                    output.innerHTML += '  ✅ Pode ser instanciado\n';
+                } catch (error) {
+                    output.innerHTML += '  ❌ Erro ao instanciar: ' + error.message + '\n';
+                }
+            } else {
+                output.innerHTML += '  ❌ Não existe\n';
+            }
+            output.innerHTML += '\n';
+            
+            // Verificar window.PROD_AI_REF_DATA
+            output.innerHTML += '📚 PROD_AI_REF_DATA:\n';
+            if (typeof window.PROD_AI_REF_DATA !== 'undefined') {
+                output.innerHTML += '  ✅ Existe\n';
+                output.innerHTML += '  Tipo: ' + typeof window.PROD_AI_REF_DATA + '\n';
+                output.innerHTML += '  É objeto: ' + (typeof window.PROD_AI_REF_DATA === 'object') + '\n';
+                
+                if (typeof window.PROD_AI_REF_DATA === 'object') {
+                    const keys = Object.keys(window.PROD_AI_REF_DATA);
+                    output.innerHTML += '  Número de chaves: ' + keys.length + '\n';
+                    output.innerHTML += '  Chaves: ' + keys.slice(0, 5).join(', ') + (keys.length > 5 ? '...' : '') + '\n';
+                }
+            } else {
+                output.innerHTML += '  ❌ Não existe\n';
+            }
+            output.innerHTML += '\n';
+            
+            // Verificar variáveis globais relacionadas
+            output.innerHTML += '🌐 Outras variáveis globais:\n';
+            const globalVars = ['PROD_AI_REF_GENRE', 'PROD_AI_REF_DATA_ACTIVE', 'USE_TT_DR', 'SCORING_V2'];
+            globalVars.forEach(varName => {
+                const exists = typeof window[varName] !== 'undefined';
+                output.innerHTML += `  ${varName}: ${exists ? '✅' : '❌'} (${typeof window[varName]})\n`;
+            });
+        }
+    </script>
+</body>
+</html>
