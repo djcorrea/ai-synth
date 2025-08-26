@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Debug Score Final</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #0a0a0a; color: #00ff00; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #333; }
+        button { padding: 10px 20px; margin: 10px; background: #333; color: #fff; border: none; cursor: pointer; }
+        button:hover { background: #555; }
+        #results { margin-top: 20px; }
+        .score-display { font-size: 20px; font-weight: bold; margin: 10px 0; }
+        .reference-display { background: #1a1a1a; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste Debug Score Final - Equal Weight V3</h1>
+    
+    <div class="test-section">
+        <h2>🎯 Teste com Diferentes Gêneros</h2>
+        <button onclick="testarFunkMandela()">Testar Funk Mandela</button>
+        <button onclick="testarTrance()">Testar Trance</button>
+        <button onclick="testarEletronico()">Testar Eletronico</button>
+        <button onclick="limparConsole()">Limpar Console</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script type="module">
+        console.log('🔍 [DEBUG] Iniciando teste de debug do score final');
+        
+        // Garantir cache bust agressivo
+        const cacheBuster = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        let audioAnalyzer = null;
+        let scoringModule = null;
+        
+        async function carregarModulos() {
+            try {
+                console.log('🔄 [DEBUG] Carregando módulos com cache busting...');
+                
+                // Importar audio-analyzer
+                audioAnalyzer = await import(`./audio-analyzer.js?cb=${cacheBuster}`);
+                console.log('✅ [DEBUG] audio-analyzer carregado');
+                
+                // Importar scoring diretamente
+                scoringModule = await import(`./lib/audio/features/scoring.js?cb=${cacheBuster}`);
+                console.log('✅ [DEBUG] scoring.js carregado');
+                
+                return true;
+            } catch (error) {
+                console.error('❌ [DEBUG] Erro ao carregar módulos:', error);
+                return false;
+            }
+        }
+        
+        async function testarGenero(genero, referenceData) {
+            console.log(`\n🎯 [DEBUG] ======= TESTANDO ${genero.toUpperCase()} =======`);
+            
+            if (!scoringModule) {
+                console.error('❌ [DEBUG] Módulo scoring não carregado');
+                return;
+            }
+            
+            // Dados de teste padronizados
+            const testTechnicalData = {
+                lufsIntegrated: -12.5,
+                truePeakDbtp: -0.8,
+                dr: 8.2,
+                lra: 6.1,
+                stereoCorrelation: 0.25,
+                dynamicRange: 8.2,
+                dr_stat: 8.2,
+                crestFactor: 12.3,
+                spectralCentroid: 2800,
+                spectralFlatness: 0.18,
+                spectralRolloff85: 7500,
+                dcOffsetLeft: 0.001,
+                dcOffsetRight: -0.002,
+                clippingPct: 0.1
+            };
+            
+            console.log('📊 [DEBUG] Technical data:', testTechnicalData);
+            console.log('📋 [DEBUG] Reference data:', referenceData);
+            
+            try {
+                // Chamar computeMixScore diretamente
+                const result = scoringModule.computeMixScore(testTechnicalData, referenceData);
+                
+                console.log(`✅ [DEBUG] Score calculado para ${genero}:`, result);
+                
+                // Exibir na tela
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML += `
+                    <div class="score-display">
+                        ${genero}: ${result.scorePct}% 
+                        (${result.classification}) 
+                        [${result.method}]
+                    </div>
+                    <div class="reference-display">
+                        Referência: lufs_target=${referenceData.lufs_target}, 
+                        dr_target=${referenceData.dr_target}, 
+                        stereo_target=${referenceData.stereo_target}
+                    </div>
+                `;
+                
+                return result;
+            } catch (error) {
+                console.error(`❌ [DEBUG] Erro ao calcular score para ${genero}:`, error);
+                return null;
+            }
+        }
+        
+        // Expor funções globalmente
+        window.testarFunkMandela = async () => {
+            const ref = {
+                lufs_target: -11.5,
+                tol_lufs: 2.5,
+                dr_target: 6.8,
+                tol_dr: 2.0,
+                stereo_target: 0.2,
+                tol_stereo: 0.3
+            };
+            await testarGenero('funk_mandela', ref);
+        };
+        
+        window.testarTrance = async () => {
+            const ref = {
+                lufs_target: -12.8,
+                tol_lufs: 1.8,
+                dr_target: 9.2,
+                tol_dr: 2.5,
+                stereo_target: 0.35,
+                tol_stereo: 0.4
+            };
+            await testarGenero('trance', ref);
+        };
+        
+        window.testarEletronico = async () => {
+            const ref = {
+                lufs_target: -13.2,
+                tol_lufs: 2.0,
+                dr_target: 8.5,
+                tol_dr: 2.2,
+                stereo_target: 0.3,
+                tol_stereo: 0.35
+            };
+            await testarGenero('eletronico', ref);
+        };
+        
+        window.limparConsole = () => {
+            console.clear();
+            document.getElementById('results').innerHTML = '';
+            console.log('🔍 [DEBUG] Console limpo - pronto para novos testes');
+        };
+        
+        // Carregar módulos automaticamente
+        carregarModulos().then(success => {
+            if (success) {
+                console.log('✅ [DEBUG] Todos os módulos carregados - pronto para testes!');
+            } else {
+                console.error('❌ [DEBUG] Falha ao carregar módulos');
+            }
+        });
+    </script>
+</body>
+</html>

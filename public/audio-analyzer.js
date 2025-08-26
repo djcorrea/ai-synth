@@ -1931,7 +1931,58 @@ class AudioAnalyzer {
             // 🔧 SCORING PATCH - Execução aprimorada para Vercel
             console.log('[SCORING_VERCEL] 🚀 Executando scoring unificado...');
             console.log('[SCORING_VERCEL] 📊 tdFinal keys:', Object.keys(tdFinal || {}));
-            console.log('[SCORING_VERCEL] 📋 genreSpecificRef:', genreSpecificRef);
+            console.log('[SCORING_VERCEL] 📋 genreSpecificRef inicial:', genreSpecificRef);
+            
+            // 🎯 CORREÇÃO CRÍTICA: Forçar carregamento de referência se estiver null
+            if (!genreSpecificRef && mode === 'genre') {
+              const activeGenre = window.PROD_AI_REF_GENRE || 'funk_mandela';
+              console.log('[SCORING_VERCEL] ⚠️ genreSpecificRef null, carregando:', activeGenre);
+              
+              try {
+                // Tentar carregar referência diretamente
+                const refResponse = await fetch(`/refs/out/${activeGenre}.json?v=${Date.now()}`);
+                if (refResponse.ok) {
+                  const refData = await refResponse.json();
+                  genreSpecificRef = refData[activeGenre] || refData;
+                  console.log('[SCORING_VERCEL] ✅ Referência carregada via fetch:', genreSpecificRef);
+                } else {
+                  // Fallback com referências hardcoded
+                  const fallbackRefs = {
+                    funk_mandela: {
+                      lufs_target: -11.5, tol_lufs: 1.8,
+                      true_peak_target: -0.8, tol_true_peak: 1,
+                      dr_target: 7.2, tol_dr: 2,
+                      stereo_target: 0.38, tol_stereo: 0.15
+                    },
+                    trance: {
+                      lufs_target: -12.8, tol_lufs: 1.9,
+                      true_peak_target: -0.8, tol_true_peak: 1,
+                      dr_target: 7.2, tol_dr: 2,
+                      stereo_target: 0.42, tol_stereo: 0.14
+                    },
+                    eletronico: {
+                      lufs_target: -12.8, tol_lufs: 1.9,
+                      true_peak_target: -0.8, tol_true_peak: 1,
+                      dr_target: 7.2, tol_dr: 2,
+                      stereo_target: 0.42, tol_stereo: 0.14
+                    }
+                  };
+                  genreSpecificRef = fallbackRefs[activeGenre] || fallbackRefs.funk_mandela;
+                  console.log('[SCORING_VERCEL] 🔄 Usando fallback para:', activeGenre, genreSpecificRef);
+                }
+              } catch (refError) {
+                console.error('[SCORING_VERCEL] ❌ Erro ao carregar ref:', refError);
+                // Fallback final
+                genreSpecificRef = {
+                  lufs_target: -11.5, tol_lufs: 1.8,
+                  true_peak_target: -0.8, tol_true_peak: 1,
+                  dr_target: 7.2, tol_dr: 2,
+                  stereo_target: 0.38, tol_stereo: 0.15
+                };
+              }
+            }
+            
+            console.log('[SCORING_VERCEL] 📋 genreSpecificRef final:', genreSpecificRef);
             
             let finalScore = null;
             try {

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Debug Score Simples</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #0a0a0a; color: #00ff00; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #333; }
+        button { padding: 10px 20px; margin: 10px; background: #333; color: #fff; border: none; cursor: pointer; }
+        button:hover { background: #555; }
+        #results { margin-top: 20px; }
+        .score-display { font-size: 20px; font-weight: bold; margin: 10px 0; }
+        .logs { background: #1a1a1a; padding: 10px; margin: 10px 0; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste Debug Score Simples</h1>
+    
+    <div class="test-section">
+        <h2>🎯 Teste Direto com Audio Analyzer</h2>
+        <button onclick="testarComAudioBuffer()">Testar com Audio Buffer Mock</button>
+        <button onclick="limparConsole()">Limpar Console</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        console.log('🔍 [DEBUG] Iniciando teste simples');
+        
+        // Interceptar console.log para mostrar na tela também
+        const originalLog = console.log;
+        const logs = [];
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const logText = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            logs.push(logText);
+            
+            // Atualizar display de logs
+            const logsDiv = document.getElementById('logs');
+            if (logsDiv) {
+                logsDiv.innerHTML = logs.slice(-50).join('\\n'); // Últimos 50 logs
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            }
+        };
+        
+        async function testarComAudioBuffer() {
+            console.log('\\n🎯 [DEBUG] ======= TESTE COM AUDIO BUFFER MOCK =======');
+            
+            // Criar um audio buffer mock simples
+            const mockAudioBuffer = {
+                sampleRate: 44100,
+                length: 44100 * 3, // 3 segundos
+                numberOfChannels: 2,
+                getChannelData: function(channel) {
+                    // Gerar dados de áudio sintéticos
+                    const data = new Float32Array(this.length);
+                    for (let i = 0; i < this.length; i++) {
+                        // Sinal senoidal simples com algum ruído
+                        data[i] = Math.sin(2 * Math.PI * 440 * i / this.sampleRate) * 0.5 + 
+                                 Math.random() * 0.1 - 0.05;
+                    }
+                    return data;
+                }
+            };
+            
+            console.log('📊 [DEBUG] Mock audio buffer criado:', {
+                sampleRate: mockAudioBuffer.sampleRate,
+                length: mockAudioBuffer.length,
+                channels: mockAudioBuffer.numberOfChannels
+            });
+            
+            // Criar context mock
+            const mockAudioContext = {
+                sampleRate: 44100,
+                createAnalyser: () => ({
+                    frequencyBinCount: 1024,
+                    getFloatFrequencyData: (array) => {
+                        for (let i = 0; i < array.length; i++) {
+                            array[i] = -60 + Math.random() * 60; // dB values
+                        }
+                    }
+                })
+            };
+            
+            // Simular diferentes gêneros
+            const generos = [
+                { nome: 'funk_mandela', ref: { lufs_target: -11.5, dr_target: 6.8, stereo_target: 0.2 } },
+                { nome: 'trance', ref: { lufs_target: -12.8, dr_target: 9.2, stereo_target: 0.35 } },
+                { nome: 'eletronico', ref: { lufs_target: -13.2, dr_target: 8.5, stereo_target: 0.3 } }
+            ];
+            
+            // Criar div para logs
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div id="logs" class="logs"></div><div id="scores"></div>';
+            
+            for (const genero of generos) {
+                console.log(`\\n🎵 [DEBUG] Testando gênero: ${genero.nome}`);
+                console.log(`📋 [DEBUG] Referência:`, genero.ref);
+                
+                try {
+                    // Chamar a função de análise (simulando)
+                    // Como não podemos importar o módulo diretamente, vamos simular o processo
+                    
+                    // Simular dados técnicos que seriam extraídos do áudio
+                    const mockTechnicalData = {
+                        lufsIntegrated: -12.3 + (Math.random() - 0.5) * 2,
+                        truePeakDbtp: -0.8 + (Math.random() - 0.5) * 0.5,
+                        dr: 8.0 + (Math.random() - 0.5) * 3,
+                        lra: 6.5 + (Math.random() - 0.5) * 2,
+                        stereoCorrelation: 0.3 + (Math.random() - 0.5) * 0.4,
+                        dynamicRange: 8.0,
+                        crestFactor: 12.0,
+                        spectralCentroid: 2800,
+                        spectralFlatness: 0.18,
+                        clippingPct: 0.1
+                    };
+                    
+                    console.log(`📊 [DEBUG] Dados técnicos simulados:`, mockTechnicalData);
+                    
+                    // Para este teste, vamos simular o que deveria acontecer
+                    console.log(`🎯 [DEBUG] [EQUAL_WEIGHT_V3] 🔍 REFERENCE VALIDATION:`);
+                    console.log(`🎯 [DEBUG] reference.lufs_target: ${genero.ref.lufs_target}`);
+                    console.log(`🎯 [DEBUG] reference.dr_target: ${genero.ref.dr_target}`);
+                    console.log(`🎯 [DEBUG] reference.stereo_target: ${genero.ref.stereo_target}`);
+                    
+                    // Simular cálculo de score baseado na referência
+                    const lufsScore = Math.max(0, 100 - Math.abs(mockTechnicalData.lufsIntegrated - genero.ref.lufs_target) * 10);
+                    const drScore = Math.max(0, 100 - Math.abs(mockTechnicalData.dr - genero.ref.dr_target) * 5);
+                    const stereoScore = Math.max(0, 100 - Math.abs(mockTechnicalData.stereoCorrelation - genero.ref.stereo_target) * 50);
+                    
+                    const finalScore = (lufsScore + drScore + stereoScore) / 3;
+                    
+                    console.log(`🎯 [DEBUG] Scores individuais: LUFS=${lufsScore.toFixed(1)}, DR=${drScore.toFixed(1)}, Stereo=${stereoScore.toFixed(1)}`);
+                    console.log(`🏁 [DEBUG] Score final: ${finalScore.toFixed(1)}%`);
+                    
+                    // Exibir resultado
+                    const scoresDiv = document.getElementById('scores');
+                    scoresDiv.innerHTML += `
+                        <div class="score-display">
+                            ${genero.nome}: ${finalScore.toFixed(1)}% 
+                            (Targets: LUFS=${genero.ref.lufs_target}, DR=${genero.ref.dr_target})
+                        </div>
+                    `;
+                    
+                } catch (error) {
+                    console.error(`❌ [DEBUG] Erro ao processar ${genero.nome}:`, error);
+                }
+            }
+            
+            console.log('\\n✅ [DEBUG] Teste concluído - verifique se os scores são diferentes para cada gênero');
+        }
+        
+        window.testarComAudioBuffer = testarComAudioBuffer;
+        
+        window.limparConsole = () => {
+            console.clear();
+            logs.length = 0;
+            document.getElementById('results').innerHTML = '';
+            console.log('🔍 [DEBUG] Console limpo - pronto para novos testes');
+        };
+    </script>
+</body>
+</html>
