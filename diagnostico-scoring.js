@@ -29,14 +29,46 @@ async function diagnosticarScoring() {
     
     console.log('\n📊 3. PREPARANDO DADOS DE TESTE...');
     
-    // Teste com dados mínimos primeiro
+    // Dados de teste no formato CORRETO que o scoring espera
     const testDataMinimo = {
+      // Formato que o scoring.js realmente espera
+      bandEnergies: {
+        sub: { rms_db: -18.5 },      
+        bass: { rms_db: -15.3 },
+        low_mid: { rms_db: -12.7 },
+        mid: { rms_db: -10.9 },
+        high_mid: { rms_db: -14.2 },
+        high: { rms_db: -16.1 },
+        presence: { rms_db: -20.4 },
+        air: { rms_db: -25.9 }
+      },
+      // Métricas de dinâmica
+      dynamicRange: 8.5,
+      lra: 4.3,
+      truePeakDbtp: -1.2,
+      
+      // Métricas espectrais
+      spectralCentroid: 2500,
+      spectralFlatness: 0.15,
+      spectralRolloff85: 8000,
+      
+      // Métricas estéreo
+      stereoCorrelation: 0.85,
+      stereoWidth: 0.95,
+      balanceLR: 0.02,
+      
+      // Métricas técnicas
+      dcOffset: 0.001,
+      
+      // Dados legacy para compatibilidade
       sampleRate: 44100,
       spectrum: [0.5, 0.4, 0.3, 0.2, 0.1],
       rms: 0.3
     };
     
-    console.log('📊 Dados de teste criados:', testDataMinimo);
+    console.log('📊 Dados de teste criados no formato CORRETO:', JSON.stringify(testDataMinimo, null, 2));
+    console.log('📊 Estrutura dados teste:', Object.keys(testDataMinimo));
+    console.log('📊 bandEnergies disponíveis:', Object.keys(testDataMinimo.bandEnergies));
     
     console.log('\n📊 4. TESTANDO SCORING DIRETO...');
     
@@ -46,13 +78,16 @@ async function diagnosticarScoring() {
     console.log('Resultado 1:', JSON.stringify(resultado1, null, 2));
     
     // Teste 2: Com adaptador
+    let resultado2 = null;
     if (window.adaptReferenceData) {
       console.log('\n🧪 Teste 2: Com adaptador');
       const dadosAdaptados = window.adaptReferenceData(rawData);
       console.log('Dados adaptados structure:', Object.keys(dadosAdaptados || {}));
       
-      const resultado2 = scoringModule.computeMixScore(testDataMinimo, dadosAdaptados);
+      resultado2 = scoringModule.computeMixScore(testDataMinimo, dadosAdaptados);
       console.log('Resultado 2:', JSON.stringify(resultado2, null, 2));
+    } else {
+      console.log('\n🚫 Teste 2: Adaptador não encontrado');
     }
     
     // Teste 3: Dados simulados simplificados
@@ -83,11 +118,30 @@ async function diagnosticarScoring() {
     
     for (let i = 0; i < resultados.length; i++) {
       const r = resultados[i];
-      console.log(`\nResultado ${i + 1}:`);
+      console.log(`\n🔍 Análise Resultado ${i + 1}:`);
       console.log(`  - advancedScorePct: ${r.advancedScorePct} (${typeof r.advancedScorePct})`);
       console.log(`  - scorePct: ${r.scorePct} (${typeof r.scorePct})`);
       console.log(`  - score: ${r.score} (${typeof r.score})`);
-      console.log(`  - Campos: ${Object.keys(r).join(', ')}`);
+      console.log(`  - classification: ${r.classification}`);
+      console.log(`  - Campos disponíveis: ${Object.keys(r).join(', ')}`);
+      
+      if (r.details) {
+        console.log(`  - details.perMetric length: ${r.details.perMetric?.length || 0}`);
+        console.log(`  - details.categories keys: ${Object.keys(r.details.categories || {}).join(', ')}`);
+        
+        if (r.details.perMetric && r.details.perMetric.length > 0) {
+          console.log(`  - Primeira métrica: ${JSON.stringify(r.details.perMetric[0])}`);
+        } else {
+          console.log(`  ❌ perMetric está vazio - isso indica que nenhuma métrica foi calculada`);
+        }
+      }
+      
+      // Verificar se é um problema de formato de dados
+      console.log(`  🔬 Diagnóstico adicional:`);
+      console.log(`    - scorePct === 0: ${r.scorePct === 0}`);
+      console.log(`    - scorePct é number: ${typeof r.scorePct === 'number'}`);
+      console.log(`    - Tem details: ${!!r.details}`);
+      console.log(`    - perMetric é array: ${Array.isArray(r.details?.perMetric)}`);
     }
     
   } catch (error) {
