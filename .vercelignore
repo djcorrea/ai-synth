@@ -4,7 +4,3 @@ refs/
 *.zip
 *.rar
 node_modules/
-
-# Permitir arquivos específicos de correção
-!public/solucao-definitiva-score.js
-!aplicar-correcao-score.html
