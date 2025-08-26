@@ -2,70 +2,6 @@
 // Versão v1.5-FIXED-CLEAN-NOHIGH sem duplicações (removido "muito alto")
 // Implementação usando Web Audio API (100% gratuito)
 
-// 🔧 CORREÇÃO CRÍTICA: Função para calcular score de frequência baseado em bandas reais
-function calcularScoreFrequenciaPorBandas(bandEnergies, reference) {
-  // Validação segura dos inputs
-  if (!bandEnergies || typeof bandEnergies !== 'object') {
-    console.warn('[FREQUENCY_SCORE] bandEnergies inválido, usando fallback');
-    return 50;
-  }
-  
-  // Extrair referência ou usar defaults seguros
-  const bandsReference = reference?.bands || {};
-  
-  // Targets padrão baseados nos dados do Funk Mandela
-  const defaultTargets = {
-    sub: -14.0, low_bass: -14.0, upper_bass: -14.0, low_mid: -14.0,
-    mid: -14.0, high_mid: -14.0, brilho: -14.0, presenca: -14.0
-  };
-  
-  // Tolerâncias padrão
-  const defaultTolerances = {
-    sub: 3.0, low_bass: 3.0, upper_bass: 3.0, low_mid: 3.0,
-    mid: 3.0, high_mid: 3.0, brilho: 3.0, presenca: 3.0
-  };
-  
-  const bandScores = [];
-  let totalWeight = 0;
-  
-  // Processar cada banda individualmente
-  for (const [bandName, bandData] of Object.entries(bandEnergies)) {
-    if (!bandData || !Number.isFinite(bandData.rms_db)) continue;
-    
-    const measuredValue = bandData.rms_db;
-    const target = bandsReference[bandName]?.target_db || defaultTargets[bandName] || -14.0;
-    const tolerance = bandsReference[bandName]?.tol_db || defaultTolerances[bandName] || 3.0;
-    
-    const deviation = Math.abs(measuredValue - target);
-    const deviationRatio = tolerance > 0 ? deviation / tolerance : 0;
-    
-    // Curva de scoring suave
-    let bandScore = 100;
-    if (deviationRatio > 0) {
-      if (deviationRatio <= 1.0) {
-        bandScore = 100 - (deviationRatio * 10);
-      } else if (deviationRatio <= 2.0) {
-        bandScore = 90 - ((deviationRatio - 1.0) * 20);
-      } else if (deviationRatio <= 3.0) {
-        bandScore = 70 - ((deviationRatio - 2.0) * 20);
-      } else {
-        bandScore = Math.max(30, 50 - ((deviationRatio - 3.0) * 10));
-      }
-    }
-    
-    bandScores.push({ band: bandName, score: bandScore, weight: 1.0 });
-    totalWeight += 1.0;
-  }
-  
-  // Calcular score final ponderado
-  if (bandScores.length === 0) return 50;
-  
-  const weightedSum = bandScores.reduce((sum, band) => sum + (band.score * band.weight), 0);
-  const finalScore = totalWeight > 0 ? weightedSum / totalWeight : 50;
-  
-  return Math.max(0, Math.min(100, Math.round(finalScore)));
-}
-
 class AudioAnalyzer {
   constructor() {
     this.audioContext = null;
@@ -1879,24 +1815,9 @@ class AudioAnalyzer {
         if (Math.abs(safe(baseAnalysis.technicalData?.dcOffset)) > 0.02) scoreTech -= 10;
         if (crest < 6) scoreTech -= 15; else if (crest < 8) scoreTech -= 5;
         if (corr < -0.2) scoreTech -= 15;
-        // 🔧 CORREÇÃO CRÍTICA: Frequency score baseado em análise real das bandas
+        // Frequency score baseado em centroid
         let scoreFreq;
-        try {
-          const bandEnergies = baseAnalysis.technicalData?.bandEnergies;
-          if (bandEnergies && Object.keys(bandEnergies).length > 0) {
-            console.log('[FREQUENCY_SCORE] ✅ Usando análise por bandas');
-            scoreFreq = calcularScoreFrequenciaPorBandas(bandEnergies, ref);
-          } else {
-            console.log('[FREQUENCY_SCORE] ⚠️ Fallback para centroide');
-            if (!Number.isFinite(centroid)) scoreFreq = 50; 
-            else if (centroid < freqIdealLow) scoreFreq = 100 - Math.min(60, (freqIdealLow-centroid)/freqIdealLow*100); 
-            else if (centroid>freqIdealHigh) scoreFreq = 100 - Math.min(60, (centroid-freqIdealHigh)/freqIdealHigh*100); 
-            else scoreFreq = 100;
-          }
-        } catch (error) {
-          console.error('[FREQUENCY_SCORE] ❌ Erro, usando fallback:', error);
-          scoreFreq = 50;
-        }
+        if (!Number.isFinite(centroid)) scoreFreq = 50; else if (centroid < freqIdealLow) scoreFreq = 100 - Math.min(60, (freqIdealLow-centroid)/freqIdealLow*100); else if (centroid>freqIdealHigh) scoreFreq = 100 - Math.min(60, (centroid-freqIdealHigh)/freqIdealHigh*100); else scoreFreq = 100;
         const clamp = v=>Math.max(0, Math.min(100, Math.round(v)));
         baseAnalysis.qualityBreakdown = {
           dynamics: clamp(scoreDyn),

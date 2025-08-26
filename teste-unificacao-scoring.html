@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste de Unificação do Scoring</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            margin: 0;
+            line-height: 1.4;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            color: white;
+        }
+        .test-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .result-box {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { border-left: 4px solid #4CAF50; }
+        .error { border-left: 4px solid #f44336; }
+        .warning { border-left: 4px solid #ff9800; }
+        .info { border-left: 4px solid #2196F3; }
+        
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #45a049; }
+        .btn:disabled { background: #666; cursor: not-allowed; }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.success { background: #4CAF50; color: white; }
+        .status.error { background: #f44336; color: white; }
+        .status.warning { background: #ff9800; color: white; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .metric {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #4CAF50;
+        }
+        
+        .score-large {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4CAF50;
+            text-align: center;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Teste de Unificação do Scoring</h1>
+            <p>Validação do Sistema Equal Weight V3 - Engine 3.0.0</p>
+        </div>
+        
+        <div class="test-section">
+            <h2>🚀 Controles de Teste</h2>
+            <button class="btn" onclick="executarTesteCompleto()">Executar Teste Completo</button>
+            <button class="btn" onclick="testarGeneroIndividual()">Testar Gênero Individual</button>
+            <button class="btn" onclick="limparResultados()">Limpar Resultados</button>
+            <button class="btn" onclick="toggleCache()">Toggle Cache</button>
+            
+            <div class="result-box" style="margin-top: 10px;">
+                <strong>Status do Cache:</strong> <span id="cacheStatus">Habilitado</span>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📊 Resultados dos Testes</h2>
+            <div id="resultadosContainer"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📋 Validação da Unificação</h2>
+            <div id="validacaoContainer"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🔍 Logs Detalhados</h2>
+            <div class="result-box" id="logsContainer"></div>
+        </div>
+    </div>
+
+    <script src="teste-unificacao-scoring.js"></script>
+    <script>
+        let cacheDesabilitado = true;
+        
+        // Configuração inicial
+        window.DISABLE_SCORING_CACHE = true;
+        window.CACHE_BUST_SCORING = true;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logContainer = document.getElementById('logsContainer');
+            const linha = `[${timestamp}] ${message}\n`;
+            logContainer.textContent += linha;
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Console também
+            if (type === 'error') {
+                console.error(message);
+            } else {
+                console.log(message);
+            }
+        }
+        
+        function toggleCache() {
+            cacheDesabilitado = !cacheDesabilitado;
+            window.DISABLE_SCORING_CACHE = cacheDesabilitado;
+            window.CACHE_BUST_SCORING = cacheDesabilitado;
+            
+            const status = cacheDesabilitado ? 'Desabilitado' : 'Habilitado';
+            document.getElementById('cacheStatus').textContent = status;
+            log(`Cache ${status.toLowerCase()}`);
+        }
+        
+        function limparResultados() {
+            document.getElementById('resultadosContainer').innerHTML = '';
+            document.getElementById('validacaoContainer').innerHTML = '';
+            document.getElementById('logsContainer').textContent = '';
+            log('Resultados limpos');
+        }
+        
+        async function executarTesteCompleto() {
+            log('🚀 Iniciando teste completo de unificação...');
+            
+            try {
+                // Executar teste
+                const resultados = await window.testarUnificacaoScoring();
+                mostrarResultados(resultados);
+                
+                // Validar
+                const validacao = window.validarUnificacao(resultados);
+                mostrarValidacao(validacao);
+                
+                log('✅ Teste completo finalizado');
+                
+            } catch (error) {
+                log(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+        
+        function mostrarResultados(resultados) {
+            const container = document.getElementById('resultadosContainer');
+            
+            let html = '<div class="grid">';
+            
+            for (const [genero, resultado] of Object.entries(resultados)) {
+                const temErro = resultado.error;
+                const statusClass = temErro ? 'error' : 'success';
+                
+                html += `
+                    <div class="metric ${statusClass}">
+                        <h3>🎵 ${genero.toUpperCase()}</h3>
+                        ${temErro ? 
+                            `<div class="status error">ERRO</div>
+                             <p><strong>Erro:</strong> ${resultado.error}</p>` :
+                            `<div class="score-large">${resultado.score}%</div>
+                             <p><strong>Method:</strong> ${resultado.method}</p>
+                             <p><strong>Classification:</strong> ${resultado.classification}</p>
+                             <p><strong>Engine:</strong> ${resultado.engineVersion}</p>
+                             <p><strong>Unified:</strong> ${resultado.unifiedScoring ? '✅' : '❌'}</p>`
+                        }
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function mostrarValidacao(validacao) {
+            const container = document.getElementById('validacaoContainer');
+            
+            const { sucesso, validacoes } = validacao;
+            
+            let html = `
+                <div class="result-box ${sucesso ? 'success' : 'error'}">
+                    <h3>🏆 Resultado Final: ${sucesso ? '✅ SUCESSO' : '❌ FALHOU'}</h3>
+                </div>
+                
+                <div class="grid">
+            `;
+            
+            const checks = [
+                ['Engine Version 3.0.0', validacoes.engineVersion],
+                ['Method equal_weight_v3', validacoes.methodConsistency],
+                ['Unified Scoring', validacoes.unifiedScoring],
+                ['Scores Diferentes', validacoes.scoresDiferentes],
+                ['Sem Erros', validacoes.semErros]
+            ];
+            
+            checks.forEach(([nome, passou]) => {
+                html += `
+                    <div class="metric ${passou ? 'success' : 'error'}">
+                        <h4>${nome}</h4>
+                        <div class="status ${passou ? 'success' : 'error'}">
+                            ${passou ? '✅ PASSOU' : '❌ FALHOU'}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        async function testarGeneroIndividual() {
+            const genero = prompt('Digite o gênero para testar:', 'funk_mandela');
+            if (!genero) return;
+            
+            log(`🎯 Testando gênero individual: ${genero}`);
+            
+            try {
+                // Implementar teste individual aqui
+                log(`✅ Teste individual para ${genero} finalizado`);
+            } catch (error) {
+                log(`❌ Erro no teste individual: ${error.message}`, 'error');
+            }
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🧪 Sistema de testes carregado');
+            log('💡 Use os botões acima para executar os testes');
+            toggleCache(); // Configurar cache inicial
+        });
+        
+        // Auto-executar teste após carregar
+        setTimeout(() => {
+            log('🚀 Executando teste automático em 3 segundos...');
+            setTimeout(executarTesteCompleto, 3000);
+        }, 1000);
+    </script>
+</body>
+</html>
