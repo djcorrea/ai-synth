@@ -3,7 +3,7 @@
 
 /**
  * 🎯 Adaptador para dados de referência
- * Converte o formato do funk_mandela.json para o formato esperado pelo sistema
+ * Converte o formato do funk_mandela.json para o formato esperado pelo sistema de scoring
  */
 function adaptReferenceData(rawData) {
   // Se já está no formato correto, retorna direto
@@ -19,16 +19,41 @@ function adaptReferenceData(rawData) {
     return null;
   }
   
+  // 🔧 CONVERSÃO PARA FORMATO SCORING
+  // O scoring.js espera bands com { target_db, tol_db } ou { target_db, tol_min, tol_max }
+  const bands = {};
+  const sourceBands = sourceData.bands || sourceData.spectralBalance?.bands || {};
+  const tolerances = sourceData.tolerances || sourceData.spectralBalance?.tolerances || {};
+  
+  // Converter cada banda para o formato esperado
+  for (const [bandName, bandData] of Object.entries(sourceBands)) {
+    if (typeof bandData === 'number') {
+      // Se é só um número, assumir como target
+      bands[bandName] = {
+        target_db: bandData,
+        tol_db: tolerances[bandName] || 2.0  // tolerância padrão
+      };
+    } else if (bandData && typeof bandData === 'object') {
+      // Se já é objeto, adaptar campos
+      bands[bandName] = {
+        target_db: bandData.target_db || bandData.target || bandData.value,
+        tol_db: bandData.tol_db || bandData.tolerance || tolerances[bandName] || 2.0,
+        tol_min: bandData.tol_min,
+        tol_max: bandData.tol_max
+      };
+    }
+  }
+  
   // Construir formato compatível
   const adaptedData = {
-    // ✅ CORREÇÃO: Bandas podem estar em spectralBalance.bands
-    bands: sourceData.bands || sourceData.spectralBalance?.bands || {},
+    // ✅ Bandas no formato que scoring.js espera
+    bands: bands,
     
     // Targets das bandas principais
     targets: sourceData.targets || {},
     
     // Tolerâncias (se existirem)
-    tolerances: sourceData.tolerances || {},
+    tolerances: tolerances,
     
     // Dados fixos (LUFS, True Peak, etc.)
     fixed: sourceData.fixed || {},
@@ -137,6 +162,44 @@ async function safeScoringTest(scoringModule, refDataRaw) {
     console.error('❌ Erro no teste seguro:', error.message);
     return null;
   }
+}
+
+/**
+ * 🎯 Adaptador para dados de áudio
+ * Converte spectralBalance.bands para bandEnergies que o scoring espera
+ */
+function adaptAudioData(audioData) {
+  if (!audioData) return audioData;
+  
+  // Se já tem bandEnergies, retorna direto
+  if (audioData.bandEnergies) {
+    return audioData;
+  }
+  
+  // Converte spectralBalance.bands para bandEnergies
+  if (audioData.spectralBalance && audioData.spectralBalance.bands) {
+    const bandEnergies = {};
+    
+    for (const [bandName, value] of Object.entries(audioData.spectralBalance.bands)) {
+      if (typeof value === 'number') {
+        // Converter valor direto para formato rms_db
+        bandEnergies[bandName] = { 
+          rms_db: value 
+        };
+      } else if (value && typeof value === 'object') {
+        // Se já é objeto, preservar estrutura
+        bandEnergies[bandName] = value;
+      }
+    }
+    
+    // Retornar dados adaptados
+    return {
+      ...audioData,
+      bandEnergies: bandEnergies
+    };
+  }
+  
+  return audioData;
 }
 
 // Exportar para uso global

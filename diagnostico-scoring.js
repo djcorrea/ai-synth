@@ -79,12 +79,16 @@ async function diagnosticarScoring() {
     
     // Teste 2: Com adaptador
     let resultado2 = null;
-    if (window.adaptReferenceData) {
+    if (window.adaptReferenceData && window.adaptAudioData) {
       console.log('\n🧪 Teste 2: Com adaptador');
       const dadosAdaptados = window.adaptReferenceData(rawData);
-      console.log('Dados adaptados structure:', Object.keys(dadosAdaptados || {}));
+      const audioAdaptado = window.adaptAudioData(testDataMinimo);
       
-      resultado2 = scoringModule.computeMixScore(testDataMinimo, dadosAdaptados);
+      console.log('Dados adaptados structure:', Object.keys(dadosAdaptados || {}));
+      console.log('Audio adaptado structure:', Object.keys(audioAdaptado || {}));
+      console.log('Audio adaptado bandEnergies:', Object.keys(audioAdaptado?.bandEnergies || {}));
+      
+      resultado2 = scoringModule.computeMixScore(audioAdaptado, dadosAdaptados);
       console.log('Resultado 2:', JSON.stringify(resultado2, null, 2));
     } else {
       console.log('\n🚫 Teste 2: Adaptador não encontrado');
