@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Auditoria de Referências</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #0a0a0a; color: #00ff00; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; }
+        button { padding: 10px 20px; margin: 10px; background: #333; color: #fff; border: none; cursor: pointer; }
+        button:hover { background: #555; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; border: 1px solid #333; text-align: left; }
+        th { background: #1a1a1a; }
+        .success { color: #00ff00; }
+        .error { color: #ff6666; }
+        .warning { color: #ffff66; }
+        pre { background: #1a1a1a; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Auditoria Completa de Referências</h1>
+    
+    <div class="section">
+        <h2>🎯 Controles</h2>
+        <button onclick="executarAuditoria()">🚀 Executar Auditoria Completa</button>
+        <button onclick="testarURLs()">🌐 Testar URLs Individuais</button>
+        <button onclick="verificarEmbedded()">📦 Verificar Embedded</button>
+        <button onclick="limparLogs()">🧹 Limpar Logs</button>
+    </div>
+    
+    <div class="section">
+        <h2>📊 Resultados</h2>
+        <div id="results"></div>
+    </div>
+    
+    <div class="section">
+        <h2>🌐 Logs de Fetch</h2>
+        <div id="fetchLogs"></div>
+    </div>
+    
+    <div class="section">
+        <h2>📂 Diagnóstico Detalhado</h2>
+        <div id="diagnostico"></div>
+    </div>
+    
+    <!-- Scripts necessários -->
+    <script src="./auditoria-referencias.js"></script>
+    <script src="./audio-analyzer-integration.js"></script>
+    
+    <script>
+        let auditoriaAtiva = false;
+        
+        async function executarAuditoria() {
+            if (auditoriaAtiva) {
+                console.log('⚠️ Auditoria já em execução...');
+                return;
+            }
+            
+            auditoriaAtiva = true;
+            document.getElementById('results').innerHTML = '<p class="warning">🔄 Executando auditoria...</p>';
+            
+            try {
+                const resultado = await window.executarAuditoria();
+                exibirResultados(resultado);
+            } catch (error) {
+                document.getElementById('results').innerHTML = `<p class="error">❌ Erro: ${error.message}</p>`;
+            } finally {
+                auditoriaAtiva = false;
+            }
+        }
+        
+        function exibirResultados(resultado) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (resultado.error) {
+                resultsDiv.innerHTML = `<p class="error">❌ ${resultado.error}</p>`;
+                return;
+            }
+            
+            let html = '<h3>📊 Resumo</h3>';
+            html += `<ul>`;
+            html += `<li>Gêneros testados: ${resultado.summary.total_genres}</li>`;
+            html += `<li class="success">URLs externas OK: ${resultado.summary.successful_external}</li>`;
+            html += `<li class="error">URLs externas FALHA: ${resultado.summary.failed_external}</li>`;
+            html += `<li class="warning">Fallbacks embedded: ${resultado.summary.embedded_fallbacks}</li>`;
+            html += `</ul>`;
+            
+            html += '<h3>🎯 Tabela Detalhada</h3>';
+            html += '<table><thead><tr><th>Gênero</th><th>URL</th><th>Status</th><th>Fonte</th></tr></thead><tbody>';
+            
+            resultado.details.forEach(detail => {
+                detail.external_attempts.forEach(attempt => {
+                    const statusClass = attempt.ok ? 'success' : 'error';
+                    const fonte = attempt.ok ? 'external' : 'failed';
+                    html += `<tr>`;
+                    html += `<td>${detail.genero}</td>`;
+                    html += `<td>${attempt.url}</td>`;
+                    html += `<td class="${statusClass}">${attempt.status}</td>`;
+                    html += `<td>${fonte}</td>`;
+                    html += `</tr>`;
+                });
+                
+                if (detail.final_source) {
+                    html += `<tr>`;
+                    html += `<td>${detail.genero}</td>`;
+                    html += `<td>FALLBACK</td>`;
+                    html += `<td class="warning">EMBEDDED</td>`;
+                    html += `<td>${detail.final_source}</td>`;
+                    html += `</tr>`;
+                }
+            });
+            
+            html += '</tbody></table>';
+            resultsDiv.innerHTML = html;
+            
+            // Atualizar logs de fetch
+            atualizarFetchLogs(resultado.fetchLogs);
+            
+            // Diagnóstico detalhado
+            atualizarDiagnostico(resultado.details);
+        }
+        
+        function atualizarFetchLogs(logs) {
+            const logsDiv = document.getElementById('fetchLogs');
+            
+            if (!logs || logs.length === 0) {
+                logsDiv.innerHTML = '<p>Nenhum log de fetch capturado</p>';
+                return;
+            }
+            
+            let html = '<table><thead><tr><th>Timestamp</th><th>URL</th><th>Status</th><th>Duração</th></tr></thead><tbody>';
+            
+            logs.forEach(log => {
+                const statusClass = log.ok ? 'success' : 'error';
+                html += `<tr>`;
+                html += `<td>${new Date(log.timestamp).toLocaleTimeString()}</td>`;
+                html += `<td>${log.url}</td>`;
+                html += `<td class="${statusClass}">${log.status}</td>`;
+                html += `<td>${log.duration}ms</td>`;
+                html += `</tr>`;
+            });
+            
+            html += '</tbody></table>';
+            logsDiv.innerHTML = html;
+        }
+        
+        function atualizarDiagnostico(details) {
+            const diagDiv = document.getElementById('diagnostico');
+            
+            let html = '<h3>🔍 Análise por Gênero</h3>';
+            
+            details.forEach(detail => {
+                html += `<h4>🎵 ${detail.genero}</h4>`;
+                html += `<pre>${JSON.stringify(detail, null, 2)}</pre>`;
+            });
+            
+            diagDiv.innerHTML = html;
+        }
+        
+        async function testarURLs() {
+            const generos = ['funk_mandela', 'trance', 'eletronico'];
+            const baseURLs = [
+                '/refs/out/',
+                'refs/out/',
+                '../refs/out/',
+                '/public/refs/out/'
+            ];
+            
+            console.log('🌐 Testando URLs individuais...');
+            
+            for (const genero of generos) {
+                for (const base of baseURLs) {
+                    const url = `${base}${genero}.json?v=${Date.now()}`;
+                    try {
+                        const response = await fetch(url);
+                        console.log(`${response.ok ? '✅' : '❌'} ${url} → ${response.status}`);
+                    } catch (error) {
+                        console.log(`❌ ${url} → ERROR: ${error.message}`);
+                    }
+                }
+            }
+        }
+        
+        function verificarEmbedded() {
+            console.log('📦 Verificando referências embedded...');
+            
+            const checks = {
+                window_embedded: !!(window.__EMBEDDED_REFS__ && window.__EMBEDDED_REFS__.byGenre),
+                inline_embedded: !!(window.__INLINE_EMBEDDED_REFS__ && window.__INLINE_EMBEDDED_REFS__.byGenre),
+                embedded_script_loaded: !!document.getElementById('embeddedRefsScript'),
+                embedded_version: window.EMBEDDED_REFS_VERSION || 'not set'
+            };
+            
+            console.log('📊 Status das referências embedded:', checks);
+            
+            if (checks.window_embedded) {
+                console.log('📋 Gêneros em window.__EMBEDDED_REFS__:', Object.keys(window.__EMBEDDED_REFS__.byGenre));
+            }
+            
+            if (checks.inline_embedded) {
+                console.log('📋 Gêneros em __INLINE_EMBEDDED_REFS__:', Object.keys(window.__INLINE_EMBEDDED_REFS__.byGenre));
+            }
+        }
+        
+        function limparLogs() {
+            console.clear();
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('fetchLogs').innerHTML = '';
+            document.getElementById('diagnostico').innerHTML = '';
+            console.log('🧹 Logs limpos');
+        }
+        
+        // Auto-verificar ao carregar
+        setTimeout(() => {
+            console.log('🔍 Auditoria de referências carregada');
+            console.log('Execute executarAuditoria() para começar');
+            verificarEmbedded();
+        }, 1000);
+    </script>
+</body>
+</html>

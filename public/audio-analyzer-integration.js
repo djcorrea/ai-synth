@@ -826,9 +826,7 @@ async function loadGenreManifest() {
         try {
             const json = await fetchRefJsonWithFallback([
                 `/refs/out/genres.json`,
-                `/refs/out/genres.json`,
-                `refs/out/genres.json`,
-                `../refs/out/genres.json`
+                `/refs/out/genres.json?cb=${Date.now()}`
             ]);
             if (json && Array.isArray(json.genres)) { __genreManifest = json.genres; return __genreManifest; }
         } catch (e) { __dwrn('Manifesto via rede indisponível:', e.message || e); }
@@ -903,16 +901,13 @@ async function loadReferenceData(genre) {
         
         console.log('🔍 DEBUG loadReferenceData início:', { genre, bypassCache });
         
-        // PRIORIDADE CORRIGIDA: external > embedded > fallback
         // 1) Tentar carregar JSON externo primeiro (sempre, independente de REFS_ALLOW_NETWORK)
         console.log('🌐 Tentando carregar JSON externo primeiro...');
         try {
             const version = Date.now(); // Force cache bust
             const json = await fetchRefJsonWithFallback([
                 `/refs/out/${genre}.json?v=${version}`,
-                `/refs/out/${genre}.json?v=${version}`,
-                `refs/out/${genre}.json?v=${version}`,
-                `../refs/out/${genre}.json?v=${version}`
+                `/refs/out/${genre}.json?cb=${version}`
             ]);
             const rootKey = Object.keys(json)[0];
             const data = json[rootKey];

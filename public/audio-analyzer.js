@@ -1940,7 +1940,10 @@ class AudioAnalyzer {
               
               try {
                 // Tentar carregar referência diretamente
-                const refResponse = await fetch(`/refs/out/${activeGenre}.json?v=${Date.now()}`);
+                const refResponse = await fetch(`/refs/out/${activeGenre}.json?v=${Date.now()}`, {
+                  cache: 'no-store',
+                  headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                });
                 if (refResponse.ok) {
                   const refData = await refResponse.json();
                   genreSpecificRef = refData[activeGenre] || refData;

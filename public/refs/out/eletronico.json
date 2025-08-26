@@ -1,110 +1,75 @@
 {
   "eletronico": {
-    "version": "1.0.3-rebuild",
-    "generated_at": "2025-08-25T01:33:39.969Z",
-    "num_tracks": 13,
-    "lufs_target": -14,
-    "tol_lufs": 0.5,
-    "true_peak_target": -7.79,
-    "tol_true_peak": 1.57,
-    "dr_target": 10.1,
-    "tol_dr": 1.4,
-    "lra_target": 5.2,
-    "tol_lra": 4,
-    "stereo_target": 0.19,
-    "tol_stereo": 0.07,
-    "calor_target": -12.08,
-    "brilho_target": -19.11,
-    "clareza_target": -5.34,
-    "bands": {
-      "sub": {
-        "target_db": -12.5,
-        "tol_db": 3
-      },
-      "low_bass": {
-        "target_db": -10.6,
-        "tol_db": 3
-      },
-      "upper_bass": {
-        "target_db": -13.7,
-        "tol_db": 3
-      },
-      "low_mid": {
-        "target_db": -12.1,
-        "tol_db": 2.7
-      },
-      "mid": {
-        "target_db": -11.8,
-        "tol_db": 2.4
-      },
-      "high_mid": {
-        "target_db": -19.1,
-        "tol_db": 2.3
-      },
-      "brilho": {
-        "target_db": -19.1,
-        "tol_db": 2
-      },
-      "presenca": {
-        "target_db": -24,
-        "tol_db": 3
-      }
-    },
-    "rebuildRunId": "rebuild_1756085619952_f5445196",
-    "last_updated": "2025-08-25T01:33:39.969Z",
+    "version": "2025-08-recalc-eletronico-arithmetic-means",
+    "generated_at": "2025-08-25T02:15:41.029Z",
+    "num_tracks": 20,
+    "aggregation_method": "arithmetic_mean_corrected",
     "legacy_compatibility": {
-      "lufs_target": -4.5,
-      "true_peak_target": -0.5,
-      "dr_target": 8.2,
-      "lra_target": 8.6,
-      "stereo_target": 0.46,
-      "tol_lufs": 3,
-      "tol_true_peak": 2.5,
-      "tol_dr": 5,
-      "tol_lra": 5,
-      "tol_stereo": 0.7,
+      "lufs_target": -12.8,
+      "tol_lufs": 1.9,
+      "tol_lufs_min": 1.9,
+      "tol_lufs_max": 1.9,
+      "true_peak_target": -0.8,
+      "tol_true_peak": 1,
+      "dr_target": 7.2,
+      "tol_dr": 2,
+      "dr_stat_target": 7.2,
+      "tol_dr_stat": 2,
+      "lra_target": 6.5,
+      "tol_lra": 1.5,
+      "lra_min": 5,
+      "lra_max": 8,
+      "stereo_target": 0.25,
+      "tol_stereo": 0.15,
       "bands": {
         "sub": {
-          "target_db": -6,
-          "tol_db": 2.5,
-          "energy_pct": 13.18
+          "target_db": -8.5,
+          "tol_db": 1.7,
+          "severity": "soft"
         },
         "low_bass": {
-          "target_db": -6.9,
-          "tol_db": 2.5,
-          "energy_pct": 10.94
+          "target_db": -6.2,
+          "tol_db": 1.5,
+          "severity": "soft"
         },
         "upper_bass": {
-          "target_db": -11.8,
-          "tol_db": 2.5,
-          "energy_pct": 3.32
+          "target_db": -8.8,
+          "tol_db": 1.8,
+          "severity": "soft"
         },
         "low_mid": {
-          "target_db": -6.8,
-          "tol_db": 2.5,
-          "energy_pct": 13.16
+          "target_db": -5.5,
+          "tol_db": 1.5,
+          "severity": "soft"
         },
         "mid": {
-          "target_db": 0.3,
-          "tol_db": 2.5,
-          "energy_pct": 53.62
+          "target_db": -3.2,
+          "tol_db": 1.5,
+          "severity": "soft"
         },
         "high_mid": {
-          "target_db": -12.6,
-          "tol_db": 2.5,
-          "energy_pct": 2.94
+          "target_db": -4.8,
+          "tol_db": 1.5,
+          "severity": "soft"
         },
         "brilho": {
-          "target_db": -14.8,
-          "tol_db": 2.5,
-          "energy_pct": 2.02
+          "target_db": -7.2,
+          "tol_db": 1.5,
+          "severity": "soft"
         },
         "presenca": {
-          "target_db": -18.6,
-          "tol_db": 2.5,
-          "energy_pct": 0.82
+          "target_db": -11.5,
+          "tol_db": 2.3,
+          "severity": "soft"
         }
       }
+    },
+    "recalculation_info": {
+      "method": "arithmetic_mean",
+      "calculated_at": "2025-08-25T02:15:41.030Z",
+      "source": "recalcular-referencias-completo.js",
+      "validation": "17_tracks_processed",
+      "note": "Médias aritméticas recalculadas corretamente, substituindo valores anteriores incorretos"
     }
   }
 }
