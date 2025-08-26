@@ -1,7 +1,7 @@
 {
   "version": 2,
   "env": {
-    "FORCE_REBUILD": "1724440290",
+    "FORCE_REBUILD": "1756249070000",
     "NODE_ENV": "production"
   },
   "builds": [
@@ -25,7 +25,15 @@
         "Cache-Control": "no-cache, no-store, must-revalidate"
       }
     },
-    { "src": "/refs/out/(.*)", "dest": "/public/refs/out/$1" },
+    { 
+      "src": "/refs/out/(.*)", 
+      "dest": "/public/refs/out/$1",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
+    },
     { "src": "/refs/(.*)", "dest": "/public/refs/$1" },
     { "src": "/lib/(.*)", "dest": "/lib/$1" },
     { "src": "/api/(.*)", "dest": "api/$1.js" },

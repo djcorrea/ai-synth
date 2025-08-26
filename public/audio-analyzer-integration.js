@@ -824,9 +824,10 @@ async function loadGenreManifest() {
     // 2) Se permitido, tentar rede
     if (typeof window !== 'undefined' && window.REFS_ALLOW_NETWORK === true) {
         try {
+            console.log('🔄 VERCEL DEBUG: Tentando carregar genres.json...');
             const json = await fetchRefJsonWithFallback([
-                `/refs/out/genres.json`,
-                `/refs/out/genres.json?cb=${Date.now()}`
+                `/refs/out/genres.json?v=${Date.now()}&nocache=1`,
+                `/refs/out/genres.json?cb=${Date.now()}&t=${Math.random()}`
             ]);
             if (json && Array.isArray(json.genres)) { __genreManifest = json.genres; return __genreManifest; }
         } catch (e) { __dwrn('Manifesto via rede indisponível:', e.message || e); }
@@ -905,9 +906,10 @@ async function loadReferenceData(genre) {
         console.log('🌐 Tentando carregar JSON externo primeiro...');
         try {
             const version = Date.now(); // Force cache bust
+            console.log(`🔄 VERCEL DEBUG: Tentando carregar ${genre} com cache bust: ${version}`);
             const json = await fetchRefJsonWithFallback([
-                `/refs/out/${genre}.json?v=${version}`,
-                `/refs/out/${genre}.json?cb=${version}`
+                `/refs/out/${genre}.json?v=${version}&nocache=1`,
+                `/refs/out/${genre}.json?cb=${version}&t=${Math.random()}`
             ]);
             const rootKey = Object.keys(json)[0];
             const data = json[rootKey];
