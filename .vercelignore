@@ -1,6 +1,12 @@
-refs/
+# Ignorar samples de referência (áudio pesado) mas permitir JSONs
+refs/*/samples/
+refs/*/samples/**
+
+# Ignorar arquivos de áudio
 *.wav
 *.mp3
 *.zip
 *.rar
+
+# Ignorar node_modules
 node_modules/
