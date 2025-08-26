@@ -341,6 +341,9 @@
     <script src="suggestion-text-generator.js?v=20250815" defer></script>
     <script src="audio-analyzer-integration.js?v=20250823k&final_fix=1724440500" defer></script>
     
+    <!-- 🎯 CORREÇÃO ORDEM DE EXECUÇÃO DO SCORE - DEPLOY VERCEL -->
+    <script src="solucao-definitiva-score.js?v=20250825" defer></script>
+    
     <!-- Inicializar Audio Analyzer -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -359,6 +362,23 @@
                 } else {
                     console.warn('⚠️ initializeAudioAnalyzerIntegration não encontrada');
                 }
+                
+                // 🎯 APLICAR CORREÇÃO AUTOMÁTICA DA ORDEM DE EXECUÇÃO DO SCORE
+                setTimeout(() => {
+                    console.log('🎯 [VERCEL-DEPLOY] Aplicando correção da ordem de execução do score...');
+                    
+                    if (typeof window.aplicarCorrecaoOrdemExecucao === 'function') {
+                        const result = window.aplicarCorrecaoOrdemExecucao();
+                        if (result.success) {
+                            console.log('✅ [VERCEL-DEPLOY] Correção aplicada automaticamente:', result.message);
+                            console.log('🎉 [VERCEL-DEPLOY] Score agora é calculado APÓS bandas espectrais estarem prontas!');
+                        } else {
+                            console.warn('⚠️ [VERCEL-DEPLOY] Falha ao aplicar correção automaticamente:', result.message);
+                        }
+                    } else {
+                        console.warn('⚠️ [VERCEL-DEPLOY] Função de correção não encontrada - script pode não ter carregado');
+                    }
+                }, 2000); // Aguardar 2s para garantir que todos os scripts de áudio carregaram
             }, 1000);
 
             // Patch para botões "+" - setup do menu popover CORRIGIDO E OTIMIZADO

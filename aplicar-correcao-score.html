@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Aplicar Correção - Ordem de Execução do Score</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            line-height: 1.6;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .success { background: rgba(46, 204, 113, 0.3); border-left: 4px solid #2ecc71; }
+        .warning { background: rgba(241, 196, 15, 0.3); border-left: 4px solid #f1c40f; }
+        .error { background: rgba(231, 76, 60, 0.3); border-left: 4px solid #e74c3c; }
+        .info { background: rgba(52, 152, 219, 0.3); border-left: 4px solid #3498db; }
+        button {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .actions {
+            text-align: center;
+            margin: 30px 0;
+        }
+        #log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .highlight {
+            background: rgba(255, 255, 0, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Correção da Ordem de Execução do Score</h1>
+        
+        <div class="info">
+            <strong>📋 PROBLEMA IDENTIFICADO:</strong><br>
+            O score é calculado <span class="highlight">ANTES</span> das bandas espectrais (bandEnergies) estarem prontas,
+            causando inconsistência entre o score mostrado e as métricas calculadas.
+        </div>
+
+        <div class="info">
+            <strong>🛠️ SOLUÇÃO APLICADA:</strong><br>
+            Reorganizar a ordem de execução para calcular o score <span class="highlight">APÓS</span> 
+            as métricas espectrais estarem completamente processadas.
+        </div>
+
+        <div class="success">
+            <strong>✅ SEGURANÇA GARANTIDA:</strong><br>
+            • Backup automático dos métodos originais<br>
+            • Reversão disponível a qualquer momento<br>
+            • 100% compatível com código existente<br>
+            • Zero impacto na funcionalidade atual
+        </div>
+
+        <div class="actions">
+            <button onclick="verificarStatus()">📊 Verificar Status</button>
+            <button onclick="aplicarCorrecao()">🚀 Aplicar Correção</button>
+            <button onclick="diagnosticar()">🔍 Diagnóstico Completo</button>
+            <button onclick="reverterCorrecao()">🔄 Reverter (Se Necessário)</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="log"></div>
+    </div>
+
+    <script src="solucao-definitiva-score.js"></script>
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function verificarStatus() {
+            addLog('🔍 Verificando status da correção...');
+            try {
+                const result = window.controlarCorrecaoOrdem('status');
+                const status = result.aplicada ? 'APLICADA' : 'NÃO APLICADA';
+                const version = result.versao ? ` (v${result.versao})` : '';
+                
+                showStatus(`📊 Status: <strong>${status}</strong>${version}`, result.aplicada ? 'success' : 'warning');
+                addLog(`Status: ${status}${version}`, 'success');
+                
+                if (result.aplicada) {
+                    addLog('✅ Correção está ativa e funcionando');
+                } else {
+                    addLog('⚠️ Correção não foi aplicada ainda');
+                }
+            } catch (error) {
+                addLog(`❌ Erro ao verificar status: ${error.message}`, 'error');
+                showStatus('❌ Erro ao verificar status', 'error');
+            }
+        }
+
+        function aplicarCorrecao() {
+            addLog('🚀 Iniciando aplicação da correção...');
+            showStatus('🔄 Aplicando correção...', 'info');
+            
+            try {
+                const result = window.aplicarCorrecaoOrdemExecucao();
+                
+                if (result.success) {
+                    showStatus('🎉 Correção aplicada com sucesso!', 'success');
+                    addLog('✅ Correção aplicada com sucesso!');
+                    addLog(`📋 Detalhes: ${result.message}`);
+                    
+                    if (result.details) {
+                        addLog(`🕐 Timestamp: ${result.details.timestamp}`);
+                        addLog(`📦 Backups criados: ${result.details.backupsCreated ? 'Sim' : 'Não'}`);
+                    }
+                    
+                    // Verificar se realmente foi aplicada
+                    setTimeout(() => {
+                        const status = window.controlarCorrecaoOrdem('status');
+                        if (status.aplicada) {
+                            addLog('🔥 CORREÇÃO ATIVA! Score agora é calculado na ordem correta.');
+                        }
+                    }, 500);
+                } else {
+                    showStatus('❌ Falha ao aplicar correção', 'error');
+                    addLog(`❌ Falha: ${result.message}`);
+                    if (result.error) {
+                        addLog(`🔍 Erro: ${result.error}`);
+                    }
+                }
+            } catch (error) {
+                addLog(`💥 Erro crítico: ${error.message}`, 'error');
+                showStatus('💥 Erro crítico ao aplicar correção', 'error');
+            }
+        }
+
+        function diagnosticar() {
+            addLog('🔍 Executando diagnóstico completo...');
+            try {
+                const result = window.diagnosticarOrdemExecucao();
+                
+                if (result.status === 'success') {
+                    const info = result.info;
+                    showStatus('📊 Diagnóstico concluído', 'info');
+                    
+                    addLog('📋 === DIAGNÓSTICO COMPLETO ===');
+                    addLog(`🕐 Timestamp: ${info.timestamp}`);
+                    addLog(`✅ Correção aplicada: ${info.correcaoAplicada ? 'SIM' : 'NÃO'}`);
+                    addLog(`📦 Versão: ${info.versao || 'N/A'}`);
+                    addLog(`📅 Data aplicação: ${info.dataAplicacao || 'N/A'}`);
+                    addLog(`💾 Backups existem: ${info.backupsExistem ? 'SIM' : 'NÃO'}`);
+                    addLog(`🎵 Analisador existe: ${info.analisadorExiste ? 'SIM' : 'NÃO'}`);
+                    addLog(`🎛️ Controle ativo: ${info.controleAtivo ? 'SIM' : 'NÃO'}`);
+                    
+                    if (info.estatisticas) {
+                        addLog('📊 Estatísticas:');
+                        addLog(`   - Análises executadas: ${info.estatisticas.analyzesCalled}`);
+                        addLog(`   - Scores calculados cedo: ${info.estatisticas.scoreCalculatedEarly}`);
+                        addLog(`   - Scores calculados tarde: ${info.estatisticas.scoreCalculatedLate}`);
+                        addLog(`   - Bandas disponíveis: ${info.estatisticas.bandsAvailable}`);
+                    }
+                } else {
+                    showStatus('❌ Erro no diagnóstico', 'error');
+                    addLog(`❌ Erro: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`💥 Erro no diagnóstico: ${error.message}`, 'error');
+                showStatus('💥 Erro no diagnóstico', 'error');
+            }
+        }
+
+        function reverterCorrecao() {
+            if (!confirm('⚠️ Tem certeza que deseja reverter a correção? O sistema voltará ao comportamento anterior.')) {
+                return;
+            }
+            
+            addLog('🔄 Iniciando reversão da correção...');
+            showStatus('🔄 Revertendo correção...', 'warning');
+            
+            try {
+                const result = window.reverterCorrecaoOrdemExecucao();
+                
+                if (result.success) {
+                    showStatus('✅ Correção revertida com sucesso', 'success');
+                    addLog('✅ Correção revertida com sucesso');
+                    addLog('🔙 Sistema voltou ao estado original');
+                } else {
+                    showStatus('❌ Falha ao reverter correção', 'error');
+                    addLog(`❌ Falha: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`💥 Erro ao reverter: ${error.message}`, 'error');
+                showStatus('💥 Erro ao reverter', 'error');
+            }
+        }
+
+        // Verificar status inicial quando a página carrega
+        window.addEventListener('load', () => {
+            addLog('🎯 Página carregada - Sistema de correção pronto');
+            setTimeout(verificarStatus, 1000);
+        });
+
+        // Log de inicialização
+        addLog('🚀 Sistema de correção inicializado');
+        addLog('📋 Correção disponível: Ordem de Execução do Score v1.0.0');
+        addLog('🎯 Problema: Score calculado antes das bandas espectrais');
+        addLog('✅ Solução: Reordenar execução para após Fase 2 completa');
+        addLog('🛡️ Segurança: Backups automáticos e reversão disponível');
+    </script>
+</body>
+</html>
