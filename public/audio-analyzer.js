@@ -1928,7 +1928,52 @@ class AudioAnalyzer {
               console.log('🔍 [MODE_DEBUG] Final scoring skipping genre-specific ref (mode=' + mode + ')');
             }
             
-            const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
+            // 🔧 SCORING PATCH - Execução aprimorada para Vercel
+            console.log('[SCORING_VERCEL] 🚀 Executando scoring unificado...');
+            console.log('[SCORING_VERCEL] 📊 tdFinal keys:', Object.keys(tdFinal || {}));
+            console.log('[SCORING_VERCEL] 📋 genreSpecificRef:', genreSpecificRef);
+            
+            let finalScore = null;
+            try {
+              // Cache bust agressivo
+              const cacheBust = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+              console.log('[SCORING_VERCEL] 🔄 Cache bust:', cacheBust);
+              
+              // Forçar reload do módulo
+              delete window.scoringModuleCache;
+              const freshScoringModule = await import('/lib/audio/features/scoring.js?v=' + cacheBust);
+              console.log('[SCORING_VERCEL] ✅ Fresh module loaded:', !!freshScoringModule);
+              
+              if (freshScoringModule && typeof freshScoringModule.computeMixScore === 'function') {
+                console.log('[SCORING_VERCEL] 🎯 Chamando computeMixScore...');
+                
+                // Interceptar logs internos
+                const originalConsoleLog = console.log;
+                console.log = function(...args) {
+                  originalConsoleLog.apply(console, ['[VERCEL_LOG]', ...args]);
+                };
+                
+                finalScore = freshScoringModule.computeMixScore(tdFinal, genreSpecificRef);
+                
+                // Restaurar console
+                console.log = originalConsoleLog;
+                
+                console.log('[SCORING_VERCEL] 📊 finalScore result:', finalScore);
+                console.log('[SCORING_VERCEL] 📊 Score value:', finalScore?.score || finalScore?.scorePct);
+                console.log('[SCORING_VERCEL] 🔧 Method:', finalScore?.method || finalScore?.scoringMethod);
+                console.log('[SCORING_VERCEL] 🔢 Engine:', finalScore?.engineVersion);
+                console.log('[SCORING_VERCEL] ✅ Unified:', finalScore?.unifiedScoring);
+                
+              } else {
+                console.error('[SCORING_VERCEL] ❌ computeMixScore não disponível');
+              }
+              
+            } catch (scoringError) {
+              console.error('[SCORING_VERCEL] ❌ Erro no scoring:', scoringError);
+              console.error('[SCORING_VERCEL] ❌ Stack:', scoringError.stack);
+              finalScore = null;
+            }
+            
             console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
             console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
             
@@ -1954,7 +1999,7 @@ class AudioAnalyzer {
               testGenreSpecificRef = activeRef[activeGenre] || null;
             }
             
-            const testScore = scorerMod.computeMixScore(testData, testGenreSpecificRef);
+            const testScore = freshScoringModule ? freshScoringModule.computeMixScore(testData, testGenreSpecificRef) : null;
             console.log('[COLOR_RATIO_V2_TEST] Manual test G=5, Y=4, R=3, T=12 should be 59:', testScore);
             // O scoring.js agora está correto, não precisa de override
             baseAnalysis.mixScore = finalScore;
