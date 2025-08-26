@@ -772,7 +772,31 @@ async function ensureEmbeddedRefsReady(timeoutMs = 2500) {
 async function fetchRefJsonWithFallback(paths) {
     let lastErr = null;
     
-    // 🚀 EXPANDIR PATHS PARA VERCEL - Adicionar variações automáticas
+    // � VERIFICAR MODO EMERGENCIAL PRIMEIRO
+    if (window.__EMERGENCY_VERCEL_REFS__ && window.getEmergencyGenreData && paths.length > 0) {
+        console.log('🚨 MODO EMERGENCIAL ATIVO - tentando fallback direto');
+        
+        // Extrair nome do gênero do primeiro path
+        const firstPath = paths[0];
+        let genreName = null;
+        
+        if (firstPath.includes('funk_mandela')) genreName = 'funk_mandela';
+        else if (firstPath.includes('trance')) genreName = 'trance';
+        else if (firstPath.includes('eletronico')) genreName = 'eletronico';
+        else if (firstPath.includes('trap')) genreName = 'trap';
+        
+        if (genreName) {
+            try {
+                const data = window.getEmergencyGenreData(genreName);
+                console.log(`✅ EMERGENCY SUCCESS: ${genreName} carregado via fallback`);
+                return data;
+            } catch (error) {
+                console.log(`⚠️ Emergency fallback falhou para ${genreName}, continuando com fetch normal`);
+            }
+        }
+    }
+    
+    // �🚀 EXPANDIR PATHS PARA VERCEL - Adicionar variações automáticas
     const allPaths = [];
     for (const p of paths) {
         if (!p) continue;
