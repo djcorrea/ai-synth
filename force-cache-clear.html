@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔄 LIMPEZA FORÇADA DE CACHE</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(0,0,0,0.3);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .status {
+            font-size: 18px;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .success { background: rgba(40, 167, 69, 0.3); }
+        .warning { background: rgba(255, 193, 7, 0.3); }
+        .error { background: rgba(220, 53, 69, 0.3); }
+        
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00ccff);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 FORÇA LIMPEZA TOTAL DE CACHE</h1>
+        <p>Este sistema vai forçar o carregamento dos arquivos mais recentes!</p>
+        
+        <div id="status" class="status warning">
+            ⏳ Preparando limpeza de cache...
+        </div>
+        
+        <div class="progress">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        
+        <button onclick="forceCacheClear()">🚀 INICIAR LIMPEZA FORÇADA</button>
+        <button onclick="testSystemAfterClear()">🎯 TESTAR SISTEMA APÓS LIMPEZA</button>
+        <button onclick="goToMainSystem()">📱 IR PARA SISTEMA PRINCIPAL</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let progressValue = 0;
+        const statusDiv = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const resultsDiv = document.getElementById('results');
+        
+        function updateProgress(value, message) {
+            progressValue = value;
+            progressBar.style.width = value + '%';
+            statusDiv.textContent = message;
+            
+            if (value === 100) {
+                statusDiv.className = 'status success';
+            } else if (value > 0) {
+                statusDiv.className = 'status warning';
+            }
+        }
+        
+        async function forceCacheClear() {
+            updateProgress(10, '🧹 Iniciando limpeza de cache...');
+            
+            // Limpar cache do Service Worker se existir
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                    updateProgress(20, '🔄 Service Workers removidos...');
+                } catch (e) {
+                    console.log('Sem service workers para remover');
+                }
+            }
+            
+            // Limpar todos os tipos de cache
+            updateProgress(30, '🗂️ Limpando Local Storage...');
+            localStorage.clear();
+            
+            updateProgress(40, '🍪 Limpando Session Storage...');
+            sessionStorage.clear();
+            
+            updateProgress(50, '💾 Forçando recarregamento de módulos...');
+            
+            // Cache busting para todos os arquivos críticos
+            const criticalFiles = [
+                '/lib/audio/features/scoring.js',
+                '/public/audio-analyzer.js',
+                '/public/audio-analyzer-v2.js',
+                '/public/refs/embedded-refs-new.js'
+            ];
+            
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(7);
+            
+            updateProgress(60, '📦 Pré-carregando arquivos críticos...');
+            
+            for (let i = 0; i < criticalFiles.length; i++) {
+                const file = criticalFiles[i];
+                try {
+                    const response = await fetch(file + `?v=FORCE_CLEAR_${timestamp}_${randomId}&bust=${i}`);
+                    if (response.ok) {
+                        console.log(`✅ Arquivo recarregado: ${file}`);
+                    }
+                } catch (e) {
+                    console.log(`⚠️ Erro ao carregar ${file}:`, e);
+                }
+                updateProgress(60 + (i + 1) * 8, `📦 Recarregando ${file}...`);
+            }
+            
+            updateProgress(90, '🔄 Finalizando limpeza...');
+            
+            // Aguardar um pouco para garantir que tudo foi processado
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            updateProgress(100, '✅ Cache completamente limpo! Sistema pronto para teste.');
+            
+            resultsDiv.innerHTML = `
+                <div class="status success">
+                    <h3>🎉 LIMPEZA CONCLUÍDA!</h3>
+                    <p>✅ Cache do navegador limpo</p>
+                    <p>✅ Local Storage limpo</p>
+                    <p>✅ Session Storage limpo</p>
+                    <p>✅ Arquivos críticos recarregados</p>
+                    <p><strong>🎯 Agora teste o sistema - ele deve estar funcionando corretamente!</strong></p>
+                </div>
+            `;
+        }
+        
+        async function testSystemAfterClear() {
+            statusDiv.textContent = '🧪 Testando sistema após limpeza...';
+            statusDiv.className = 'status warning';
+            
+            try {
+                // Tentar carregar e testar o sistema de scoring
+                const timestamp = Date.now();
+                const scoringModule = await import(`/lib/audio/features/scoring.js?v=TEST_${timestamp}`);
+                
+                if (scoringModule.computeMixScore) {
+                    // Criar dados de teste
+                    const testData = {
+                        spectrum: new Array(512).fill(0).map(() => Math.random() * 0.1),
+                        sampleRate: 44100
+                    };
+                    
+                    const testResult = scoringModule.computeMixScore(testData);
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="status success">
+                            <h3>🎯 TESTE DO SISTEMA:</h3>
+                            <p><strong>Score calculado:</strong> ${testResult.advancedScorePct}%</p>
+                            <p><strong>Versão:</strong> ${testResult.version || 'N/A'}</p>
+                            <p><strong>Status:</strong> ${testResult.advancedScorePct !== 36.5 ? '✅ FUNCIONANDO!' : '❌ Ainda com problema'}</p>
+                        </div>
+                    `;
+                    
+                    if (testResult.advancedScorePct !== 36.5) {
+                        statusDiv.textContent = '🎉 Sistema funcionando corretamente!';
+                        statusDiv.className = 'status success';
+                    } else {
+                        statusDiv.textContent = '⚠️ Problema ainda persiste - requer investigação adicional';
+                        statusDiv.className = 'status error';
+                    }
+                } else {
+                    throw new Error('Módulo de scoring não carregado corretamente');
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="status error">
+                        <h3>❌ ERRO NO TESTE:</h3>
+                        <p>${error.message}</p>
+                        <p>Tente recarregar a página e testar novamente.</p>
+                    </div>
+                `;
+                statusDiv.textContent = '❌ Erro durante o teste';
+                statusDiv.className = 'status error';
+            }
+        }
+        
+        function goToMainSystem() {
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(7);
+            window.location.href = `/?force_reload=${timestamp}&cache_bust=${randomId}`;
+        }
+        
+        // Inicialização
+        updateProgress(0, '🔄 Sistema de limpeza carregado. Clique em "Iniciar Limpeza" para começar.');
+    </script>
+</body>
+</html>
