@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Validação Pré-Auditoria</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(0,0,0,0.3);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .btn {
+            background: linear-gradient(45deg, #e74c3c, #f39c12);
+            border: none;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .log {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Validação Pré-Auditoria</h1>
+        <p>Execute os testes abaixo antes da auditoria oficial para garantir que tudo está funcionando.</p>
+        
+        <button class="btn" onclick="runValidation()">🚀 Executar Validação Completa</button>
+        <button class="btn" onclick="clearLog()">🧹 Limpar Log</button>
+        
+        <div id="log" class="log">Clique em "Executar Validação" para começar...</div>
+    </div>
+
+    <script src="/validador-sistema.js"></script>
+    <script>
+        const logElement = document.getElementById('log');
+        
+        // Capturar console.log
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logElement.textContent += args.join(' ') + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+        };
+        
+        const originalError = console.error;
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logElement.textContent += '❌ ERROR: ' + args.join(' ') + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+        };
+        
+        async function runValidation() {
+            clearLog();
+            console.log('🔧 Iniciando validação pré-auditoria...\n');
+            
+            try {
+                const result = await runCompleteValidation();
+                
+                console.log('\n🎯 RESUMO FINAL:');
+                console.log('================');
+                
+                if (result.overallOK) {
+                    console.log('🎉 TUDO FUNCIONANDO PERFEITAMENTE!');
+                    console.log('✅ Sistema pronto para auditoria oficial');
+                    console.log('📈 Score esperado: 90-100/100');
+                } else {
+                    console.log('⚠️ AINDA HÁ PROBLEMAS PARA RESOLVER');
+                    console.log('🔧 Verifique os erros acima');
+                }
+                
+            } catch (error) {
+                console.error('Erro durante validação:', error.message);
+            }
+        }
+        
+        function clearLog() {
+            logElement.textContent = '';
+        }
+    </script>
+</body>
+</html>

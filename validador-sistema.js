@@ -58,13 +58,20 @@ async function validateReferenceStructure() {
       const data = rawData.funk_mandela;
       console.log('📋 Campos em funk_mandela:', Object.keys(data));
       
-      const hasBands = !!data.bands;
+      // ✅ CORREÇÃO: Verificar bands no local correto (dentro de spectralBalance)
+      const hasBands = !!(data.bands || data.spectralBalance?.bands);
       const hasTargets = !!data.targets;
       const hasStats = !!data.stats;
       
       console.log(`✅ bands: ${hasBands ? 'PRESENTE' : 'AUSENTE'}`);
       console.log(`✅ targets: ${hasTargets ? 'PRESENTE' : 'AUSENTE'}`);
       console.log(`✅ stats: ${hasStats ? 'PRESENTE' : 'AUSENTE'}`);
+      
+      // Verificar estrutura detalhada
+      if (data.spectralBalance?.bands) {
+        const bandCount = Object.keys(data.spectralBalance.bands).length;
+        console.log(`📊 Bandas encontradas em spectralBalance: ${bandCount}`);
+      }
       
       return {
         hasWrapper: true,
@@ -111,7 +118,7 @@ async function validateScoring() {
     console.log('🧪 Executando teste de scoring...');
     const result = scoringModule.computeMixScore(testData, refData);
     
-    console.log('📊 Resultado:', result);
+    console.log('📊 Resultado completo:', JSON.stringify(result, null, 2));
     
     const hasValidScore = result && (
       typeof result.advancedScorePct === 'number' ||
@@ -122,9 +129,16 @@ async function validateScoring() {
     if (hasValidScore) {
       const score = result.advancedScorePct || result.scorePct || result.score;
       console.log(`✅ Score calculado: ${score}%`);
+      console.log(`📊 Campos do resultado:`, Object.keys(result));
       return { allOK: true, score, result };
     } else {
       console.log('❌ Score não calculado');
+      console.log('🔍 Campos disponíveis:', Object.keys(result || {}));
+      console.log('🔍 Valores dos campos score:', {
+        advancedScorePct: result?.advancedScorePct,
+        scorePct: result?.scorePct,  
+        score: result?.score
+      });
       return { allOK: false, result };
     }
     

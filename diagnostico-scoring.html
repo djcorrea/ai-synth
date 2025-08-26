@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔬 Diagnóstico Scoring</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #8e44ad 0%, #3498db 100%);
+            color: white;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(0,0,0,0.3);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .btn {
+            background: linear-gradient(45deg, #e74c3c, #f39c12);
+            border: none;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .log {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            height: 500px;
+            overflow-y: auto;
+            margin: 20px 0;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Diagnóstico Específico do Scoring</h1>
+        <p>Identifica exatamente por que o score retorna undefined</p>
+        
+        <button class="btn" onclick="executarDiagnostico()">🚀 Executar Diagnóstico</button>
+        <button class="btn" onclick="clearLog()">🧹 Limpar</button>
+        
+        <div id="log" class="log">Clique em "Executar Diagnóstico" para começar...</div>
+    </div>
+
+    <script src="/adaptador-compatibilidade.js"></script>
+    <script src="/diagnostico-scoring.js"></script>
+    <script>
+        const logElement = document.getElementById('log');
+        
+        // Capturar console
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logElement.textContent += args.join(' ') + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+        };
+        
+        const originalError = console.error;
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logElement.textContent += '❌ ERROR: ' + args.join(' ') + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+        };
+        
+        async function executarDiagnostico() {
+            clearLog();
+            console.log('🔬 Iniciando diagnóstico específico do scoring...\n');
+            
+            try {
+                await diagnosticarScoring();
+                console.log('\n🎯 DIAGNÓSTICO CONCLUÍDO');
+            } catch (error) {
+                console.error('Erro durante diagnóstico:', error.message);
+            }
+        }
+        
+        function clearLog() {
+            logElement.textContent = '';
+        }
+    </script>
+</body>
+</html>

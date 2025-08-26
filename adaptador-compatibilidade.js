@@ -21,8 +21,8 @@ function adaptReferenceData(rawData) {
   
   // Construir formato compatível
   const adaptedData = {
-    // Bandas detalhadas (se existirem)
-    bands: sourceData.bands || {},
+    // ✅ CORREÇÃO: Bandas podem estar em spectralBalance.bands
+    bands: sourceData.bands || sourceData.spectralBalance?.bands || {},
     
     // Targets das bandas principais
     targets: sourceData.targets || {},
