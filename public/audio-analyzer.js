@@ -1957,14 +1957,14 @@ class AudioAnalyzer {
                     trance: {
                       lufs_target: -12.8, tol_lufs: 1.9,
                       true_peak_target: -0.8, tol_true_peak: 1,
-                      dr_target: 7.2, tol_dr: 2,
-                      stereo_target: 0.42, tol_stereo: 0.14
+                      dr_target: 9.2, tol_dr: 2.5,
+                      stereo_target: 0.35, tol_stereo: 0.4
                     },
                     eletronico: {
-                      lufs_target: -12.8, tol_lufs: 1.9,
+                      lufs_target: -13.2, tol_lufs: 2.0,
                       true_peak_target: -0.8, tol_true_peak: 1,
-                      dr_target: 7.2, tol_dr: 2,
-                      stereo_target: 0.42, tol_stereo: 0.14
+                      dr_target: 8.5, tol_dr: 2.2,
+                      stereo_target: 0.3, tol_stereo: 0.35
                     }
                   };
                   genreSpecificRef = fallbackRefs[activeGenre] || fallbackRefs.funk_mandela;
@@ -1972,13 +1972,29 @@ class AudioAnalyzer {
                 }
               } catch (refError) {
                 console.error('[SCORING_VERCEL] ❌ Erro ao carregar ref:', refError);
-                // Fallback final
-                genreSpecificRef = {
-                  lufs_target: -11.5, tol_lufs: 1.8,
-                  true_peak_target: -0.8, tol_true_peak: 1,
-                  dr_target: 7.2, tol_dr: 2,
-                  stereo_target: 0.38, tol_stereo: 0.15
+                // Fallback final por gênero
+                const finalFallbacks = {
+                  funk_mandela: {
+                    lufs_target: -11.5, tol_lufs: 1.8,
+                    true_peak_target: -0.8, tol_true_peak: 1,
+                    dr_target: 7.2, tol_dr: 2,
+                    stereo_target: 0.38, tol_stereo: 0.15
+                  },
+                  trance: {
+                    lufs_target: -12.8, tol_lufs: 1.9,
+                    true_peak_target: -0.8, tol_true_peak: 1,
+                    dr_target: 9.2, tol_dr: 2.5,
+                    stereo_target: 0.35, tol_stereo: 0.4
+                  },
+                  eletronico: {
+                    lufs_target: -13.2, tol_lufs: 2.0,
+                    true_peak_target: -0.8, tol_true_peak: 1,
+                    dr_target: 8.5, tol_dr: 2.2,
+                    stereo_target: 0.3, tol_stereo: 0.35
+                  }
                 };
+                genreSpecificRef = finalFallbacks[activeGenre] || finalFallbacks.funk_mandela;
+                console.log('[SCORING_VERCEL] 🔄 Usando fallback final para:', activeGenre, genreSpecificRef);
               }
             }
             
@@ -6749,18 +6765,3 @@ if (typeof window !== 'undefined' && window.audioAnalyzer) {
   
   console.log('✅ Phase 3 - Cache Invalidation initialized safely');
 }
-
-// 🚀 EXPORTS PARA MÓDULO ES6 - CORREÇÃO CRÍTICA
-// Expor as principais funções para uso como módulo
-if (typeof window !== 'undefined') {
-  // No browser, manter funcionamento atual
-  window.AudioAnalyzer = AudioAnalyzer;
-} else {
-  // Para imports ES6
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { AudioAnalyzer };
-  }
-}
-
-// Export ES6 para dynamic imports
-export { AudioAnalyzer };
