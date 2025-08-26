@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Diagnóstico Profundo do Sistema de Score</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .section h2 {
+            color: #4ecdc4;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+        
+        .button {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .button.success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+        }
+        
+        .button.warning {
+            background: linear-gradient(45deg, #ffc107, #fd7e14);
+        }
+        
+        .button.danger {
+            background: linear-gradient(45deg, #dc3545, #e83e8c);
+        }
+        
+        .output {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border: 1px solid #333;
+            white-space: pre-wrap;
+        }
+        
+        .status {
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+        
+        .status.warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            color: #ffc107;
+        }
+        
+        .status.error {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid #dc3545;
+            color: #dc3545;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        
+        .metric-label {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            transition: width 0.5s ease;
+            border-radius: 5px;
+        }
+        
+        .console-log { color: #00ff00; }
+        .console-warn { color: #ffff00; }
+        .console-error { color: #ff0000; }
+        .console-info { color: #00bfff; }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .tab.active {
+            border-bottom-color: #4ecdc4;
+            color: #4ecdc4;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico Profundo do Sistema de Score</h1>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('diagnostico')">🔍 Diagnóstico</div>
+            <div class="tab" onclick="switchTab('teste')">🧪 Testes</div>
+            <div class="tab" onclick="switchTab('metricas')">📊 Métricas</div>
+            <div class="tab" onclick="switchTab('console')">💻 Console</div>
+        </div>
+        
+        <!-- Tab Diagnóstico -->
+        <div id="diagnostico" class="tab-content active">
+            <div class="section">
+                <h2>🎯 Diagnóstico Geral</h2>
+                <p>Execute um diagnóstico completo do sistema de scoring para identificar problemas.</p>
+                <button class="button" onclick="executarDiagnosticoCompleto()">▶ Executar Diagnóstico Completo</button>
+                <button class="button warning" onclick="verificarInconsistencias()">⚠️ Verificar Inconsistências</button>
+                <button class="button success" onclick="verificarFuncoesCarregadas()">✅ Verificar Funções</button>
+                <div id="status-diagnostico"></div>
+                <div id="output-diagnostico" class="output" style="display: none;"></div>
+            </div>
+            
+            <div class="section">
+                <h2>🔧 Status do Sistema</h2>
+                <div id="status-sistema" class="grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="status-scoring">❓</div>
+                        <div class="metric-label">Sistema de Scoring</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="status-bandas">❓</div>
+                        <div class="metric-label">Bandas Espectrais</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="status-refs">❓</div>
+                        <div class="metric-label">Referências</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="status-flags">❓</div>
+                        <div class="metric-label">Flags Globais</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab Testes -->
+        <div id="teste" class="tab-content">
+            <div class="section">
+                <h2>🧪 Testes de Funcionamento</h2>
+                <p>Execute testes específicos para verificar se o score está respondendo corretamente.</p>
+                <button class="button" onclick="testarDadosDiferentes()">🎲 Testar Dados Diferentes</button>
+                <button class="button warning" onclick="testarComparacao()">⚖️ Comparar Métodos</button>
+                <button class="button success" onclick="testarRealTime()">⚡ Teste em Tempo Real</button>
+                <div id="output-teste" class="output" style="display: none;"></div>
+            </div>
+            
+            <div class="section">
+                <h2>📈 Resultados de Teste</h2>
+                <div id="resultados-teste" class="grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="score-base">--</div>
+                        <div class="metric-label">Score Base</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="score-modificado">--</div>
+                        <div class="metric-label">Score Modificado</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="diferenca-score">--</div>
+                        <div class="metric-label">Diferença</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="status-teste">❓</div>
+                        <div class="metric-label">Status do Teste</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab Métricas -->
+        <div id="metricas" class="tab-content">
+            <div class="section">
+                <h2>📊 Análise de Métricas</h2>
+                <p>Analise as métricas atuais do sistema de áudio.</p>
+                <button class="button" onclick="analisarMetricas()">📈 Analisar Métricas Atuais</button>
+                <button class="button warning" onclick="analisarReferencias()">📋 Analisar Referências</button>
+                <button class="button success" onclick="simularNovoScore()">🎯 Simular Novo Score</button>
+                <div id="output-metricas" class="output" style="display: none;"></div>
+            </div>
+            
+            <div class="section">
+                <h2>🌈 Bandas Espectrais</h2>
+                <div id="bandas-info" class="grid">
+                    <!-- Será preenchido dinamicamente -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab Console -->
+        <div id="console" class="tab-content">
+            <div class="section">
+                <h2>💻 Console de Debug</h2>
+                <p>Logs detalhados do sistema de scoring.</p>
+                <button class="button" onclick="limparConsole()">🧹 Limpar Console</button>
+                <button class="button warning" onclick="capturarLogsScoring()">📝 Capturar Logs</button>
+                <button class="button success" onclick="exportarDados()">💾 Exportar Dados</button>
+                <div id="console-output" class="output"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="./lib/audio/features/scoring.js?v=1756170529734"></script>
+    <script src="./diagnostico-score-profundo.js"></script>
+    
+    <script>
+        // Sistema de tabs
+        function switchTab(tabName) {
+            // Remover active de todas as tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Ativar tab selecionada
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+        
+        // Capturar logs do console
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        const originalInfo = console.info;
+        
+        function logToHTML(message, type = 'log') {
+            const consoleOutput = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            consoleOutput.innerHTML += `<span class="console-${type}">[${timestamp}] ${message}</span>\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logToHTML(args.join(' '), 'log');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            logToHTML(args.join(' '), 'warn');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logToHTML(args.join(' '), 'error');
+        };
+        
+        console.info = function(...args) {
+            originalInfo.apply(console, args);
+            logToHTML(args.join(' '), 'info');
+        };
+        
+        // Funções de status
+        function updateStatus(elementId, status, text) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = text;
+                element.className = 'metric-value';
+                if (status === 'success') element.style.color = '#28a745';
+                else if (status === 'warning') element.style.color = '#ffc107';
+                else if (status === 'error') element.style.color = '#dc3545';
+                else element.style.color = '#4ecdc4';
+            }
+        }
+        
+        function showOutput(tabId, content) {
+            const output = document.getElementById(`output-${tabId}`);
+            if (output) {
+                output.style.display = 'block';
+                output.textContent = content;
+            }
+        }
+        
+        function addStatusMessage(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            if (container) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = `status ${type}`;
+                statusDiv.textContent = message;
+                container.appendChild(statusDiv);
+            }
+        }
+        
+        // Funções de diagnóstico
+        function verificarFuncoesCarregadas() {
+            console.log('🔍 Verificando funções carregadas...');
+            
+            const funcoes = [
+                'computeMixScore',
+                '_computeMixScoreInternal', 
+                '_computeEqualWeightV3',
+                'diagnosticoScoreProfundo',
+                'testarComDadosDiferentes'
+            ];
+            
+            const status = {};
+            funcoes.forEach(func => {
+                status[func] = typeof window[func] === 'function';
+            });
+            
+            console.log('📊 Status das funções:', status);
+            
+            const todasCarregadas = Object.values(status).every(Boolean);
+            updateStatus('status-scoring', todasCarregadas ? 'success' : 'error', 
+                        todasCarregadas ? '✅ OK' : '❌ ERRO');
+            
+            addStatusMessage('status-diagnostico', 
+                           `Funções carregadas: ${Object.values(status).filter(Boolean).length}/${funcoes.length}`,
+                           todasCarregadas ? 'success' : 'error');
+            
+            return todasCarregadas;
+        }
+        
+        function verificarInconsistencias() {
+            console.log('🔍 Verificando inconsistências...');
+            
+            if (typeof window.verificarInconsistencias === 'function') {
+                window.verificarInconsistencias();
+                addStatusMessage('status-diagnostico', 'Verificação de inconsistências executada', 'success');
+            } else {
+                console.error('❌ Função verificarInconsistencias não encontrada');
+                addStatusMessage('status-diagnostico', 'Função de verificação não encontrada', 'error');
+            }
+        }
+        
+        function executarDiagnosticoCompleto() {
+            console.log('🎯 Executando diagnóstico completo...');
+            
+            // Verificar se função existe
+            if (typeof window.diagnosticoScoreProfundo !== 'function') {
+                console.error('❌ Função diagnosticoScoreProfundo não encontrada');
+                addStatusMessage('status-diagnostico', 'Função de diagnóstico não encontrada', 'error');
+                return;
+            }
+            
+            // Simular dados de teste
+            const dadosTeste = {
+                lufsIntegrated: -6.2,
+                truePeakDbtp: -1.9,
+                dynamicRange: 6.6,
+                lra: 4.96,
+                stereoCorrelation: 0.20,
+                stereoWidth: 0.23,
+                spectralCentroid: 4615,
+                bandEnergies: {
+                    'baixas_60_120': { rms_db: -6.90 },
+                    'medias_graves_200_500': { rms_db: -7.44 },
+                    'medias_500_2000': { rms_db: -7.31 },
+                    'medias_agudas_2_4khz': { rms_db: -12.34 },
+                    'agudos_4_8khz': { rms_db: -15.54 },
+                    'presenca_8_12khz': { rms_db: -22.82 }
+                }
+            };
+            
+            const refTeste = {
+                lufs_target: -8.0,
+                tol_lufs: 2.0,
+                true_peak_target: -3.0,
+                tol_true_peak: 2.0,
+                dr_target: 8.0,
+                tol_dr: 3.0,
+                bands: {
+                    'baixas_60_120': { target_db: -8.0, tol_db: 2.0 },
+                    'medias_graves_200_500': { target_db: -9.0, tol_db: 2.0 },
+                    'medias_500_2000': { target_db: -6.0, tol_db: 2.0 },
+                    'medias_agudas_2_4khz': { target_db: -12.0, tol_db: 3.0 },
+                    'agudos_4_8khz': { target_db: -16.0, tol_db: 4.0 },
+                    'presenca_8_12khz': { target_db: -19.0, tol_db: 3.0 }
+                }
+            };
+            
+            try {
+                const resultado = window.diagnosticoScoreProfundo(dadosTeste, refTeste);
+                
+                if (resultado) {
+                    addStatusMessage('status-diagnostico', 'Diagnóstico completo executado com sucesso', 'success');
+                    updateStatus('status-scoring', 'success', '✅ OK');
+                } else {
+                    addStatusMessage('status-diagnostico', 'Problemas detectados no sistema de scoring', 'error');
+                    updateStatus('status-scoring', 'error', '❌ ERRO');
+                }
+                
+            } catch (error) {
+                console.error('❌ Erro no diagnóstico:', error);
+                addStatusMessage('status-diagnostico', `Erro: ${error.message}`, 'error');
+                updateStatus('status-scoring', 'error', '❌ ERRO');
+            }
+        }
+        
+        function testarDadosDiferentes() {
+            console.log('🧪 Testando com dados diferentes...');
+            
+            if (typeof window.testarComDadosDiferentes !== 'function') {
+                console.error('❌ Função testarComDadosDiferentes não encontrada');
+                addStatusMessage('output-teste', 'Função de teste não encontrada', 'error');
+                return;
+            }
+            
+            try {
+                const resultado = window.testarComDadosDiferentes();
+                
+                if (resultado) {
+                    console.log('✅ Teste passou - Sistema está funcionando');
+                    updateStatus('status-teste', 'success', '✅ PASSOU');
+                } else {
+                    console.error('❌ Teste falhou - Score não está mudando');
+                    updateStatus('status-teste', 'error', '❌ FALHOU');
+                }
+                
+            } catch (error) {
+                console.error('❌ Erro no teste:', error);
+                updateStatus('status-teste', 'error', '❌ ERRO');
+            }
+        }
+        
+        function analisarMetricas() {
+            console.log('📊 Analisando métricas...');
+            
+            // Verificar se há dados disponíveis
+            if (window.__LAST_FULL_ANALYSIS) {
+                const analysis = window.__LAST_FULL_ANALYSIS;
+                console.log('📈 Análise encontrada:', analysis);
+                
+                if (typeof window.analisarDadosTecnicos === 'function') {
+                    window.analisarDadosTecnicos(analysis.technicalData || {});
+                }
+                
+                updateStatus('status-bandas', 'success', '✅ DADOS');
+            } else {
+                console.warn('⚠️ Nenhuma análise encontrada');
+                updateStatus('status-bandas', 'warning', '⚠️ SEM DADOS');
+            }
+        }
+        
+        function analisarReferencias() {
+            console.log('📋 Analisando referências...');
+            
+            if (window.PROD_AI_REF_DATA) {
+                console.log('📋 Referências encontradas:', window.PROD_AI_REF_DATA);
+                
+                if (typeof window.analisarReferencias === 'function') {
+                    window.analisarReferencias(window.PROD_AI_REF_DATA);
+                }
+                
+                updateStatus('status-refs', 'success', '✅ ATIVAS');
+            } else {
+                console.warn('⚠️ Nenhuma referência encontrada');
+                updateStatus('status-refs', 'warning', '⚠️ INATIVAS');
+            }
+        }
+        
+        function simularNovoScore() {
+            console.log('🎯 Simulando novo score...');
+            
+            if (typeof window.simularCalculoScore === 'function') {
+                const metricas = window.__LAST_FULL_ANALYSIS?.technicalData || {};
+                const refs = window.PROD_AI_REF_DATA || {};
+                
+                const resultado = window.simularCalculoScore(metricas, refs);
+                
+                if (resultado) {
+                    console.log('📊 Score simulado:', resultado.scorePct + '%');
+                    updateStatus('score-base', 'success', resultado.scorePct + '%');
+                } else {
+                    console.error('❌ Falha na simulação');
+                    updateStatus('score-base', 'error', 'ERRO');
+                }
+            }
+        }
+        
+        function testarComparacao() {
+            console.log('⚖️ Testando comparação de métodos...');
+            // Implementar comparação entre métodos diferentes
+        }
+        
+        function testarRealTime() {
+            console.log('⚡ Teste em tempo real...');
+            // Implementar teste em tempo real
+        }
+        
+        function limparConsole() {
+            document.getElementById('console-output').innerHTML = '';
+        }
+        
+        function capturarLogsScoring() {
+            console.log('📝 Capturando logs específicos do sistema de scoring...');
+            // Implementar captura específica
+        }
+        
+        function exportarDados() {
+            console.log('💾 Exportando dados de diagnóstico...');
+            
+            const dados = {
+                timestamp: new Date().toISOString(),
+                lastAnalysis: window.__LAST_FULL_ANALYSIS || null,
+                lastScore: window.__LAST_MIX_SCORE || null,
+                referenceData: window.PROD_AI_REF_DATA || null,
+                flags: {
+                    AUDIT_MODE: window.AUDIT_MODE,
+                    SCORING_V2: window.SCORING_V2,
+                    USE_TT_DR: window.USE_TT_DR,
+                    PROD_AI_REF_GENRE: window.PROD_AI_REF_GENRE,
+                    PROD_AI_REF_DATA_ACTIVE: window.PROD_AI_REF_DATA_ACTIVE
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `diagnostico-score-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            console.log('✅ Dados exportados com sucesso');
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Diagnóstico de Score carregado');
+            
+            // Verificar funções ao carregar
+            setTimeout(() => {
+                verificarFuncoesCarregadas();
+                
+                // Verificar flags globais
+                const flags = {
+                    AUDIT_MODE: window.AUDIT_MODE,
+                    SCORING_V2: window.SCORING_V2,
+                    USE_TT_DR: window.USE_TT_DR
+                };
+                
+                const flagsOK = Object.values(flags).some(Boolean);
+                updateStatus('status-flags', flagsOK ? 'success' : 'warning', 
+                           flagsOK ? '✅ ATIVAS' : '⚠️ INATIVAS');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

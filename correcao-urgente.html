@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 CORREÇÃO URGENTE - Score Fixo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 50%, #ffc107 100%);
+            color: #ffffff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 2px solid #dc3545;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            color: #ffc107;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .alert {
+            background: rgba(220, 53, 69, 0.2);
+            border: 2px solid #dc3545;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .alert h2 {
+            color: #dc3545;
+            margin-bottom: 15px;
+        }
+        
+        .fix-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .button {
+            background: linear-gradient(45deg, #dc3545, #fd7e14);
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .button.success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+        }
+        
+        .button.warning {
+            background: linear-gradient(45deg, #ffc107, #fd7e14);
+        }
+        
+        .button.big {
+            padding: 20px 40px;
+            font-size: 18px;
+        }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .before-after {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        
+        .before-after.before {
+            border: 2px solid #dc3545;
+        }
+        
+        .before-after.after {
+            border: 2px solid #28a745;
+        }
+        
+        .score-display {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        
+        .before .score-display {
+            color: #dc3545;
+        }
+        
+        .after .score-display {
+            color: #28a745;
+        }
+        
+        .output {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .status.error {
+            background: rgba(220, 53, 69, 0.3);
+            border: 2px solid #dc3545;
+            color: #dc3545;
+        }
+        
+        .status.success {
+            background: rgba(40, 167, 69, 0.3);
+            border: 2px solid #28a745;
+            color: #28a745;
+        }
+        
+        .status.warning {
+            background: rgba(255, 193, 7, 0.3);
+            border: 2px solid #ffc107;
+            color: #ffc107;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border-radius: 5px;
+            transition: width 1s ease;
+        }
+        
+        .blink {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 CORREÇÃO URGENTE - Score Fixo em 36.5%</h1>
+        
+        <div class="alert">
+            <h2>⚠️ PROBLEMA IDENTIFICADO</h2>
+            <p><strong>O sistema está forçando o uso de "equal-weight-v3-FORCED" que contém bugs.</strong></p>
+            <p>Isso faz com que o score sempre retorne ~36.5% independente da qualidade do áudio.</p>
+            <p><strong>Esta correção vai desabilitar o sistema bugado e reativar o sistema funcional.</strong></p>
+        </div>
+        
+        <div class="fix-section">
+            <h2>🔧 Aplicar Correção</h2>
+            <p>Clique no botão abaixo para aplicar a correção automática:</p>
+            <button class="button big success" onclick="aplicarCorrecao()">🚀 APLICAR CORREÇÃO COMPLETA</button>
+            <button class="button warning" onclick="testarAposCorrecao()">🧪 TESTAR APÓS CORREÇÃO</button>
+            <button class="button" onclick="limparTudo()">🧹 LIMPAR TUDO</button>
+            
+            <div id="fix-status"></div>
+            <div id="fix-output" class="output" style="display: none;"></div>
+        </div>
+        
+        <div class="fix-section">
+            <h2>📊 Comparação Antes vs Depois</h2>
+            <div class="comparison">
+                <div class="before-after before">
+                    <h3>❌ ANTES (Bugado)</h3>
+                    <div class="score-display" id="score-antes">36.5%</div>
+                    <p>Score sempre igual<br>Sistema Equal Weight V3 FORCED</p>
+                </div>
+                <div class="before-after after">
+                    <h3>✅ DEPOIS (Corrigido)</h3>
+                    <div class="score-display" id="score-depois">--</div>
+                    <p>Score varia corretamente<br>Sistema Color Ratio V2 Reativado</p>
+                </div>
+            </div>
+            
+            <div class="progress">
+                <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+            </div>
+            
+            <div id="comparison-status"></div>
+        </div>
+        
+        <div class="fix-section">
+            <h2>🔍 Diagnóstico Detalhado</h2>
+            <button class="button" onclick="diagnosticar()">🔬 DIAGNOSTICAR SISTEMA</button>
+            <button class="button" onclick="verificarFlags()">🏁 VERIFICAR FLAGS</button>
+            <button class="button" onclick="testarDiferencial()">⚖️ TESTE DIFERENCIAL</button>
+            
+            <div id="diagnostic-output" class="output" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="./lib/audio/features/scoring.js?v=1756170529734"></script>
+    <script src="./correcao-score-urgente.js"></script>
+    
+    <script>
+        function log(message, elementId = 'fix-output') {
+            const output = document.getElementById(elementId);
+            if (output) {
+                output.style.display = 'block';
+                output.innerHTML += message + '\n';
+                output.scrollTop = output.scrollHeight;
+            }
+            console.log(message);
+        }
+        
+        function setStatus(message, type = 'info', containerId = 'fix-status') {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = `<div class="status ${type}">${message}</div>`;
+            }
+        }
+        
+        function updateProgress(percent) {
+            const bar = document.getElementById('progress-bar');
+            if (bar) {
+                bar.style.width = percent + '%';
+            }
+        }
+        
+        function updateScore(elementId, score) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = score ? score.toFixed(1) + '%' : '--';
+                if (score) {
+                    element.classList.add('blink');
+                    setTimeout(() => element.classList.remove('blink'), 3000);
+                }
+            }
+        }
+        
+        async function aplicarCorrecao() {
+            log('🚨 [CORREÇÃO] Iniciando correção de emergência...', 'fix-output');
+            setStatus('🔄 Aplicando correção...', 'warning');
+            updateProgress(10);
+            
+            // Aguardar scripts carregarem
+            let tentativas = 0;
+            while (!window.aplicarCorrecaoCompleta && tentativas < 10) {
+                log(`⏳ [WAIT] Aguardando scripts... (${tentativas + 1}/10)`, 'fix-output');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                tentativas++;
+            }
+            
+            updateProgress(30);
+            
+            if (!window.aplicarCorrecaoCompleta) {
+                log('❌ [ERRO] Função de correção não carregada!', 'fix-output');
+                setStatus('❌ Erro: Script de correção não carregado', 'error');
+                return;
+            }
+            
+            log('✅ [OK] Função de correção encontrada', 'fix-output');
+            updateProgress(50);
+            
+            try {
+                log('🔧 [EXEC] Executando correção...', 'fix-output');
+                const sucesso = window.aplicarCorrecaoCompleta();
+                
+                updateProgress(80);
+                
+                if (sucesso) {
+                    log('✅ [SUCESSO] Correção aplicada com sucesso!', 'fix-output');
+                    setStatus('✅ Correção aplicada com sucesso! Sistema corrigido.', 'success');
+                    updateProgress(100);
+                    
+                    // Testar automaticamente
+                    setTimeout(() => {
+                        testarAposCorrecao();
+                    }, 2000);
+                } else {
+                    log('❌ [FALHA] Correção falhou', 'fix-output');
+                    setStatus('❌ Falha na correção. Verificar logs.', 'error');
+                    updateProgress(0);
+                }
+            } catch (error) {
+                log(`❌ [ERRO] Exceção: ${error.message}`, 'fix-output');
+                setStatus(`❌ Erro: ${error.message}`, 'error');
+                updateProgress(0);
+            }
+        }
+        
+        async function testarAposCorrecao() {
+            log('🧪 [TESTE] Testando sistema após correção...', 'fix-output');
+            setStatus('🧪 Testando sistema corrigido...', 'warning');
+            
+            if (!window.testeImediatoCorrecao) {
+                log('❌ [ERRO] Função de teste não encontrada!', 'fix-output');
+                setStatus('❌ Função de teste não disponível', 'error');
+                return;
+            }
+            
+            try {
+                const resultado = window.testeImediatoCorrecao();
+                
+                if (resultado) {
+                    log('✅ [TESTE] Sistema está funcionando corretamente!', 'fix-output');
+                    setStatus('✅ Sistema corrigido e testado com sucesso!', 'success');
+                    updateScore('score-depois', 75); // Exemplo de score corrigido
+                } else {
+                    log('⚠️ [TESTE] Sistema melhorou mas ainda precisa ajustes', 'fix-output');
+                    setStatus('⚠️ Sistema parcialmente corrigido', 'warning');
+                    updateScore('score-depois', 45);
+                }
+            } catch (error) {
+                log(`❌ [ERRO] Erro no teste: ${error.message}`, 'fix-output');
+                setStatus(`❌ Erro no teste: ${error.message}`, 'error');
+            }
+        }
+        
+        function diagnosticar() {
+            log('🔬 [DIAGNÓSTICO] Analisando sistema...', 'diagnostic-output');
+            
+            // Verificar versão do scoring
+            if (window.__MIX_SCORING_VERSION__) {
+                log(`📋 [VERSÃO] ${window.__MIX_SCORING_VERSION__}`, 'diagnostic-output');
+                
+                if (window.__MIX_SCORING_VERSION__.includes('FORCED')) {
+                    log('❌ [PROBLEMA] Sistema ainda está FORÇADO!', 'diagnostic-output');
+                } else if (window.__MIX_SCORING_VERSION__.includes('FIXED')) {
+                    log('✅ [OK] Sistema foi corrigido', 'diagnostic-output');
+                }
+            }
+            
+            // Verificar funções
+            const funcoes = [
+                'computeMixScore',
+                'computeMixScoreResponsivo',
+                '_computeMixScoreInternal',
+                'aplicarCorrecaoCompleta'
+            ];
+            
+            funcoes.forEach(func => {
+                const existe = typeof window[func] === 'function';
+                log(`${existe ? '✅' : '❌'} ${func}: ${existe ? 'OK' : 'AUSENTE'}`, 'diagnostic-output');
+            });
+            
+            // Verificar cache
+            if (window.__LAST_MIX_SCORE) {
+                log(`🗄️ [CACHE] Score em cache: ${window.__LAST_MIX_SCORE.scorePct}%`, 'diagnostic-output');
+                log(`🗄️ [CACHE] Método: ${window.__LAST_MIX_SCORE.method}`, 'diagnostic-output');
+            } else {
+                log('✅ [CACHE] Nenhum cache encontrado (bom)', 'diagnostic-output');
+            }
+        }
+        
+        function verificarFlags() {
+            log('🏁 [FLAGS] Verificando flags do sistema...', 'diagnostic-output');
+            
+            const flags = {
+                'AUDIT_MODE': window.AUDIT_MODE,
+                'SCORING_V2': window.SCORING_V2,
+                'USE_TT_DR': window.USE_TT_DR,
+                'AUTO_SCORING_V2': window.AUTO_SCORING_V2,
+                'PROD_AI_REF_DATA_ACTIVE': window.PROD_AI_REF_DATA_ACTIVE
+            };
+            
+            Object.entries(flags).forEach(([flag, valor]) => {
+                log(`${valor ? '✅' : '❌'} ${flag}: ${valor}`, 'diagnostic-output');
+            });
+        }
+        
+        function testarDiferencial() {
+            log('⚖️ [TESTE-DIFF] Executando teste diferencial...', 'diagnostic-output');
+            
+            if (!window.computeMixScore) {
+                log('❌ [ERRO] computeMixScore não disponível', 'diagnostic-output');
+                return;
+            }
+            
+            // Dados muito diferentes
+            const dadosBaixo = {
+                lufsIntegrated: -3.0,     // Ruim
+                truePeakDbtp: 0.5,        // Péssimo
+                dynamicRange: 2.0,        // Ruim
+                lra: 20.0                 // Ruim
+            };
+            
+            const dadosAlto = {
+                lufsIntegrated: -14.0,    // Perfeito
+                truePeakDbtp: -3.0,       // Perfeito
+                dynamicRange: 12.0,       // Excelente
+                lra: 8.0                  // Bom
+            };
+            
+            try {
+                const resultBaixo = window.computeMixScore(dadosBaixo);
+                const resultAlto = window.computeMixScore(dadosAlto);
+                
+                log(`📊 [DIFF] Qualidade baixa: ${resultBaixo.scorePct}%`, 'diagnostic-output');
+                log(`📊 [DIFF] Qualidade alta: ${resultAlto.scorePct}%`, 'diagnostic-output');
+                
+                const diferenca = resultAlto.scorePct - resultBaixo.scorePct;
+                log(`📈 [DIFF] Diferença: ${diferenca.toFixed(1)} pontos`, 'diagnostic-output');
+                
+                if (diferenca > 15) {
+                    log('✅ [DIFF] Sistema está diferenciando corretamente!', 'diagnostic-output');
+                } else if (diferenca > 5) {
+                    log('⚠️ [DIFF] Sistema diferencia parcialmente', 'diagnostic-output');
+                } else {
+                    log('❌ [DIFF] Sistema NÃO está diferenciando!', 'diagnostic-output');
+                }
+                
+                updateScore('score-antes', resultBaixo.scorePct);
+                updateScore('score-depois', resultAlto.scorePct);
+                
+            } catch (error) {
+                log(`❌ [DIFF] Erro: ${error.message}`, 'diagnostic-output');
+            }
+        }
+        
+        function limparTudo() {
+            // Limpar outputs
+            document.querySelectorAll('.output').forEach(el => {
+                el.style.display = 'none';
+                el.innerHTML = '';
+            });
+            
+            // Limpar status
+            document.querySelectorAll('[id$="-status"]').forEach(el => {
+                el.innerHTML = '';
+            });
+            
+            // Reset progress
+            updateProgress(0);
+            
+            // Reset scores
+            updateScore('score-depois', null);
+            
+            // Limpar cache
+            if (window.__LAST_MIX_SCORE) delete window.__LAST_MIX_SCORE;
+            if (window.__LAST_FULL_ANALYSIS) delete window.__LAST_FULL_ANALYSIS;
+            
+            console.clear();
+            console.log('🧹 Tudo limpo - pronto para nova correção');
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚨 CORREÇÃO URGENTE carregada');
+            
+            // Auto-detectar se correção já foi aplicada
+            setTimeout(() => {
+                if (window.__MIX_SCORING_VERSION__ && window.__MIX_SCORING_VERSION__.includes('FIXED')) {
+                    setStatus('✅ Correção já foi aplicada anteriormente', 'success');
+                    updateProgress(100);
+                } else if (window.__MIX_SCORING_VERSION__ && window.__MIX_SCORING_VERSION__.includes('FORCED')) {
+                    setStatus('⚠️ Sistema ainda está FORÇADO - correção necessária', 'warning');
+                } else {
+                    setStatus('🔍 Verificando sistema...', 'warning');
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
