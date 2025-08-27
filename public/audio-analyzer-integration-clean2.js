@@ -519,6 +519,15 @@ function invalidateReferenceDerivedCaches() {
 function enrichReferenceObject(refObj, genreKey) {
     try {
         if (!refObj || typeof refObj !== 'object') return refObj;
+        
+        // 1) Flatten: mover bands do legado para o root uma única vez
+        try {
+            const legacyBands = refObj?.legacy_compatibility?.bands;
+            if (legacyBands && !refObj.bands) {
+                refObj.bands = legacyBands; // shape unificado
+            }
+        } catch (e) { console.warn('[refs] enrich: flatten legacy bands failed', e); }
+        
         // Feature flag geral
         const enabled = (typeof window === 'undefined') || window.ENABLE_REF_ENRICHMENT !== false;
         if (!enabled) return refObj;
