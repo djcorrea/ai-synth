@@ -519,15 +519,6 @@ function invalidateReferenceDerivedCaches() {
 function enrichReferenceObject(refObj, genreKey) {
     try {
         if (!refObj || typeof refObj !== 'object') return refObj;
-        
-        // 1) Flatten: mover bands do legado para o root uma única vez
-        try {
-            const legacyBands = refObj?.legacy_compatibility?.bands;
-            if (legacyBands && !refObj.bands) {
-                refObj.bands = legacyBands; // shape unificado
-            }
-        } catch (e) { console.warn('[refs] enrich: flatten legacy bands failed', e); }
-        
         // Feature flag geral
         const enabled = (typeof window === 'undefined') || window.ENABLE_REF_ENRICHMENT !== false;
         if (!enabled) return refObj;
@@ -872,9 +863,7 @@ async function loadReferenceData(genre) {
             if (data && typeof data === 'object' && data.version) {
                 const enrichedNet = enrichReferenceObject(data, genre);
                 __refDataCache[genre] = enrichedNet;
-                // Evitar shape antigo residir no cache
-                __activeRefData = JSON.parse(JSON.stringify(enrichedNet));
-                __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
+                __activeRefData = enrichedNet;
                 __activeRefGenre = genre;
                 window.PROD_AI_REF_DATA = enrichedNet;
                 
@@ -906,9 +895,7 @@ async function loadReferenceData(genre) {
         if (useData && typeof useData === 'object') {
             const enriched = enrichReferenceObject(structuredClone(useData), genre);
             __refDataCache[genre] = enriched;
-            // Evitar shape antigo residir no cache
-            __activeRefData = JSON.parse(JSON.stringify(enriched));
-            __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
+            __activeRefData = enriched;
             __activeRefGenre = genre;
             window.PROD_AI_REF_DATA = enriched;
             
@@ -939,9 +926,7 @@ async function loadReferenceData(genre) {
         if (fallback) {
             const enrichedFb = enrichReferenceObject(structuredClone(fallback), 'trance');
             __refDataCache['trance'] = enrichedFb;
-            // Evitar shape antigo residir no cache
-            __activeRefData = JSON.parse(JSON.stringify(enrichedFb));
-            __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
+            __activeRefData = enrichedFb;
             __activeRefGenre = 'trance';
             window.PROD_AI_REF_DATA = enrichedFb;
             
@@ -971,9 +956,7 @@ async function loadReferenceData(genre) {
             if (emb && typeof emb === 'object') {
                 const enrichedEmb = enrichReferenceObject(structuredClone(emb), genre);
                 __refDataCache[genre] = enrichedEmb;
-                // Evitar shape antigo residir no cache
-                __activeRefData = JSON.parse(JSON.stringify(enrichedEmb));
-                __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
+                __activeRefData = enrichedEmb;
                 __activeRefGenre = genre;
                 window.PROD_AI_REF_DATA = enrichedEmb;
                 updateRefStatus('✔ referências embutidas', '#0d6efd');
@@ -984,9 +967,7 @@ async function loadReferenceData(genre) {
             if (embMap && embMap.trance) {
                 const enrichedEmbTr = enrichReferenceObject(structuredClone(embMap.trance), 'trance');
                 __refDataCache['trance'] = enrichedEmbTr;
-                // Evitar shape antigo residir no cache
-                __activeRefData = JSON.parse(JSON.stringify(enrichedEmbTr));
-                __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
+                __activeRefData = enrichedEmbTr;
                 __activeRefGenre = 'trance';
                 window.PROD_AI_REF_DATA = enrichedEmbTr;
                 updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
@@ -3627,13 +3608,10 @@ function renderReferenceComparisons(analysis) {
     // Bandas detalhadas Fase 2: priorizar bandEnergies completas se disponíveis
     const preferLog = (typeof window !== 'undefined' && window.USE_LOG_BAND_ENERGIES === true);
     const bandEnergies = (preferLog ? (tech.bandEnergiesLog || tech.bandEnergies) : tech.bandEnergies) || null;
-    // 🔒 HARDENING: Acesso robusto às bandas de referência (não depender só do root)
-    const refBands = ref?.bands || ref?.legacy_compatibility?.bands;
-    
-    if (bandEnergies && refBands) {
+    if (bandEnergies && ref.bands) {
         const normMap = (analysis?.technicalData?.refBandTargetsNormalized?.mapping) || null;
         const showNorm = (typeof window !== 'undefined' && window.SHOW_NORMALIZED_REF_TARGETS === true && normMap);
-        for (const [band, refBand] of Object.entries(refBands)) {
+        for (const [band, refBand] of Object.entries(ref.bands)) {
             const bLocal = bandEnergies[band];
             if (bLocal && Number.isFinite(bLocal.rms_db)) {
                 let tgt = null;
@@ -3648,7 +3626,7 @@ function renderReferenceComparisons(analysis) {
         const bandMap = { sub:'sub', low:'low_bass', mid:'mid', high:'brilho' };
         Object.entries(bandMap).forEach(([tbKey, refBand]) => {
             const bData = tb[tbKey];
-            const refBandData = refBands?.[refBand];
+            const refBandData = ref.bands?.[refBand];
             if (bData && refBandData && Number.isFinite(bData.rms_db)) {
                 pushRow(`${tbKey.toUpperCase()}`, bData.rms_db, refBandData.target_db, refBandData.tol_db);
             }
