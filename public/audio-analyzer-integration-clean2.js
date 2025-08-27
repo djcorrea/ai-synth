@@ -872,7 +872,9 @@ async function loadReferenceData(genre) {
             if (data && typeof data === 'object' && data.version) {
                 const enrichedNet = enrichReferenceObject(data, genre);
                 __refDataCache[genre] = enrichedNet;
-                __activeRefData = enrichedNet;
+                // Evitar shape antigo residir no cache
+                __activeRefData = JSON.parse(JSON.stringify(enrichedNet));
+                __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
                 __activeRefGenre = genre;
                 window.PROD_AI_REF_DATA = enrichedNet;
                 
@@ -904,7 +906,9 @@ async function loadReferenceData(genre) {
         if (useData && typeof useData === 'object') {
             const enriched = enrichReferenceObject(structuredClone(useData), genre);
             __refDataCache[genre] = enriched;
-            __activeRefData = enriched;
+            // Evitar shape antigo residir no cache
+            __activeRefData = JSON.parse(JSON.stringify(enriched));
+            __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
             __activeRefGenre = genre;
             window.PROD_AI_REF_DATA = enriched;
             
@@ -935,7 +939,9 @@ async function loadReferenceData(genre) {
         if (fallback) {
             const enrichedFb = enrichReferenceObject(structuredClone(fallback), 'trance');
             __refDataCache['trance'] = enrichedFb;
-            __activeRefData = enrichedFb;
+            // Evitar shape antigo residir no cache
+            __activeRefData = JSON.parse(JSON.stringify(enrichedFb));
+            __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
             __activeRefGenre = 'trance';
             window.PROD_AI_REF_DATA = enrichedFb;
             
@@ -965,7 +971,9 @@ async function loadReferenceData(genre) {
             if (emb && typeof emb === 'object') {
                 const enrichedEmb = enrichReferenceObject(structuredClone(emb), genre);
                 __refDataCache[genre] = enrichedEmb;
-                __activeRefData = enrichedEmb;
+                // Evitar shape antigo residir no cache
+                __activeRefData = JSON.parse(JSON.stringify(enrichedEmb));
+                __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
                 __activeRefGenre = genre;
                 window.PROD_AI_REF_DATA = enrichedEmb;
                 updateRefStatus('✔ referências embutidas', '#0d6efd');
@@ -976,7 +984,9 @@ async function loadReferenceData(genre) {
             if (embMap && embMap.trance) {
                 const enrichedEmbTr = enrichReferenceObject(structuredClone(embMap.trance), 'trance');
                 __refDataCache['trance'] = enrichedEmbTr;
-                __activeRefData = enrichedEmbTr;
+                // Evitar shape antigo residir no cache
+                __activeRefData = JSON.parse(JSON.stringify(enrichedEmbTr));
+                __activeRefData.__schema = 'v1-bands-root'; // marcador útil p/ diagnóstico
                 __activeRefGenre = 'trance';
                 window.PROD_AI_REF_DATA = enrichedEmbTr;
                 updateRefStatus('✔ referências embutidas (fallback)', '#0d6efd');
