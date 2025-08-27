@@ -3617,10 +3617,13 @@ function renderReferenceComparisons(analysis) {
     // Bandas detalhadas Fase 2: priorizar bandEnergies completas se disponíveis
     const preferLog = (typeof window !== 'undefined' && window.USE_LOG_BAND_ENERGIES === true);
     const bandEnergies = (preferLog ? (tech.bandEnergiesLog || tech.bandEnergies) : tech.bandEnergies) || null;
-    if (bandEnergies && ref.bands) {
+    // 🔒 HARDENING: Acesso robusto às bandas de referência (não depender só do root)
+    const refBands = ref?.bands || ref?.legacy_compatibility?.bands;
+    
+    if (bandEnergies && refBands) {
         const normMap = (analysis?.technicalData?.refBandTargetsNormalized?.mapping) || null;
         const showNorm = (typeof window !== 'undefined' && window.SHOW_NORMALIZED_REF_TARGETS === true && normMap);
-        for (const [band, refBand] of Object.entries(ref.bands)) {
+        for (const [band, refBand] of Object.entries(refBands)) {
             const bLocal = bandEnergies[band];
             if (bLocal && Number.isFinite(bLocal.rms_db)) {
                 let tgt = null;
@@ -3635,7 +3638,7 @@ function renderReferenceComparisons(analysis) {
         const bandMap = { sub:'sub', low:'low_bass', mid:'mid', high:'brilho' };
         Object.entries(bandMap).forEach(([tbKey, refBand]) => {
             const bData = tb[tbKey];
-            const refBandData = ref.bands?.[refBand];
+            const refBandData = refBands?.[refBand];
             if (bData && refBandData && Number.isFinite(bData.rms_db)) {
                 pushRow(`${tbKey.toUpperCase()}`, bData.rms_db, refBandData.target_db, refBandData.tol_db);
             }
