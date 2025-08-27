@@ -3625,8 +3625,18 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
   // ===== FASE 2 (INÍCIO): Bandas espectrais alinhadas às referências =====
     try {
       const t0Spec = performance.now();
-      const ref = (typeof window !== 'undefined') ? window.PROD_AI_REF_DATA : null;
-      const doBands = !!ref && cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
+      let ref = (typeof window !== 'undefined') ? window.PROD_AI_REF_DATA : null;
+      
+      // 🎯 FIX CRÍTICO: Garantir que ref existe antes de processar bandas
+      if (!ref && typeof window !== 'undefined' && window.__activeRefData) {
+        ref = window.__activeRefData;
+        window.PROD_AI_REF_DATA = ref; // sincronizar
+      }
+      
+      // 🎯 FIX: Forçar doBands = true se temos specMod, independente de ref para evitar problemas de timing
+      const hasSpecMod = cache.specMod && !cache.specMod.__err && typeof cache.specMod.analyzeSpectralFeatures === 'function';
+      const doBands = hasSpecMod; // Removido dependência de ref para evitar chicken-egg problem
+      
       if (doBands) {
         // Evitar reprocessar se já existe (idempotente)
         if (!td.bandEnergies) {
