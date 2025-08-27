@@ -1071,12 +1071,27 @@ function applyGenreSelection(genre) {
     // Invalidação de cache opcional
     if (typeof window !== 'undefined' && window.INVALIDATE_REF_CACHE_ON_GENRE_CHANGE === true) {
         try { delete __refDataCache[genre]; } catch {}
-    invalidateReferenceDerivedCaches();
+        invalidateReferenceDerivedCaches();
     }
+    
+    // 🎯 FORÇAR invalidação para garantir nova referência
+    try { 
+        delete __refDataCache[genre]; 
+        invalidateReferenceDerivedCaches();
+        console.log('✅ Cache invalidado para gênero:', genre);
+    } catch(e) { console.warn('⚠️ Falha na invalidação:', e); }
     // Carregar refs e, se já houver análise no modal, atualizar sugestões de referência e re-renderizar
     return loadReferenceData(genre).then(() => {
         try {
             if (typeof currentModalAnalysis === 'object' && currentModalAnalysis) {
+                // 🎯 NOVO: Recalcular score com nova referência
+                try {
+                    if (typeof window !== 'undefined' && window.computeMixScore && __refData) {
+                        currentModalAnalysis.qualityOverall = window.computeMixScore(currentModalAnalysis.technicalData, __refData);
+                        console.log('✅ Score recalculado para novo gênero:', currentModalAnalysis.qualityOverall);
+                    }
+                } catch(e) { console.warn('❌ Falha ao recalcular score:', e); }
+                
                 // Recalcular sugestões reference_* com as novas tolerâncias
                 try { updateReferenceSuggestions(currentModalAnalysis); } catch(e) { console.warn('updateReferenceSuggestions falhou', e); }
                 // Re-renderização completa para refletir sugestões e comparações
