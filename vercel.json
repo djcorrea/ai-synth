@@ -12,6 +12,13 @@
   ],
   "routes": [
     { 
+      "src": "/debug-fase1.js", 
+      "dest": "/debug-fase1.js",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
+    { 
       "src": "/refs/embedded-refs.js", 
       "dest": "/public/refs/embedded-refs.js",
       "headers": {
