@@ -575,6 +575,29 @@ function invalidateReferenceDerivedCaches() {
 function enrichReferenceObject(refObj, genreKey) {
     try {
         if (!refObj || typeof refObj !== 'object') return refObj;
+        
+        // CORREÇÃO CRÍTICA: Mapear legacy_compatibility para propriedades root
+        if (refObj.legacy_compatibility && typeof refObj.legacy_compatibility === 'object') {
+            const legacy = refObj.legacy_compatibility;
+            
+            // Mapear propriedades principais
+            if (legacy.lufs_target !== undefined) refObj.lufs_target = legacy.lufs_target;
+            if (legacy.tol_lufs !== undefined) refObj.tol_lufs = legacy.tol_lufs;
+            if (legacy.true_peak_target !== undefined) refObj.true_peak_target = legacy.true_peak_target;
+            if (legacy.tol_true_peak !== undefined) refObj.tol_true_peak = legacy.tol_true_peak;
+            if (legacy.dr_target !== undefined) refObj.dr_target = legacy.dr_target;
+            if (legacy.tol_dr !== undefined) refObj.tol_dr = legacy.tol_dr;
+            if (legacy.lra_target !== undefined) refObj.lra_target = legacy.lra_target;
+            if (legacy.tol_lra !== undefined) refObj.tol_lra = legacy.tol_lra;
+            if (legacy.stereo_target !== undefined) refObj.stereo_target = legacy.stereo_target;
+            if (legacy.tol_stereo !== undefined) refObj.tol_stereo = legacy.tol_stereo;
+            
+            // Mapear bandas de frequência
+            if (legacy.bands && typeof legacy.bands === 'object') {
+                refObj.bands = legacy.bands;
+            }
+        }
+        
         // Feature flag geral
         const enabled = (typeof window === 'undefined') || window.ENABLE_REF_ENRICHMENT !== false;
         if (!enabled) return refObj;
@@ -1048,12 +1071,27 @@ function applyGenreSelection(genre) {
     // Invalidação de cache opcional
     if (typeof window !== 'undefined' && window.INVALIDATE_REF_CACHE_ON_GENRE_CHANGE === true) {
         try { delete __refDataCache[genre]; } catch {}
-    invalidateReferenceDerivedCaches();
+        invalidateReferenceDerivedCaches();
     }
+    
+    // 🎯 FORÇAR invalidação para garantir nova referência
+    try { 
+        delete __refDataCache[genre]; 
+        invalidateReferenceDerivedCaches();
+        console.log('✅ Cache invalidado para gênero:', genre);
+    } catch(e) { console.warn('⚠️ Falha na invalidação:', e); }
     // Carregar refs e, se já houver análise no modal, atualizar sugestões de referência e re-renderizar
     return loadReferenceData(genre).then(() => {
         try {
             if (typeof currentModalAnalysis === 'object' && currentModalAnalysis) {
+                // 🎯 NOVO: Recalcular score com nova referência
+                try {
+                    if (typeof window !== 'undefined' && window.computeMixScore && __refData) {
+                        currentModalAnalysis.qualityOverall = window.computeMixScore(currentModalAnalysis.technicalData, __refData);
+                        console.log('✅ Score recalculado para novo gênero:', currentModalAnalysis.qualityOverall);
+                    }
+                } catch(e) { console.warn('❌ Falha ao recalcular score:', e); }
+                
                 // Recalcular sugestões reference_* com as novas tolerâncias
                 try { updateReferenceSuggestions(currentModalAnalysis); } catch(e) { console.warn('updateReferenceSuggestions falhou', e); }
                 // Re-renderização completa para refletir sugestões e comparações
@@ -1338,6 +1376,9 @@ function selectAnalysisMode(mode) {
 // 🎯 NOVO: Abrir modal de análise configurado para o modo
 function openAnalysisModalForMode(mode) {
     __dbg(`🎵 Abrindo modal de análise para modo: ${mode}`);
+    
+    // CORREÇÃO CRÍTICA: Definir window.currentAnalysisMode sempre que o modal for aberto
+    window.currentAnalysisMode = mode;
     
     const modal = document.getElementById('audioAnalysisModal');
     if (!modal) {

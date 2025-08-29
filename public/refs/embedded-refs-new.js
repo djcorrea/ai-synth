@@ -377,7 +377,7 @@ window.PROD_AI_REF_DATA = {
     "num_tracks": 17,
     "aggregation_method": "arithmetic_mean_corrected",
     "legacy_compatibility": {
-      "lufs_target": -4.9,
+      "lufs_target": -8.0,
       "tol_lufs": 1.5,
       "tol_lufs_min": 1.5,
       "tol_lufs_max": 1.5,

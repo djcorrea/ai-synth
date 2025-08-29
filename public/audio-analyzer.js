@@ -2,6 +2,13 @@
 // Versão v1.5-FIXED-CLEAN-NOHIGH sem duplicações (removido "muito alto")
 // Implementação usando Web Audio API (100% gratuito)
 
+// 🚩 FEATURE FLAG: RUNID_ENFORCED - Modo rigoroso para dev/staging
+const RUNID_ENFORCED = (typeof window !== 'undefined') ? 
+  (window.location?.hostname === 'localhost' || 
+   window.location?.hostname?.includes('staging') ||
+   window.NODE_ENV === 'development' ||
+   window.DEBUG_RUNID === true) : false;
+
 class AudioAnalyzer {
   constructor() {
     this.audioContext = null;
@@ -219,8 +226,13 @@ class AudioAnalyzer {
       this._currentRunId = runId;
     }
     
-    // Chamar a versão nova
-    this._logPipelineStage(stage, { runId, ...data });
+    // Calcular duration automaticamente se não fornecida
+    const analysisContext = this._activeAnalyses?.get(runId);
+    const stageStartTime = analysisContext?.startedAt || performance.now();
+    const duration = data.duration || (performance.now() - stageStartTime);
+    
+    // Chamar a versão nova com duration garantida
+    this._logPipelineStage(stage, { runId, duration, ...data });
     
     // Restaurar o runId original
     this._currentRunId = originalRunId;
@@ -594,11 +606,19 @@ class AudioAnalyzer {
     // Novo controlador para esta análise
     this._abortController = new AbortController();
     
-    // 🆔 Gerar runId único para esta análise
-    const runId = this._generateRunId();
+    // 🆔 Gerar ou usar runId fornecido para esta análise
+    const runId = options.runId || this._generateRunId();
     this._currentRunId = runId; // Definir contexto atual
     
+    // 🚩 RUNID_ENFORCED: Avisar se runId não foi fornecido em ambiente rigoroso
+    if (RUNID_ENFORCED && !options.runId) {
+      console.warn(`⚠️ [${runId}] RUNID_ENFORCED ativo: runId não fornecido, gerado automaticamente`);
+    }
+    
     console.log(`🎵 [${runId}] Iniciando análise de arquivo:`, file?.name || 'unknown');
+    
+    // 🛡️ Vincular AbortController ao runId específico
+    this._abortController._runId = runId;
     
     // 🛡️ INICIALIZAÇÃO DEFENSIVA DO CONTEXTO
     if (!this._activeAnalyses.has(runId)) {
@@ -611,7 +631,8 @@ class AudioAnalyzer {
         startTime: Date.now(),
         file: file?.name || 'unknown',
         options: { ...options },
-        status: 'running'
+        status: 'running',
+        abortController: this._abortController
       });
     }
     
@@ -744,7 +765,7 @@ class AudioAnalyzer {
           const t0Full = (performance&&performance.now)?performance.now():Date.now();
           // Modo de qualidade: 'fast' ou 'full' (default 'full' se CAIAR_ENABLED e window.ANALYSIS_QUALITY!='fast')
           const qualityMode = (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full' : 'fast';
-          let analysis = this.performFullAnalysis(audioBuffer, { qualityMode });
+          let analysis = this.performFullAnalysis(audioBuffer, { qualityMode, runId });
           analysis.qualityMode = qualityMode;
           try { (window.__caiarLog||function(){})('METRICS_V1_DONE','Métricas V1 calculadas', { keys: Object.keys(analysis.technicalData||{}) }); } catch {}
 
@@ -1006,7 +1027,7 @@ class AudioAnalyzer {
     
     // Replicação da lógica existente (refatorada para reutilização)
     // Context + V1 + Phase2 + Stems + Matrix
-    let analysis = this.performFullAnalysis(audioBuffer, { qualityMode: (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast' });
+    let analysis = this.performFullAnalysis(audioBuffer, { qualityMode: (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast', runId });
     analysis.qualityMode = analysis.qualityMode || ((window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast');
     try { (window.__caiarLog||function(){})('METRICS_V1_DONE','Métricas V1 calculadas(direct)'); } catch {}
     
@@ -2046,9 +2067,10 @@ class AudioAnalyzer {
   // (remoção do conversor WAV — não é mais necessário)
 
   // 🔬 Realizar análise completa
-  performFullAnalysis(audioBuffer) {
+  performFullAnalysis(audioBuffer, options = {}) {
+  const runId = options.runId || this._currentRunId;
   const _caiarLog = (window && window.__caiarLog) ? window.__caiarLog : function(){};
-  _caiarLog('METRICS_V1_START','Iniciando cálculo métricas V1', { duration: audioBuffer?.duration, sr: audioBuffer?.sampleRate });
+  _caiarLog('METRICS_V1_START','Iniciando cálculo métricas V1', { duration: audioBuffer?.duration, sr: audioBuffer?.sampleRate, runId });
     const analysis = {
       duration: audioBuffer.duration,
       sampleRate: audioBuffer.sampleRate,

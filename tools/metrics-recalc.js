@@ -264,7 +264,7 @@ function measureTrack(left, right, sampleRate) {
     const clareza = (bandsDb.high_mid ?? 0) - (0.7 * (bandsDb.upper_bass ?? 0) + 0.3 * (bandsDb.low_mid ?? 0));
 
     return {
-      lufs_integrated: CONFIG.lufsTarget, // após normalização
+      lufs_integrated: lufs.integrated, // USANDO VALOR MEDIDO REAL
       lra: lufs.lra,
       true_peak_dbtp: tp.true_peak_dbtp,
       stereo_width: stereo,
