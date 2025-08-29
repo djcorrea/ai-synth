@@ -40,6 +40,149 @@ let referenceStepState = {
 
 // 🎯 Funções de Acessibilidade e Gestão de Modais
 
+// 📊 CORREÇÃO: Contador Visual de Problemas
+// Garante que contador sempre corresponde ao que usuário vê na interface
+function countVisualProblems(analysis) {
+    if (!analysis || !analysis.technicalData) {
+        return { count: 0, problems: [], breakdown: { critical: 0, warning: 0 } };
+    }
+
+    const problemMetrics = [];
+    const technicalData = analysis.technicalData;
+    
+    // Caregar referências do gênero atual para tolerâncias
+    const refData = window.__activeRefData || {};
+    const defaultTolerances = {
+        lufs: 1.0,
+        truePeak: 1.0,
+        dynamicRange: 3.0,
+        stereoCorrelation: 0.15
+    };
+
+    // 1. LUFS Integration - Verificar se está fora da tolerância
+    if (Number.isFinite(technicalData.lufsIntegrated)) {
+        const lufsTarget = refData.lufs_target || -14;
+        const lufsTolerance = refData.lufs_tolerance || defaultTolerances.lufs;
+        const lufsDiff = Math.abs(technicalData.lufsIntegrated - lufsTarget);
+        
+        if (lufsDiff > lufsTolerance) {
+            const severity = lufsDiff > (lufsTolerance * 2) ? 'critical' : 'warning';
+            problemMetrics.push({
+                metric: 'LUFS',
+                value: technicalData.lufsIntegrated,
+                target: lufsTarget,
+                tolerance: lufsTolerance,
+                diff: lufsDiff,
+                severity,
+                issue: technicalData.lufsIntegrated > lufsTarget ? 
+                       'Muito alto - pode causar limitação' : 
+                       'Muito baixo - falta presença'
+            });
+        }
+    }
+
+    // 2. True Peak - Verificar clipping ou risco de clipping
+    if (Number.isFinite(technicalData.truePeakDbtp)) {
+        const truePeakTarget = refData.true_peak_target || -1;
+        const truePeakTolerance = refData.true_peak_tolerance || defaultTolerances.truePeak;
+        
+        if (technicalData.truePeakDbtp > truePeakTarget + truePeakTolerance) {
+            const severity = technicalData.truePeakDbtp > 0 ? 'critical' : 'warning';
+            problemMetrics.push({
+                metric: 'True Peak',
+                value: technicalData.truePeakDbtp,
+                target: truePeakTarget,
+                tolerance: truePeakTolerance,
+                severity,
+                issue: technicalData.truePeakDbtp > 0 ? 
+                       'CLIPPING DETECTADO' : 
+                       'Risco de clipping'
+            });
+        }
+    }
+
+    // 3. Dynamic Range - Verificar compressão excessiva
+    if (Number.isFinite(technicalData.dynamicRange)) {
+        const drTarget = refData.dynamic_range_target || 10;
+        const drTolerance = refData.dynamic_range_tolerance || defaultTolerances.dynamicRange;
+        
+        if (technicalData.dynamicRange < (drTarget - drTolerance)) {
+            const severity = technicalData.dynamicRange < 4 ? 'critical' : 'warning';
+            problemMetrics.push({
+                metric: 'Dynamic Range',
+                value: technicalData.dynamicRange,
+                target: drTarget,
+                tolerance: drTolerance,
+                severity,
+                issue: 'Compressão excessiva - som "achatado"'
+            });
+        }
+    }
+
+    // 4. Stereo Correlation - Verificar problemas mono/phase
+    if (Number.isFinite(technicalData.stereoCorrelation)) {
+        const correlationTarget = refData.stereo_correlation_target || 0.5;
+        const correlationTolerance = refData.stereo_correlation_tolerance || defaultTolerances.stereoCorrelation;
+        
+        const correlationDiff = Math.abs(technicalData.stereoCorrelation - correlationTarget);
+        if (correlationDiff > correlationTolerance) {
+            problemMetrics.push({
+                metric: 'Stereo Width',
+                value: technicalData.stereoCorrelation,
+                target: correlationTarget,
+                tolerance: correlationTolerance,
+                severity: 'warning',
+                issue: technicalData.stereoCorrelation > 0.9 ? 
+                       'Muito mono' : 
+                       'Possível problema de fase'
+            });
+        }
+    }
+
+    // 5. Verificar problemas críticos detectados pelo engine (manter compatibilidade)
+    if (analysis.problems && Array.isArray(analysis.problems)) {
+        analysis.problems.forEach(problem => {
+            if (problem.severity === 'critical' || problem.type === 'clipping') {
+                problemMetrics.push({
+                    metric: problem.metric || 'Detectado',
+                    severity: 'critical',
+                    issue: problem.description || problem.message || 'Problema crítico detectado',
+                    fromEngine: true
+                });
+            }
+        });
+    }
+
+    const breakdown = {
+        critical: problemMetrics.filter(p => p.severity === 'critical').length,
+        warning: problemMetrics.filter(p => p.severity === 'warning').length
+    };
+
+    // Debug log para rastreamento
+    if (window.DEBUG_AUDIO_ANALYSIS) {
+        console.log('🔍 Problem Count Fix - Visual Count:', {
+            totalCount: problemMetrics.length,
+            breakdown,
+            originalProblemsArray: analysis.problems ? analysis.problems.length : 0,
+            problems: problemMetrics
+        });
+    }
+
+    return {
+        count: problemMetrics.length,
+        problems: problemMetrics,
+        breakdown,
+        note: problemMetrics.length > 0 ? 
+              `${breakdown.critical} críticos, ${breakdown.warning} avisos` : 
+              'Nenhum problema detectado'
+    };
+}
+
+// 🌐 Anexar função ao escopo global para acesso externo
+if (typeof window !== 'undefined') {
+    window.countVisualProblems = countVisualProblems;
+}
+
 function handleModalEscapeKey(e) {
     if (e.key === 'Escape') {
         closeModeSelectionModal();
@@ -2563,10 +2706,14 @@ function displayModalResults(analysis) {
                 } catch {}
                 return extra ? row('Top Freq. adicionais', `<span style="opacity:.9">${extra}</span>`) : '';
             })();
+            // ✅ CORREÇÃO: Contador Visual de Problemas
+            const visualProblems = countVisualProblems(analysis);
+            const problemCount = visualProblems.count;
+            
             const col3 = [
                 row('Tonal Balance', analysis.technicalData?.tonalBalance ? tonalSummary(analysis.technicalData.tonalBalance) : '—', 'tonalBalance'),
                 (analysis.technicalData.dominantFrequencies.length > 0 ? row('Freq. Dominante', `${Math.round(analysis.technicalData.dominantFrequencies[0].frequency)} Hz`) : ''),
-                row('Problemas', analysis.problems.length > 0 ? `<span class="tag tag-danger">${analysis.problems.length} detectado(s)</span>` : '—'),
+                row('Problemas', problemCount > 0 ? `<span class="tag tag-danger">${problemCount} detectado(s)</span>` : '—'),
                 row('Sugestões', analysis.suggestions.length > 0 ? `<span class="tag tag-success">${analysis.suggestions.length} disponível(s)</span>` : '—'),
                 col3Extras
             ].join('');
@@ -2987,7 +3134,7 @@ function displayModalResults(analysis) {
                             </div>`;
                     }
                 };
-                if (analysis.problems.length > 0) {
+                if (analysis.problems && analysis.problems.length > 0) {
                     // 🎯 Função local para deduplicar problemas por tipo
                     const deduplicateByType = (items) => {
                         const seen = new Map();
@@ -3968,7 +4115,7 @@ function generateDetailedReport(analysis) {
         report += `\n`;
     }
     
-    if (analysis.problems.length > 0) {
+    if (analysis.problems && analysis.problems.length > 0) {
         report += `🚨 PROBLEMAS DETECTADOS:\n`;
         report += `${'-'.repeat(30)}\n`;
         analysis.problems.forEach((problem, i) => {
