@@ -7,6 +7,7 @@
 // NEW_CACHE_KEY: true em dev/staging, pode ser false em prod para rollback
 if (typeof window !== 'undefined' && window.NEW_CACHE_KEY === undefined) {
   window.NEW_CACHE_KEY = window.location.hostname !== 'prod.ai'; // Default baseado no hostname
+  console.log('🔧 NEW_CACHE_KEY inicializado:', window.NEW_CACHE_KEY);
 }
 
 // 🚩 FEATURE FLAG: RUNID_ENFORCED - Modo rigoroso para dev/staging
@@ -3481,7 +3482,8 @@ async function sendAudioAnalysisToChat(prompt, analysis) {
 console.log('🎵 Audio Analyzer carregado com sucesso!');
 
 // Utilitário global para invalidar cache manualmente (fora da classe)
-if (typeof window !== 'undefined' && !window.invalidateAudioAnalysisCache) {
+if (typeof window !== 'undefined') {
+  // Sempre redefinir para garantir que temos a versão mais recente
   window.invalidateAudioAnalysisCache = function(){
     try {
       const map = window.__AUDIO_ANALYSIS_CACHE__;
@@ -3502,7 +3504,10 @@ if (typeof window !== 'undefined' && !window.invalidateAudioAnalysisCache) {
     }
   };
   
+  console.log('✅ invalidateAudioAnalysisCache definida');
+  
   // 🔄 CACHE INVALIDATION BY GENRE/REFS CHANGE
+  // Sempre redefinir para garantir versão mais recente
   window.invalidateCacheByChange = function(changeType, oldValue, newValue) {
     try {
       const map = window.__AUDIO_ANALYSIS_CACHE__;
@@ -3549,9 +3554,11 @@ if (typeof window !== 'undefined' && !window.invalidateAudioAnalysisCache) {
     }
   };
   
+  console.log('✅ invalidateCacheByChange definida');
+  
   // 🔍 CACHE CHANGE MONITOR - Monitoramento automático de mudanças
-  if (!window._cacheChangeMonitor) {
-    window._cacheChangeMonitor = {
+  // Sempre redefinir para garantir versão mais recente
+  window._cacheChangeMonitor = {
       lastGenre: window.PROD_AI_REF_GENRE,
       lastRefsVersion: window.EMBEDDED_REFS_VERSION,
       
@@ -3571,7 +3578,8 @@ if (typeof window !== 'undefined' && !window.invalidateAudioAnalysisCache) {
         this.lastRefsVersion = currentRefsVersion;
       }
     };
-  }
+  
+  console.log('✅ _cacheChangeMonitor definido');
 }
 
 // === Extensão: análise direta de AudioBuffer (uso interno / testes) ===
