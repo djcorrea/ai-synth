@@ -24,6 +24,9 @@
     <script src="auth.js?v=20250810" defer></script>
     <script src="friendly-labels.js?v=20250817" defer></script>
     
+    <!-- 🎯 Correção da Ordem do Pipeline -->
+    <script src="/pipeline-order-correction.js?v=20250828" defer></script>
+    
     <!-- Feature Flags para Análise por Referência -->
     <script>
         // 🎯 Feature Flags: Análise por Música de Referência
@@ -701,5 +704,17 @@
     
     <!-- Debug do analyzer - caminho corrigido -->
     <script src="../debug-analyzer.js"></script>
+    
+    <!-- Debug WAV Support - investigar problemas de formato -->
+    <script src="../debug-wav-support.js"></script>
+    
+    <!-- Debug Upload Diagnostic - investigar uploads parciais -->
+    <script src="../debug-upload-diagnostic.js"></script>
+    
+    <!-- Debug Upload Test - teste específico 32MB → 15 bytes -->
+    <script src="../debug-upload-test.js"></script>
+    
+    <!-- Debug Audio Analyzer Deep - interceptar pipeline completo -->
+    <script src="../debug-audio-analyzer-deep.js"></script>
 </body>
 </html>

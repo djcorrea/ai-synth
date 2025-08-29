@@ -20,6 +20,28 @@ const __DEBUG_ANALYZER__ = true; // 🔧 TEMPORÁRIO: Ativado para debug do prob
 const __dbg = (...a) => { if (__DEBUG_ANALYZER__) console.log('[AUDIO-DEBUG]', ...a); };
 const __dwrn = (...a) => { if (__DEBUG_ANALYZER__) console.warn('[AUDIO-WARN]', ...a); };
 
+// 🆔 SISTEMA runId - Função utilitária centralizada
+function generateAnalysisRunId(context = 'ui') {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    return `${context}_${timestamp}_${random}`;
+}
+
+// 🛡️ HELPER: Preparar options com runId de forma segura
+function prepareAnalysisOptions(baseOptions = {}, context = 'analysis') {
+    // Gerar runId se não fornecido
+    if (!baseOptions.runId) {
+        baseOptions.runId = generateAnalysisRunId(context);
+    }
+    
+    // Configurar variável global para UI_GATE
+    window.__CURRENT_ANALYSIS_RUN_ID__ = baseOptions.runId;
+    
+    __dbg(`🆔 [runId] Preparado para análise: ${baseOptions.runId} (contexto: ${context})`);
+    
+    return { ...baseOptions };
+}
+
 let currentModalAnalysis = null;
 let __audioIntegrationInitialized = false; // evita listeners duplicados
 let __refDataCache = {}; // cache por gênero
@@ -1095,7 +1117,18 @@ function applyGenreSelection(genre) {
                 // Recalcular sugestões reference_* com as novas tolerâncias
                 try { updateReferenceSuggestions(currentModalAnalysis); } catch(e) { console.warn('updateReferenceSuggestions falhou', e); }
                 // Re-renderização completa para refletir sugestões e comparações
-                try { displayModalResults(currentModalAnalysis); } catch(e) { console.warn('re-render modal falhou', e); }
+                try { 
+                    // 🔒 UI GATE: Verificar se análise ainda é válida
+                    const analysisRunId = currentModalAnalysis?.runId || currentModalAnalysis?.metadata?.runId;
+                    const currentRunId = window.__CURRENT_ANALYSIS_RUN_ID__;
+                    
+                    if (analysisRunId && currentRunId && analysisRunId !== currentRunId) {
+                        console.warn(`🚫 [UI_GATE] Re-render cancelado - análise obsoleta (análise: ${analysisRunId}, atual: ${currentRunId})`);
+                        return;
+                    }
+                    
+                    displayModalResults(currentModalAnalysis); 
+                } catch(e) { console.warn('re-render modal falhou', e); }
             }
         } catch (e) { console.warn('re-render comparação falhou', e); }
     });
@@ -1113,7 +1146,9 @@ if (typeof window !== 'undefined' && !window.__audioHealthCheck) {
         const out = { runs: [], spreads: {}, anomalies: [] };
         for (let i=0;i<runs;i++) {
             const t0 = performance.now();
-            const res = await window.audioAnalyzer.analyzeAudioFile(file);
+            // 🆔 CORREÇÃO: Adicionar runId para funções de health check
+            const healthOptions = prepareAnalysisOptions({}, `health_${i+1}`);
+            const res = await window.audioAnalyzer.analyzeAudioFile(file, healthOptions);
             const t1 = performance.now();
             out.runs.push({
                 idx: i+1,
@@ -1736,7 +1771,9 @@ async function handleReferenceFileSelection(file) {
           windowDuration: 30,
           fftSize: 4096
         };
-        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, userAnalysisOptions);
+        // 🆔 CORREÇÃO: Preparar options com runId
+        const userOptionsWithRunId = prepareAnalysisOptions(userAnalysisOptions, 'user_ref');
+        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, userOptionsWithRunId);
         
         // 🐛 VALIDAÇÃO: Verificar que não há comparação com gênero
         if (analysis.comparison || analysis.mixScore) {
@@ -1785,7 +1822,9 @@ async function handleReferenceFileSelection(file) {
           windowDuration: 30,
           fftSize: 4096
         };
-        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, refAnalysisOptions);
+        // 🆔 CORREÇÃO: Preparar options com runId
+        const refOptionsWithRunId = prepareAnalysisOptions(refAnalysisOptions, 'ref_audio');
+        const analysis = await window.audioAnalyzer.analyzeAudioFile(file, refOptionsWithRunId);
         
         // 🐛 VALIDAÇÃO: Verificar que não há comparação com gênero
         if (analysis.comparison || analysis.mixScore) {
@@ -1893,7 +1932,9 @@ async function handleGenreFileSelection(file) {
     const analysisOptions = { 
       mode: window.currentAnalysisMode || 'genre' 
     };
-    const analysis = await window.audioAnalyzer.analyzeAudioFile(file, analysisOptions);
+    // 🆔 CORREÇÃO: Preparar options com runId para análise principal
+    const optionsWithRunId = prepareAnalysisOptions(analysisOptions, 'main');
+    const analysis = await window.audioAnalyzer.analyzeAudioFile(file, optionsWithRunId);
     currentModalAnalysis = analysis;
     
     __dbg('✅ Análise concluída:', analysis);
@@ -1907,6 +1948,15 @@ async function handleGenreFileSelection(file) {
     
     // Mostrar resultados
     setTimeout(() => {
+        // 🔒 FASE 2 UI GATE: Verificar se análise ainda é válida
+        const analysisRunId = analysis?.runId || analysis?.metadata?.runId;
+        const currentRunId = window.__CURRENT_ANALYSIS_RUN_ID__;
+        
+        if (analysisRunId && currentRunId && analysisRunId !== currentRunId) {
+            __dbg(`🚫 [UI_GATE] Análise cancelada - não renderizar UI (análise: ${analysisRunId}, atual: ${currentRunId})`);
+            return;
+        }
+        
         // Telemetria: verificar elementos alvo antes de preencher o modal
         const exists = {
             audioUploadArea: !!document.getElementById('audioUploadArea'),
@@ -1915,6 +1965,13 @@ async function handleGenreFileSelection(file) {
             modalTechnicalData: !!document.getElementById('modalTechnicalData')
         };
         __dbg('🛰️ [Telemetry] Front antes de preencher modal (existência de elementos):', exists);
+        
+        // 🔒 UI GATE: Verificar novamente antes de renderizar
+        if (analysisRunId && currentRunId && analysisRunId !== currentRunId) {
+            __dbg(`🚫 [UI_GATE] Verificação dupla - análise cancelada durante delay`);
+            return;
+        }
+        
         displayModalResults(analysis);
         
         // 🔧 CORREÇÃO: Limpar flag de análise em progresso após sucesso
@@ -2259,6 +2316,15 @@ async function performReferenceComparison() {
         
         // Mostrar resultados
         setTimeout(() => {
+            // 🔒 UI GATE: Verificar se análise ainda é válida
+            const analysisRunId = combinedAnalysis?.runId || combinedAnalysis?.metadata?.runId;
+            const currentRunId = window.__CURRENT_ANALYSIS_RUN_ID__;
+            
+            if (analysisRunId && currentRunId && analysisRunId !== currentRunId) {
+                console.warn(`🚫 [UI_GATE] Comparação cancelada - não renderizar UI (análise: ${analysisRunId}, atual: ${currentRunId})`);
+                return;
+            }
+            
             displayModalResults(combinedAnalysis);
             window.logReferenceEvent('reference_comparison_completed');
         }, 800);
@@ -2680,6 +2746,15 @@ function showModalLoading() {
 // 📊 Mostrar resultados no modal
 // 📊 Mostrar resultados no modal
 function displayModalResults(analysis) {
+    // 🔒 UI GATE: Verificação final antes de renderizar
+    const analysisRunId = analysis?.runId || analysis?.metadata?.runId;
+    const currentRunId = window.__CURRENT_ANALYSIS_RUN_ID__;
+    
+    if (analysisRunId && currentRunId && analysisRunId !== currentRunId) {
+        console.warn(`🚫 [UI_GATE] displayModalResults cancelado - análise obsoleta (análise: ${analysisRunId}, atual: ${currentRunId})`);
+        return;
+    }
+    
     const uploadArea = document.getElementById('audioUploadArea');
     const loading = document.getElementById('audioAnalysisLoading');
     const results = document.getElementById('audioAnalysisResults');
@@ -4396,7 +4471,9 @@ if (typeof window !== 'undefined' && !window.__testConsistency) {
         const out = { runs: [], deltas: {} };
         for (let i = 0; i < runs; i++) {
             const t0 = performance.now();
-            const res = await window.audioAnalyzer.analyzeAudioFile(file);
+            // 🆔 CORREÇÃO: Adicionar runId para funções de teste de consistência
+            const testOptions = prepareAnalysisOptions({}, `consistency_${i+1}`);
+            const res = await window.audioAnalyzer.analyzeAudioFile(file, testOptions);
             const t1 = performance.now();
             out.runs.push({
                 idx: i+1,

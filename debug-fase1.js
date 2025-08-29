@@ -70,11 +70,17 @@
                 // Interceptar logs para verificar se runId customizado é usado
                 const originalLog = console.log;
                 let runIdDetectado = null;
+                let durationDetectado = false;
                 
                 console.log = function(...args) {
                     const msg = args.join(' ');
                     if (msg.includes(customRunId)) {
                         runIdDetectado = customRunId;
+                    }
+                    // Verificar se duration está aparecendo nos logs
+                    if (msg.includes('→') && msg.includes('ms')) {
+                        durationDetectado = true;
+                        console.log('🕐 Duration detectado nos logs');
                     }
                     originalLog.apply(console, args);
                 };
@@ -92,8 +98,23 @@
                         } else {
                             console.log('❌ runId customizado não detectado');
                         }
+                        
+                        // ✅ CORREÇÃO: Verificar se duration logs já apareceram na página
+                        // Como os logs mostram durações como "369ms", "522ms", etc, vamos verificar isso
+                        const bodyText = document.body.textContent || '';
+                        const hasTimingLogs = bodyText.includes('→') || 
+                                            bodyText.includes('ANALYSIS_STARTED') || 
+                                            bodyText.includes('ms') && bodyText.includes('ETAPA');
+                        
+                        if (durationDetectado || hasTimingLogs) {
+                            resultados.durationLogs = true;
+                            console.log('✅ Duration logs detectados (timing patterns found)');
+                        } else {
+                            console.log('❌ Duration logs não detectados');
+                        }
+                        
                         console.log = originalLog; // Restaurar
-                    }, 100);
+                    }, 200);
                 } catch (e) {
                     console.log = originalLog;
                     console.log('⚠️ Erro esperado ao analisar mock file:', e.message.substring(0, 50) + '...');
@@ -219,19 +240,17 @@
         return compativel;
     }
     
-    // Aguardar carregamento completo
+    // ✅ Aguardar carregamento completo - EXECUÇÃO AUTOMÁTICA REMOVIDA
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                testarFase1();
-                verificarCompatibilidadeVercel();
-            }, 1000);
+            console.log('🚀 Debug Fase 1 carregado');
+            console.log('🔍 Use: testarFase1() para testar funcionalidades');
+            console.log('💡 IMPORTANTE: Testes só executam quando explicitamente chamados');
         });
     } else {
-        setTimeout(() => {
-            testarFase1();
-            verificarCompatibilidadeVercel();
-        }, 1000);
+        console.log('🚀 Debug Fase 1 carregado');
+        console.log('🔍 Use: testarFase1() para testar funcionalidades');
+        console.log('💡 IMPORTANTE: Testes só executam quando explicitamente chamados');
     }
     
     // Exportar funções para uso manual

@@ -168,7 +168,71 @@ class AudioAnalyzer {
     return `run_${timestamp}_${random}`;
   }
 
-  // 🔬 MODO DIAGNÓSTICO - Controle
+  // � VALIDAÇÃO CRÍTICA DE ARQUIVO - Detectar problemas antes da decodificação
+  _validateFileBasics(file) {
+    const issues = [];
+    const warnings = [];
+    
+    // 1. VERIFICAÇÃO DE ARQUIVO VAZIO OU MUITO PEQUENO
+    if (!file || file.size === 0) {
+      issues.push({
+        type: 'ARQUIVO_VAZIO',
+        message: 'Arquivo está vazio (0 bytes)',
+        suggestion: 'Selecione um arquivo de áudio válido'
+      });
+    } else if (file.size < 100) {
+      issues.push({
+        type: 'ARQUIVO_MUITO_PEQUENO',
+        message: `Arquivo muito pequeno (${file.size} bytes) - mínimo ~100 bytes para WAV`,
+        suggestion: 'Arquivo pode estar corrompido ou truncado. Verifique a origem do arquivo.'
+      });
+    } else if (file.size < 1000) {
+      warnings.push({
+        type: 'ARQUIVO_SUSPEITO',
+        message: `Arquivo pequeno (${file.size} bytes) - pode estar corrompido`,
+        suggestion: 'Verifique se o arquivo contém áudio útil'
+      });
+    }
+    
+    // 2. VERIFICAÇÃO DE TIPO MIME
+    if (file.type && !file.type.includes('audio') && file.type !== '') {
+      warnings.push({
+        type: 'MIME_TYPE_SUSPEITO',
+        message: `MIME type "${file.type}" pode não ser de áudio`,
+        suggestion: 'Verifique se é realmente um arquivo de áudio'
+      });
+    }
+    
+    // 3. VERIFICAÇÃO DE EXTENSÃO
+    if (file.name) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      const supportedExts = ['wav', 'mp3', 'mp4', 'm4a', 'ogg', 'flac', 'aac'];
+      if (ext && !supportedExts.includes(ext)) {
+        warnings.push({
+          type: 'EXTENSÃO_DESCONHECIDA',
+          message: `Extensão ".${ext}" pode não ser suportada`,
+          suggestion: 'Use WAV, MP3 ou M4A para melhor compatibilidade'
+        });
+      }
+    }
+    
+    // 4. VERIFICAÇÃO DE TAMANHO EXCESSIVO (>500MB)
+    if (file.size > 500 * 1024 * 1024) {
+      warnings.push({
+        type: 'ARQUIVO_MUITO_GRANDE',
+        message: `Arquivo muito grande (${Math.round(file.size / 1024 / 1024)}MB)`,
+        suggestion: 'Arquivos grandes podem causar problemas de memória'
+      });
+    }
+    
+    return {
+      isValid: issues.length === 0,
+      issues,
+      warnings
+    };
+  }
+
+  // �🔬 MODO DIAGNÓSTICO - Controle
   enableDiagnosticMode(enabled = true) {
     this._diagnosticMode = enabled;
     console.log(`🔬 Modo diagnóstico: ${enabled ? 'ATIVADO' : 'DESATIVADO'}`);
@@ -573,8 +637,16 @@ class AudioAnalyzer {
   // 🎤 Inicializar análise de áudio
   async initializeAnalyzer() {
     try {
-      // Criar contexto de áudio
+      // Criar contexto de áudio com tratamento moderno
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // 🔧 CORREÇÃO: Verificar se context precisa ser resumed (política moderna de browsers)
+      if (this.audioContext.state === 'suspended') {
+        console.log('🔄 AudioContext suspenso, aguardando user gesture...');
+        // Não tentar resume automaticamente, aguardar gesture do usuário
+        return true; // Retornar sucesso, será resumed quando necessário
+      }
+      
       this.analyzer = this.audioContext.createAnalyser();
       
       // Configurações de análise
@@ -596,6 +668,16 @@ class AudioAnalyzer {
   async analyzeAudioFile(file, options = {}) {
     // 🛡️ INICIALIZAÇÃO DEFENSIVA E CONTROLE DE DUPLICATAS
     if (!this._activeAnalyses) this._activeAnalyses = new Map();
+    
+    // 🚨 VALIDAÇÕES CRÍTICAS PRÉ-ANÁLISE
+    const validation = this._validateFileBasics(file);
+    if (!validation.isValid) {
+      const criticalError = validation.issues[0];
+      console.error(`❌ ARQUIVO INVÁLIDO: ${criticalError.message}`);
+      console.error(`💡 SOLUÇÃO: ${criticalError.suggestion}`);
+      
+      throw new Error(`Arquivo inválido - ${criticalError.type}: ${criticalError.message}`);
+    }
     
     // Abortar análise anterior se ainda ativa
     if (this._abortController && !this._abortController.signal.aborted) {
@@ -692,6 +774,17 @@ class AudioAnalyzer {
     if (!this.audioContext) {
       await this.initializeAnalyzer();
     }
+    
+    // 🔧 CORREÇÃO: Resume AudioContext se necessário (com user gesture)
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume();
+        console.log('🔄 AudioContext resumed com sucesso');
+      } catch (e) {
+        console.warn('⚠️ AudioContext não pode ser resumed (precisa de user gesture):', e.message);
+        // Continuar mesmo assim - análise offline ainda funciona
+      }
+    }
 
     // Se já temos o ArrayBuffer (hash) podemos pular FileReader para reduzir latência
     if (file._cachedArrayBufferForHash && file._cachedArrayBufferForHash.byteLength) {
@@ -710,17 +803,18 @@ class AudioAnalyzer {
           } catch(e){ 
             clearTimeout(timeout); 
             try {
-              if (audioBuffer) {
-                this._cleanupAudioBuffer(audioBuffer);
-                console.log('🧹 AudioBuffer limpo em direct decode error path');
-              }
+              // audioBuffer não está disponível neste escopo durante erro de decode direto
+              console.log('🧹 Direct decode error path - audioBuffer não disponível para limpeza');
             } catch (cleanupErr) {
               console.warn('⚠️ Erro na limpeza do AudioBuffer (direct decode error):', cleanupErr);
             }
             reject(e); 
           }
         });
-      } catch(e){ console.warn('Direct decode fallback para FileReader', e); }
+      } catch(e){ 
+        console.warn(`🔄 [${this._currentRunId || 'unknown'}] Direct decode não suportado para este formato, usando FileReader...`);
+        console.warn(`📋 [${this._currentRunId || 'unknown'}] Detalhes: ${e?.message || e}`);
+      }
     }
 
     return new Promise((resolve, reject) => {
@@ -858,7 +952,7 @@ class AudioAnalyzer {
           } catch (stErr) { (window.__caiarLog||function(){})('STEMS_CHAIN_ERROR','Erro cadeia stems', { error: stErr?.message||String(stErr) }); }
           
           clearTimeout(timeout);
-          const finalAnalysis = await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache });
+          const finalAnalysis = await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache, runId });
           
           // 🧠 MEMORY CLEANUP: Limpeza final do AudioBuffer
           try {
@@ -913,9 +1007,21 @@ class AudioAnalyzer {
             console.warn('⚠️ Erro ao notificar UI:', uiError);
           }
           
-          console.error('❌ Erro na decodificação:', error);
-          try { (window.__caiarLog||function(){})('DECODE_ERROR','Erro ao decodificar', { error: error?.message||String(error) }); } catch {}
-          reject(new Error(`Erro ao decodificar áudio: ${error.message}`));
+          
+          console.error(`❌ [${this._currentRunId || 'unknown'}] ERRO DE DECODIFICAÇÃO:`, error);
+          console.error(`📋 [${this._currentRunId || 'unknown'}] Arquivo: ${file?.name || 'desconhecido'}`);
+          console.error(`📋 [${this._currentRunId || 'unknown'}] Tipo: ${file?.type || 'N/A'}`);
+          console.error(`� [${this._currentRunId || 'unknown'}] Tamanho: ${file?.size || 'N/A'} bytes`);
+          console.error(`� [${this._currentRunId || 'unknown'}] Detalhes: ${error?.message || error}`);
+          
+          try { (window.__caiarLog||function(){})('DECODE_ERROR','Erro de decodificação investigação', { 
+            error: error?.message||String(error), 
+            fileName: file?.name,
+            fileType: file?.type,
+            fileSize: file?.size 
+          }); } catch {}
+          
+          reject(new Error(`Erro ao decodificar áudio: ${error?.message || error}`));
         }
       };
       
@@ -1258,6 +1364,20 @@ class AudioAnalyzer {
         stack: this._diagnosticMode ? e.stack : undefined
       });
     }
+    
+    // 🆔 ADICIONAR METADATA COM runId PARA UI_GATE
+    try { 
+      analysis._metadata = {
+        runId: runId || this._currentRunId,
+        timestamp: Date.now(),
+        pipelineVersion: this._pipelineVersion
+      };
+      // Manter compatibilidade com código existente que espera runId diretamente
+      if (runId || this._currentRunId) {
+        analysis.runId = runId || this._currentRunId;
+      }
+    } catch {}
+    
     try { analysis.pipelineVersion = this._pipelineVersion; } catch {}
     if (fileHash && !disableCache) {
       try {
@@ -1429,7 +1549,8 @@ class AudioAnalyzer {
               }
             } catch (rmErr) { (window.__caiarLog||function(){})('REF_MATCH_INTEGRATION_ERROR','Erro matcher', { error: rmErr?.message||String(rmErr) }); }
             const enableScoring = (typeof window === 'undefined' || window.ENABLE_MIX_SCORING !== false);
-            // Adiado: scoring completo será recalculado ao final (após bandas) para garantir contagem correta
+            // 🎯 CORREÇÃO DA ORDEM: Scoring inicial DESABILITADO - será executado após bandas espectrais
+            // Esta mudança garante que o scoring aconteça somente quando as bandas estiverem prontas
             if (false && enableScoring) {
               let activeRef = null;
               try {
@@ -1902,17 +2023,53 @@ class AudioAnalyzer {
     }
 
     try {
-      // Recalcular score ao final (todas bandas prontas) para garantir contagem correta de verdes/vermelhas
-      // Removida exigência de baseAnalysis.mixScore prévio (bloco inicial está desativado)
-      console.log('[SCORE_DEBUG] 🔍 Iniciando recálculo de score final...');
-      console.log('[SCORE_DEBUG] window exists:', typeof window !== 'undefined');
-      console.log('[SCORE_DEBUG] technicalData exists:', !!baseAnalysis.technicalData);
+      // 🎯 CORREÇÃO DA ORDEM DO PIPELINE: Scoring após bandas espectrais
+      // Garante que o scoring execute SOMENTE após bandas espectrais válidas
+      console.log('[PIPELINE-CORRECTION] 🔍 Iniciando scoring com pré-condições...');
+      console.log('[PIPELINE-CORRECTION] Feature flag ativa:', window.PIPELINE_ORDER_CORRECTION_ENABLED);
+      console.log('[PIPELINE-CORRECTION] technicalData exists:', !!baseAnalysis.technicalData);
       
       if (typeof window !== 'undefined' && baseAnalysis.technicalData) {
-        console.log('[SCORE_DEBUG] ✅ Condições iniciais atendidas');
+        console.log('[PIPELINE-CORRECTION] ✅ Condições iniciais atendidas');
         const tdFinal = baseAnalysis.technicalData;
-        console.log('[COLOR_RATIO_V2_DEBUG] tdFinal input:', tdFinal);
-        console.log('[COLOR_RATIO_V2_DEBUG] tdFinal keys:', Object.keys(tdFinal || {}));
+        console.log('[PIPELINE-CORRECTION] tdFinal keys:', Object.keys(tdFinal || {}));
+        
+        // Verificar se a correção está ativa
+        const correctionEnabled = window.PIPELINE_ORDER_CORRECTION_ENABLED !== false;
+        console.log('[PIPELINE-CORRECTION] Correção ativa:', correctionEnabled);
+        
+        if (correctionEnabled && window.PipelineOrderCorrection) {
+          // 🎯 NOVA ORDEM: Validar bandas espectrais ANTES do scoring
+          const bandsValidation = window.PipelineOrderCorrection.validateSpectralBands(tdFinal, runId);
+          console.log('[PIPELINE-CORRECTION] Validação das bandas:', bandsValidation);
+          
+          if (!bandsValidation.ready || !bandsValidation.valid) {
+            // 📝 Log estruturado de skip
+            window.PipelineOrderCorrection.logPipelineEvent('scoring_skipped', runId, {
+              reason: bandsValidation.reason,
+              depends_on: 'spectral-bands',
+              validation: bandsValidation
+            });
+            
+            console.log('[PIPELINE-CORRECTION] ⚠️ Scoring pulado - bandas não prontas:', bandsValidation.reason);
+            
+            // Aplicar fallback seguro
+            const fallbackScore = window.PipelineOrderCorrection.createScoringFallback(bandsValidation.reason, runId);
+            baseAnalysis.mixScore = fallbackScore;
+            baseAnalysis.mixScorePct = null; // UI não exibe score parcial
+            baseAnalysis.mixClassification = 'unavailable';
+            
+            console.log('[PIPELINE-CORRECTION] 🛡️ Fallback aplicado');
+            return baseAnalysis; // Retorno antecipado seguro
+          }
+          
+          // 📊 Log que bandas estão prontas
+          window.PipelineOrderCorrection.logPipelineEvent('spectral_bands_ready', runId, {
+            bandCount: bandsValidation.bandCount,
+            validBandCount: bandsValidation.validBandCount,
+            depends_on: 'spectral-bands'
+          });
+        }
         let activeRef = null;
         // 🎯 CORREÇÃO TOTAL: Apenas usar PROD_AI_REF_DATA no modo gênero
         try { 
@@ -1926,34 +2083,54 @@ class AudioAnalyzer {
           }
         } catch {}
         try {
-          console.log('[SCORE_DEBUG] 🔍 Tentando carregar scoring.js...');
+          console.log('[PIPELINE-CORRECTION] 🔍 Carregando módulo de scoring...');
           const scorerMod = await import('/lib/audio/features/scoring.js?v=' + Date.now()).catch((err)=>{
-            console.error('[SCORE_DEBUG] ❌ Erro no import scoring.js:', err);
+            console.error('[PIPELINE-CORRECTION] ❌ Erro no import scoring.js:', err);
             return null;
           });
-          console.log('[SCORE_DEBUG] scoring.js carregado:', !!scorerMod);
-          console.log('[SCORE_DEBUG] computeMixScore disponível:', !!(scorerMod && typeof scorerMod.computeMixScore === 'function'));
+          console.log('[PIPELINE-CORRECTION] scoring.js carregado:', !!scorerMod);
+          console.log('[PIPELINE-CORRECTION] computeMixScore disponível:', !!(scorerMod && typeof scorerMod.computeMixScore === 'function'));
           
           if (scorerMod && typeof scorerMod.computeMixScore === 'function') {
-            console.log('[SCORE_DEBUG] ✅ scoring.js válido, executando...');
+            console.log('[PIPELINE-CORRECTION] ✅ scoring.js válido, executando...');
             // 🎯 CORREÇÃO: Buscar targets específicos do gênero ativo (segunda ocorrência)
             let genreSpecificRef = null;
             if (mode === 'genre' && activeRef) {
               const activeGenre = window.PROD_AI_REF_GENRE || 'default';
               genreSpecificRef = activeRef[activeGenre] || null;
               if (DEBUG_MODE_REFERENCE) {
-                console.log('🔍 [MODE_DEBUG] Final scoring using genre-specific ref:', activeGenre);
-                console.log('🔍 [MODE_DEBUG] Final genre ref targets:', genreSpecificRef);
+                console.log('[PIPELINE-CORRECTION] Final scoring using genre-specific ref:', activeGenre);
+                console.log('[PIPELINE-CORRECTION] Final genre ref targets:', genreSpecificRef);
               }
             } else if (DEBUG_MODE_REFERENCE) {
-              console.log('🔍 [MODE_DEBUG] Final scoring skipping genre-specific ref (mode=' + mode + ')');
+              console.log('[PIPELINE-CORRECTION] Final scoring skipping genre-specific ref (mode=' + mode + ')');
             }
             
-            const finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
-            console.log('[COLOR_RATIO_V2_DEBUG] Raw finalScore:', finalScore);
-            console.log('[SCORE_DEBUG] 🎯 Final score calculado - scorePct:', finalScore?.scorePct);
+            // 🎯 CORREÇÃO DA ORDEM: Usar nova função com pré-condições
+            const correctionEnabled = window.PIPELINE_ORDER_CORRECTION_ENABLED !== false;
+            let finalScore = null;
             
-            // TESTE MANUAL COM DADOS CONHECIDOS
+            if (correctionEnabled && window.PipelineOrderCorrection) {
+              // Nova implementação com validação de bandas espectrais
+              finalScore = await window.PipelineOrderCorrection.executeScoringWithPreconditions(
+                tdFinal, 
+                genreSpecificRef, 
+                scorerMod, 
+                runId
+              );
+            } else {
+              // Implementação original (fallback)
+              console.log('[PIPELINE-CORRECTION] ⚠️ Usando implementação original - correção desabilitada');
+              finalScore = scorerMod.computeMixScore(tdFinal, genreSpecificRef);
+            }
+            
+            if (finalScore) {
+              console.log('[PIPELINE-CORRECTION] 🎯 Score calculado com sucesso - scorePct:', finalScore?.scorePct);
+            } else {
+              console.log('[PIPELINE-CORRECTION] ⚠️ Score não calculado - verificar logs acima');
+            }
+            
+            // TESTE MANUAL COM DADOS CONHECIDOS (mantido para compatibilidade)
             const testData = {
               "spectrum.balance": { classification: "yellow" },
               "spectrum.clarity": { classification: "red" },
@@ -1977,21 +2154,23 @@ class AudioAnalyzer {
             
             const testScore = scorerMod.computeMixScore(testData, testGenreSpecificRef);
             console.log('[COLOR_RATIO_V2_TEST] Manual test G=5, Y=4, R=3, T=12 should be 59:', testScore);
-            // O scoring.js agora está correto, não precisa de override
-            baseAnalysis.mixScore = finalScore;
-            baseAnalysis.mixScorePct = finalScore.scorePct;
-            baseAnalysis.mixClassification = finalScore.classification;
             
-            // CRÍTICO: Atualizar qualityOverall usado pela UI
-            console.log('[SCORE_DEBUG] 💾 Atualizando qualityOverall...');
-            console.log('[SCORE_DEBUG] Valor anterior:', baseAnalysis.qualityOverall);
-            console.log('[SCORE_DEBUG] Novo valor:', finalScore.scorePct);
-            
-            baseAnalysis._originalQualityOverall = baseAnalysis.qualityOverall;
-            baseAnalysis.qualityOverall = finalScore.scorePct;
-            console.log('[COLOR_RATIO_V2_FIX] ✅ NOVO SISTEMA ATIVO! Setting qualityOverall =', finalScore.scorePct, '(was:', baseAnalysis._originalQualityOverall, ')');
-            console.log('[COLOR_RATIO_V2_FIX] 🎯 Método usado:', finalScore.method, 'Classificação:', finalScore.classification);
-            console.log('[SCORE_DEBUG] ✅ qualityOverall atualizado com sucesso');
+            // Aplicar resultado do scoring se válido
+            if (finalScore && finalScore.scorePct !== null) {
+              baseAnalysis.mixScore = finalScore;
+              baseAnalysis.mixScorePct = finalScore.scorePct;
+              baseAnalysis.mixClassification = finalScore.classification;
+              
+              // CRÍTICO: Atualizar qualityOverall usado pela UI
+              console.log('[PIPELINE-CORRECTION] 💾 Atualizando qualityOverall...');
+              console.log('[PIPELINE-CORRECTION] Valor anterior:', baseAnalysis.qualityOverall);
+              console.log('[PIPELINE-CORRECTION] Novo valor:', finalScore.scorePct);
+              
+              baseAnalysis._originalQualityOverall = baseAnalysis.qualityOverall;
+              baseAnalysis.qualityOverall = finalScore.scorePct;
+              console.log('[PIPELINE-CORRECTION] ✅ qualityOverall atualizado =', finalScore.scorePct, '(was:', baseAnalysis._originalQualityOverall, ')');
+              console.log('[PIPELINE-CORRECTION] 🎯 Método usado:', finalScore.method, 'Classificação:', finalScore.classification);
+            }
             // Logging para debug (sem override)
             try {
               const cc = finalScore.colorCounts || {};
@@ -3177,7 +3356,20 @@ async function analyzeAndChat(file) {
     
   } catch (error) {
     console.error('❌ Erro na análise:', error);
-    alert('Erro ao analisar áudio. Verifique se é um arquivo válido.');
+    
+    // Detectar tipos específicos de erro
+    if (error.message?.includes('ARQUIVO_MUITO_PEQUENO')) {
+      alert(`Arquivo corrompido ou incompleto!\n\nO arquivo possui apenas ${error.message.match(/\d+/)?.[0] || 'poucos'} bytes, mas um arquivo de áudio válido precisa de pelo menos 100 bytes.\n\nPossíveis causas:\n• Upload foi interrompido\n• Arquivo está corrompido\n• Arquivo não é realmente de áudio\n\nTente fazer upload novamente ou use outro arquivo.`);
+    } else if (error.message?.includes('ARQUIVO_VAZIO')) {
+      alert('Arquivo vazio selecionado!\n\nO arquivo não contém dados. Selecione um arquivo de áudio válido.');
+    } else if (error.message?.includes('Formato de áudio não suportado')) {
+      console.warn('⚠️ Formato de áudio incompatível:', error.message);
+      alert('Formato de áudio não suportado pelo navegador. Tente converter para WAV, MP3 ou M4A.');
+    } else if (error.message?.includes('Unable to decode audio data')) {
+      alert('Erro ao decodificar arquivo de áudio!\n\nPossíveis causas:\n• Arquivo corrompido ou incompleto\n• Formato de áudio não suportado\n• Codificação incompatível\n\nTente converter o arquivo para WAV PCM ou MP3 padrão.');
+    } else {
+      alert(`Erro ao analisar áudio: ${error.message}\n\nVerifique se é um arquivo de áudio válido e tente novamente.`);
+    }
   }
 }
 
