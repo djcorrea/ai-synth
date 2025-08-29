@@ -1,6 +1,13 @@
 // 🎵 AUDIO ANALYZER V1 - Ponte para V2 com cache-busting agressivo
 // Versão v1.5-FIXED-CLEAN-NOHIGH sem duplicações (removido "muito alto")
 // Implementação usando Web Audio API (100% gratuito)
+// 🔄 Cache determinístico: genre:fileHash:refsVer para invalidação precisa
+
+// 🚩 FEATURE FLAGS CONFIGURATION
+// NEW_CACHE_KEY: true em dev/staging, pode ser false em prod para rollback
+if (typeof window !== 'undefined' && window.NEW_CACHE_KEY === undefined) {
+  window.NEW_CACHE_KEY = window.location.hostname !== 'prod.ai'; // Default baseado no hostname
+}
 
 // 🚩 FEATURE FLAG: RUNID_ENFORCED - Modo rigoroso para dev/staging
 const RUNID_ENFORCED = (typeof window !== 'undefined') ? 
@@ -666,7 +673,12 @@ class AudioAnalyzer {
 
   // 📁 Analisar arquivo de áudio
   async analyzeAudioFile(file, options = {}) {
-    // 🛡️ INICIALIZAÇÃO DEFENSIVA E CONTROLE DE DUPLICATAS
+    // � CACHE CHANGE MONITOR - Verificar mudanças antes da análise
+    if (typeof window !== 'undefined' && window._cacheChangeMonitor) {
+      window._cacheChangeMonitor.checkAndInvalidate();
+    }
+    
+    // �🛡️ INICIALIZAÇÃO DEFENSIVA E CONTROLE DE DUPLICATAS
     if (!this._activeAnalyses) this._activeAnalyses = new Map();
     
     // 🚨 VALIDAÇÕES CRÍTICAS PRÉ-ANÁLISE
@@ -742,25 +754,86 @@ class AudioAnalyzer {
       
       const tsStart = new Date().toISOString();
       const disableCache = (typeof window !== 'undefined' && window.DISABLE_ANALYSIS_CACHE === true);
-  // ====== CACHE POR HASH (somente leitura de conteúdo) ======
+  // ====== CACHE POR CHAVE DETERMINÍSTICA (genre:fileHash:refsVer) ======
   let fileHash = null;
+  let cacheKey = null;
   try {
     if (file && file.arrayBuffer) {
       const buf = await file.arrayBuffer();
       const hashBuf = await crypto.subtle.digest('SHA-256', buf);
       fileHash = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,40);
+      
+      // 🔧 NEW_CACHE_KEY: Feature flag para nova chave determinística
+      const useNewCacheKey = window.NEW_CACHE_KEY !== false; // Default true (false apenas em prod explícito)
+      
+      if (useNewCacheKey) {
+        // Nova chave determinística: genre:fileHash:refsVer
+        const genre = window.PROD_AI_REF_GENRE || 'unknown';
+        const refsVer = window.EMBEDDED_REFS_VERSION || 'unknown';
+        cacheKey = `${genre}:${fileHash}:${refsVer}`;
+      } else {
+        // Fallback para chave antiga (apenas fileHash)
+        cacheKey = fileHash;
+      }
+      
       // Cache global
       const cacheMap = (window.__AUDIO_ANALYSIS_CACHE__ = window.__AUDIO_ANALYSIS_CACHE__ || new Map());
-  if (!disableCache && cacheMap.has(fileHash)) {
-        const cached = cacheMap.get(fileHash);
-        try { (window.__caiarLog||function(){})('CACHE_HIT','Reuso análise por hash', { hash:fileHash, ageMs: Date.now()-cached._ts }); } catch {}
+      
+      // 📦 CACHE HIT CHECK - Primeira tentativa com nova chave
+      if (!disableCache && cacheMap.has(cacheKey)) {
+        const cached = cacheMap.get(cacheKey);
+        try { 
+          (window.__caiarLog||function(){})('CACHE_HIT','Cache hit com chave determinística', { 
+            runId: this._currentRunId || 'unknown',
+            key: cacheKey, 
+            ageMs: Date.now()-cached._ts 
+          }); 
+        } catch {}
         // Deep clone leve para evitar mutações externas
         return JSON.parse(JSON.stringify(cached.analysis));
+      }
+      
+      // 🔄 BACKWARD COMPATIBILITY: Tentar chave antiga se nova não funcionou
+      if (useNewCacheKey && !disableCache && cacheKey !== fileHash && cacheMap.has(fileHash)) {
+        const cached = cacheMap.get(fileHash);
+        try { 
+          (window.__caiarLog||function(){})('CACHE_HIT_LEGACY','Cache hit com chave antiga (migração)', { 
+            runId: this._currentRunId || 'unknown',
+            oldKey: fileHash,
+            newKey: cacheKey,
+            ageMs: Date.now()-cached._ts 
+          }); 
+          console.warn(`⚠️ [CACHE] Usando entrada legacy ${fileHash} -> migrando para ${cacheKey}`);
+        } catch {}
+        
+        // Migrar entrada para nova chave e remover antiga
+        cacheMap.set(cacheKey, cached);
+        cacheMap.delete(fileHash);
+        
+        // Deep clone leve para evitar mutações externas
+        return JSON.parse(JSON.stringify(cached.analysis));
+      }
+      
+      // 📝 CACHE MISS
+      if (!disableCache) {
+        try { 
+          (window.__caiarLog||function(){})('CACHE_MISS','Cache miss - nova análise necessária', { 
+            runId: this._currentRunId || 'unknown',
+            key: cacheKey
+          }); 
+        } catch {}
       }
       // Recriar FileReader usando buffer já lido (evitar reler)
       file._cachedArrayBufferForHash = buf;
     }
-  } catch(e){ try { (window.__caiarLog||function(){})('CACHE_HASH_ERROR','Falha gerar hash',{ err:e?.message}); } catch {} }
+  } catch(e){ 
+    try { 
+      (window.__caiarLog||function(){})('CACHE_HASH_ERROR','Falha gerar hash/chave cache',{ 
+        runId: this._currentRunId || 'unknown',
+        err: e?.message
+      }); 
+    } catch {} 
+  }
   try { (window.__caiarLog||function(){})('INPUT','Arquivo recebido para análise', { name: file?.name, size: file?.size }); } catch {}
   if (window.DEBUG_ANALYZER === true) console.log('🛰️ [Telemetry] Front antes do fetch (modo local, sem fetch):', {
       route: '(client-only) audio-analyzer.js',
@@ -795,9 +868,26 @@ class AudioAnalyzer {
           try {
             const audioBuffer = await this.audioContext.decodeAudioData(directBuf.slice(0));
             clearTimeout(timeout);
-            const analysis = await this._pipelineFromDecodedBuffer(audioBuffer, file, { fileHash }, runId);
-            // Cache store
-            try { if (fileHash && !disableCache) { const cacheMap = (window.__AUDIO_ANALYSIS_CACHE__ = window.__AUDIO_ANALYSIS_CACHE__ || new Map()); cacheMap.set(fileHash, { analysis: JSON.parse(JSON.stringify(analysis)), _ts: Date.now() }); } } catch{}
+            const analysis = await this._pipelineFromDecodedBuffer(audioBuffer, file, { fileHash, cacheKey }, runId);
+            // 💾 CACHE STORE - Usar chave determinística
+            try { 
+              if (cacheKey && !disableCache) { 
+                const cacheMap = (window.__AUDIO_ANALYSIS_CACHE__ = window.__AUDIO_ANALYSIS_CACHE__ || new Map()); 
+                cacheMap.set(cacheKey, { analysis: JSON.parse(JSON.stringify(analysis)), _ts: Date.now() });
+                (window.__caiarLog||function(){})('CACHE_STORE','Análise armazenada em cache', { 
+                  runId: this._currentRunId || 'unknown',
+                  key: cacheKey
+                });
+              } 
+            } catch(storeErr) {
+              try { 
+                (window.__caiarLog||function(){})('CACHE_STORE_ERROR','Erro ao armazenar cache', { 
+                  runId: this._currentRunId || 'unknown',
+                  key: cacheKey,
+                  err: storeErr?.message
+                }); 
+              } catch {}
+            }
             this._cleanupAudioBuffer(audioBuffer);
             resolve(analysis);
           } catch(e){ 
@@ -1115,7 +1205,7 @@ class AudioAnalyzer {
     }
   }
 
-  async _pipelineFromDecodedBuffer(audioBuffer, file, { fileHash }, runId = null) {
+  async _pipelineFromDecodedBuffer(audioBuffer, file, { fileHash, cacheKey }, runId = null) {
     if (!runId) {
       runId = this._generateRunId();
       console.warn(`⚠️ [${runId}] runId não fornecido para _pipelineFromDecodedBuffer, gerando novo`);
@@ -1127,6 +1217,7 @@ class AudioAnalyzer {
     // 📊 LOG: PIPELINE STARTED
     this._logPipelineStageCompat(runId, 'PIPELINE_START', {
       fileHash,
+      cacheKey,
       bufferDuration: audioBuffer.duration,
       qualityMode: (window.CAIAR_ENABLED && window.ANALYSIS_QUALITY !== 'fast') ? 'full':'fast'
     });
@@ -1227,10 +1318,10 @@ class AudioAnalyzer {
       });
     }
     
-    return await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache: (typeof window!=='undefined' && window.DISABLE_ANALYSIS_CACHE), runId });
+    return await this._finalizeAndMaybeCache(analysis, { t0Full, fileHash, cacheKey, disableCache: (typeof window!=='undefined' && window.DISABLE_ANALYSIS_CACHE), runId });
   }
 
-  async _finalizeAndMaybeCache(analysis, { t0Full, fileHash, disableCache, runId }) {
+  async _finalizeAndMaybeCache(analysis, { t0Full, fileHash, cacheKey, disableCache, runId }) {
     try {
       // 📊 LOG: REFS START (referências e comparações)
       this._logPipelineStageCompat(runId, 'REFS_START', {
@@ -1312,7 +1403,8 @@ class AudioAnalyzer {
         problemsCount: (analysis.problems || []).length,
         suggestionsCount: (analysis.suggestions || []).length,
         cacheDisabled: disableCache,
-        fileHash: fileHash ? fileHash.substring(0, 8) + '...' : null
+        fileHash: fileHash ? fileHash.substring(0, 8) + '...' : null,
+        cacheKey: cacheKey ? cacheKey.substring(0, 40) + '...' : null
       });
       
       // Gerar relatório final do pipeline
@@ -3393,11 +3485,93 @@ if (typeof window !== 'undefined' && !window.invalidateAudioAnalysisCache) {
   window.invalidateAudioAnalysisCache = function(){
     try {
       const map = window.__AUDIO_ANALYSIS_CACHE__;
-      if (map && typeof map.clear === 'function') map.clear();
-      (window.__caiarLog||function(){})('CACHE_INVALIDATE','Cache de análises limpo manualmente');
-      console.log('[AudioAnalyzer] Cache limpo. Próxima análise será recalculada.');
-    } catch(e){ console.warn('Falha ao invalidar cache', e); }
+      let size = 0;
+      if (map && typeof map.clear === 'function') {
+        size = map.size || 0;
+        map.clear();
+      }
+      (window.__caiarLog||function(){})('CACHE_INVALIDATE','Cache de análises limpo manualmente', {
+        entriesCleared: size,
+        reason: 'manual'
+      });
+      console.log(`[AudioAnalyzer] Cache limpo (${size} entradas). Próxima análise será recalculada.`);
+      return { cleared: size };
+    } catch(e){ 
+      console.warn('Falha ao invalidar cache', e); 
+      return { cleared: 0, error: e?.message };
+    }
   };
+  
+  // 🔄 CACHE INVALIDATION BY GENRE/REFS CHANGE
+  window.invalidateCacheByChange = function(changeType, oldValue, newValue) {
+    try {
+      const map = window.__AUDIO_ANALYSIS_CACHE__;
+      if (!map || typeof map.delete !== 'function') return { cleared: 0 };
+      
+      let cleared = 0;
+      
+      // Invalidar apenas entradas que contenham o componente alterado
+      for (const [key, entry] of map.entries()) {
+        let shouldInvalidate = false;
+        
+        if (changeType === 'genre' && key.includes(`${oldValue}:`)) {
+          shouldInvalidate = true;
+        } else if (changeType === 'refsVersion' && key.includes(`:${oldValue}`)) {
+          shouldInvalidate = true;
+        } else if (changeType === 'all') {
+          shouldInvalidate = true;
+        }
+        
+        if (shouldInvalidate) {
+          map.delete(key);
+          cleared++;
+        }
+      }
+      
+      (window.__caiarLog||function(){})('CACHE_INVALIDATE','Cache invalidado por mudança', {
+        changeType,
+        oldValue,
+        newValue,
+        entriesCleared: cleared,
+        reason: `${changeType}_change`
+      });
+      
+      console.log(`[AudioAnalyzer] Cache invalidado: ${cleared} entradas removidas por ${changeType} change`);
+      return { cleared };
+      
+    } catch(e) {
+      (window.__caiarLog||function(){})('CACHE_INVALIDATE_ERROR','Erro na invalidação por mudança', {
+        changeType,
+        error: e?.message
+      });
+      console.warn('Falha ao invalidar cache por mudança', e);
+      return { cleared: 0, error: e?.message };
+    }
+  };
+  
+  // 🔍 CACHE CHANGE MONITOR - Monitoramento automático de mudanças
+  if (!window._cacheChangeMonitor) {
+    window._cacheChangeMonitor = {
+      lastGenre: window.PROD_AI_REF_GENRE,
+      lastRefsVersion: window.EMBEDDED_REFS_VERSION,
+      
+      checkAndInvalidate() {
+        const currentGenre = window.PROD_AI_REF_GENRE;
+        const currentRefsVersion = window.EMBEDDED_REFS_VERSION;
+        
+        if (this.lastGenre && this.lastGenre !== currentGenre) {
+          window.invalidateCacheByChange?.('genre', this.lastGenre, currentGenre);
+        }
+        
+        if (this.lastRefsVersion && this.lastRefsVersion !== currentRefsVersion) {
+          window.invalidateCacheByChange?.('refsVersion', this.lastRefsVersion, currentRefsVersion);
+        }
+        
+        this.lastGenre = currentGenre;
+        this.lastRefsVersion = currentRefsVersion;
+      }
+    };
+  }
 }
 
 // === Extensão: análise direta de AudioBuffer (uso interno / testes) ===
