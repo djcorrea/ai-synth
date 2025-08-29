@@ -1,6 +1,6 @@
 /**
  * Sistema de Upload e Pré-visualização de Imagens
- * Compatível com o chat existente do SOUNDY.AI
+ * Compatível com o chat existente do SoundyAI
  * Implementação: Dezembro 2024
  */
 

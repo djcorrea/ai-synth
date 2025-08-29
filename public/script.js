@@ -1186,7 +1186,7 @@ function showTypingIndicator() {
     const typingMessage = document.createElement('div');
     typingMessage.className = 'chatbot-conversation-typing active';
     typingMessage.innerHTML = `
-      <span class="typing-text">SOUNDY.AI está digitando</span>
+      <span class="typing-text">SoundyAI está digitando</span>
       <div class="typing-dots">
         <span></span>
         <span></span>
