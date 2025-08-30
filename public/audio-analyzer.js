@@ -664,6 +664,10 @@ class AudioAnalyzer {
       const bufferLength = this.analyzer.frequencyBinCount;
       this.dataArray = new Uint8Array(bufferLength);
       
+      // 🔧 iOS DETECTION: Detectar capacidades do dispositivo
+      this.capabilities = this._detectIOSCapabilities();
+      console.log('📱 Capacidades detectadas:', this.capabilities);
+      
   if (window.DEBUG_ANALYZER === true) console.log('🎵 Analisador de áudio inicializado com sucesso');
       return true;
     } catch (error) {
@@ -672,7 +676,28 @@ class AudioAnalyzer {
     }
   }
 
-  // 📁 Analisar arquivo de áudio
+  // � iOS CAPABILITIES: Detectar capacidades do dispositivo
+  _detectIOSCapabilities() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const hasWebWorkers = typeof Worker !== 'undefined';
+    const supportsOfflineContext = (() => {
+      try {
+        const testCtx = new OfflineAudioContext(1, 1024, 44100);
+        return testCtx && testCtx.length > 0;
+      } catch { 
+        return false; 
+      }
+    })();
+    
+    return { 
+      isIOS, 
+      hasWebWorkers, 
+      supportsOfflineContext,
+      preferWebWorkers: hasWebWorkers && (isIOS || !supportsOfflineContext)
+    };
+  }
+
+  // �📁 Analisar arquivo de áudio
   async analyzeAudioFile(file, options = {}) {
     // � CACHE CHANGE MONITOR - Verificar mudanças antes da análise
     if (typeof window !== 'undefined' && window._cacheChangeMonitor) {
@@ -865,9 +890,17 @@ class AudioAnalyzer {
       try {
         const directBuf = file._cachedArrayBufferForHash;
         return await new Promise(async (resolve, reject)=>{
-          const timeout = setTimeout(()=> reject(new Error('Timeout decode (direct path)')), 30000);
+          // 🔧 iOS FIX: Timeout estendido para iOS
+          const timeoutMs = /iPad|iPhone|iPod/.test(navigator.userAgent) ? 45000 : 30000;
+          const timeout = setTimeout(()=> reject(new Error('Timeout decode (direct path)')), timeoutMs);
           try {
-            const audioBuffer = await this.audioContext.decodeAudioData(directBuf.slice(0));
+            // 🔧 iOS FIX: Timeout para decodeAudioData (direct path)
+            const audioBuffer = await Promise.race([
+              this.audioContext.decodeAudioData(directBuf.slice(0)),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('iOS decodeAudioData timeout (direct)')), 15000)
+              )
+            ]);
             clearTimeout(timeout);
             const analysis = await this._pipelineFromDecodedBuffer(audioBuffer, file, { fileHash, cacheKey }, runId);
             // 💾 CACHE STORE - Usar chave determinística
@@ -927,7 +960,14 @@ class AudioAnalyzer {
           if (window.DEBUG_ANALYZER === true) console.log('🎵 Decodificando áudio...');
           let audioData = e.target.result;
           if (!audioData && file._cachedArrayBufferForHash) audioData = file._cachedArrayBufferForHash;
-          const audioBuffer = await this.audioContext.decodeAudioData(audioData.slice ? audioData.slice(0) : audioData);
+          
+          // 🔧 iOS FIX: Timeout para decodeAudioData que pode travar indefinidamente
+          const audioBuffer = await Promise.race([
+            this.audioContext.decodeAudioData(audioData.slice ? audioData.slice(0) : audioData),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('iOS decodeAudioData timeout')), 15000)
+            )
+          ]);
           try { (window.__caiarLog||function(){})('DECODE_OK','Buffer decodificado', { duration: audioBuffer.duration, sr: audioBuffer.sampleRate, channels: audioBuffer.numberOfChannels }); } catch {}
           // ===== Context Detector (BPM / Key / Densidade) =====
           try {
