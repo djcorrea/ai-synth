@@ -2517,7 +2517,7 @@ class AudioAnalyzer {
       let dcSum = 0;
       let clipped = 0;
       const len = leftChannel.length;
-      const clipThreshold = 0.99; // Threshold mais rigoroso para detecção de clipping
+      const clipThreshold = 0.999; // 🎯 CORREÇÃO: Threshold realista para detectar clipping REAL (99.9%)
       let dcSumR = 0;
       const useHPF = (typeof window !== 'undefined' && window.AUDIT_MODE===true && window.DC_HPF20===true) || (typeof process !== 'undefined' && process.env.AUDIT_MODE==='1' && process.env.DC_HPF20==='1');
       // HPF estado
@@ -2778,24 +2778,44 @@ class AudioAnalyzer {
     const clipPct = analysis.technicalData?.clippingPct || 0;
     const truePeak = analysis.technicalData?.truePeakDbtp;
 
-    // Problema: Clipping - critérios mais rigorosos e completos
-    const hasClipping = peak > -0.1 || clipSamples > 0 || clipPct > 0 || (truePeak !== null && truePeak > -0.1);
+    // 🎯 CORREÇÃO: Critérios mais realistas para clipping
+    // Só considera clipping real se:
+    // 1. True Peak > -0.1 dBTP (muito próximo de 0dBFS)
+    // 2. OU samples realmente saturados (>=0.999)
+    // 3. OU peak muito alto (>-0.05dB)
+    const hasRealClipping = (truePeak !== null && truePeak > -0.1) || 
+                           peak > -0.05 || 
+                           (clipSamples > 0 && clipPct > 0.01); // Só se >0.01% realmente clippado
     
-    if (hasClipping) {
+    if (hasRealClipping) {
       let clippingDetails = [];
-      if (peak > -0.1) clippingDetails.push(`Peak: ${peak.toFixed(2)}dB`);
+      if (peak > -0.05) clippingDetails.push(`Peak: ${peak.toFixed(2)}dB`);
       if (truePeak !== null && truePeak > -0.1) clippingDetails.push(`TruePeak: ${truePeak.toFixed(2)}dBTP`);
       if (clipSamples > 0) clippingDetails.push(`${clipSamples} samples (${clipPct.toFixed(3)}%)`);
+      
+      // 🎯 CORREÇÃO: Cálculo mais inteligente da redução necessária
+      let reductionDb;
+      
+      if (truePeak !== null && truePeak > -0.1) {
+        // Basear na distância do true peak para -1dBTP (seguro)
+        reductionDb = Math.max(1, Math.min(8, truePeak + 1.5)); // +1.5dB de margem
+      } else if (peak > -0.05) {
+        // Basear na distância do peak para -1dB (seguro)
+        reductionDb = Math.max(1, Math.min(6, peak + 1.5));
+      } else {
+        // Fallback baseado na porcentagem de clipping (formula original ajustada)
+        reductionDb = Math.max(1, Math.min(4, clipPct * 10)); // Reduzida de 20 para 10
+      }
       
       analysis.problems.push({
         type: 'clipping',
         severity: 'critical',
         message: `Clipping detectado`,
-        solution: `Reduzir volume geral em ${Math.max(3, Math.min(6, clipPct * 20)).toFixed(1)}dB`,
+        solution: `Reduzir volume geral em ${reductionDb.toFixed(1)}dB`,
         explanation: "Clipping ocorre quando o sinal excede 0dBFS, causando distorção digital",
         impact: "Distorção audível, perda de qualidade, som áspero e desagradável",
         frequency_range: "Todas as frequências",
-        adjustment_db: -Math.max(3, Math.min(6, clipPct * 20)),
+        adjustment_db: -reductionDb,
         details: clippingDetails.join(', ')
       });
     }
@@ -4147,15 +4167,37 @@ AudioAnalyzer.prototype._tryAdvancedMetricsAdapter = async function(audioBuffer,
               td.bandScale = 'log_ratio_db';
               td.bandLogScale = 'log_proportion_db';
             } catch (_) { /* não crítico */ }
-            // Converter subconjunto para tonalBalance se ainda vazio (não substitui tonalBalance existente)
-            if (!td.tonalBalance) {
-              td.tonalBalance = {
+            // 🛡️ TONAL BALANCE SAFE V1: Validação avançada antes de criar tonalBalance
+            if (!td.tonalBalance && Object.keys(bandEnergies).length > 0) {
+              const candidateTonalBalance = {
                 sub: bandEnergies.sub ? { rms_db: bandEnergies.sub.rms_db } : null,
                 low: bandEnergies.low_bass ? { rms_db: bandEnergies.low_bass.rms_db } : null,
                 mid: bandEnergies.mid ? { rms_db: bandEnergies.mid.rms_db } : null,
                 high: bandEnergies.brilho ? { rms_db: bandEnergies.brilho.rms_db } : null
               };
-              (td._sources = td._sources || {}).tonalBalance = 'advanced:spectrum';
+              
+              // 🔍 Aplicar validação se sistema seguro estiver ativo
+              if (typeof window !== 'undefined' && window.TONAL_BALANCE_SAFE_V1 && window.validateSpectralBandsData) {
+                const validation = window.validateSpectralBandsData(candidateTonalBalance);
+                
+                if (validation.shouldDisplay) {
+                  // Dados validados - pode usar
+                  td.tonalBalance = candidateTonalBalance;
+                  (td._sources = td._sources || {}).tonalBalance = 'advanced:spectrum:validated';
+                } else {
+                  // Dados problemáticos - não criar tonalBalance (UI mostrará "—")
+                  td.tonalBalance = null;
+                  (td._sources = td._sources || {}).tonalBalance = 'advanced:spectrum:rejected';
+                  
+                  if (typeof window !== 'undefined' && window.TONAL_BALANCE_CONFIG?.DEBUG) {
+                    console.log('🚫 [TONAL-SAFE] tonalBalance rejeitado na origem:', validation.issues);
+                  }
+                }
+              } else {
+                // Sistema seguro não ativo - usar comportamento original
+                td.tonalBalance = candidateTonalBalance;
+                (td._sources = td._sources || {}).tonalBalance = 'advanced:spectrum';
+              }
             }
             // Comparar com targets da referência e gerar sugestões band_adjust
             try {

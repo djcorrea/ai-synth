@@ -6,7 +6,7 @@
     "aggregation_method": "linear_domain",
     "lufs_target": -8,
     "tol_lufs": 1.2,
-    "true_peak_target": -9.58,
+    "true_peak_target": -0.8,
     "tol_true_peak": 2.5,
     "dr_target": 8.1,
     "tol_dr": 2.0,

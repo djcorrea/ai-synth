@@ -5,7 +5,7 @@
     "num_tracks": 10,
     "lufs_target": -14,
     "tol_lufs": 0.5,
-    "true_peak_target": -7.5,
+    "true_peak_target": -1.0,
     "tol_true_peak": 1.6,
     "dr_target": 9.0,
     "tol_dr": 1.5,

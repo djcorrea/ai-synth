@@ -15,7 +15,7 @@
         "policy": "deriveFromLUFS"
       },
       "truePeak": {
-        "streamingMax": -8,
+        "streamingMax": -1,
         "baileMax": 0
       },
       "dynamicRange": {
@@ -134,7 +134,7 @@
       "tol_lufs": 2.5,
       "tol_lufs_min": 1,
       "tol_lufs_max": 1,
-      "true_peak_target": -8,
+      "true_peak_target": -0.8,
       "tol_true_peak": 3.4,
       "true_peak_streaming_max": -0.3,
       "true_peak_baile_max": 0,

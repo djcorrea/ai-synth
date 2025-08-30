@@ -678,12 +678,12 @@ const __INLINE_EMBEDDED_REFS__ = {
         { key: 'trap', label: 'Trap' }
     ]},
     byGenre: {
-        trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -7.26, tol_true_peak: 1.14, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:2.5}, low_bass:{target_db:-14.6,tol_db:4.3}, upper_bass:{target_db:-14.8,tol_db:2.5}, low_mid:{target_db:-12.6,tol_db:3.7}, mid:{target_db:-12,tol_db:4.0}, high_mid:{target_db:-20.2,tol_db:3.6}, brilho:{target_db:-24.7,tol_db:2.5}, presenca:{target_db:-32.1,tol_db:3.6} } },
+        trance: { lufs_target: -14, tol_lufs: 0.5, true_peak_target: -1.0, tol_true_peak: 1.0, dr_target: 9.4, tol_dr: 0.8, lra_target: 10.7, tol_lra: 2.7, stereo_target: 0.17, tol_stereo: 0.03, bands: { sub:{target_db:-17.3,tol_db:2.5}, low_bass:{target_db:-14.6,tol_db:4.3}, upper_bass:{target_db:-14.8,tol_db:2.5}, low_mid:{target_db:-12.6,tol_db:3.7}, mid:{target_db:-12,tol_db:4.0}, high_mid:{target_db:-20.2,tol_db:3.6}, brilho:{target_db:-24.7,tol_db:2.5}, presenca:{target_db:-32.1,tol_db:3.6} } },
     // Perfil atualizado Funk Mandela 2025-08-mandela-targets.4-tolerances-updated - TOLERÂNCIAS BIDIRECIONAIS ATUALIZADAS
     funk_mandela:   { 
         version: "2025-08-mandela-targets.4-tolerances-updated", 
         lufs_target: -8.0, tol_lufs: 2.5, tol_lufs_min: 2.5, tol_lufs_max: 2.5, 
-        true_peak_target: -8.0, tol_true_peak: 3.40, true_peak_streaming_max: -1.2, true_peak_baile_max: -0.1, 
+        true_peak_target: -0.8, tol_true_peak: 1.0, true_peak_streaming_max: -1.2, true_peak_baile_max: -0.1, 
         dr_target: 8.0, tol_dr: 3.0, // Atualizado para ±3.0 unidades
         lra_target: 9.0, lra_min: 6.5, lra_max: 11.5, tol_lra: 2.5, 
         stereo_target: 0.60, tol_stereo: 0.25, stereo_width_target: 0.20, stereo_width_tol: 0.25, // Correlação 0.60 ± 0.25
@@ -722,8 +722,8 @@ const __INLINE_EMBEDDED_REFS__ = {
             num_tracks: 29,
             lufs_target: -14,
             tol_lufs: 0.5,
-            true_peak_target: -10.6,
-            tol_true_peak: 1.27,
+            true_peak_target: -1.0,
+            tol_true_peak: 1.0,
             dr_target: 7.4,
             tol_dr: 1.3,
             lra_target: 8.4,
@@ -744,11 +744,11 @@ const __INLINE_EMBEDDED_REFS__ = {
                 presenca: { target_db: -26.7, tol_db: 2.8 }
             }
         },
-        funk_automotivo:{ lufs_target: -8,  tol_lufs: 1.2, true_peak_target: -9.58, tol_true_peak: 2.5, dr_target: 8.1, tol_dr: 2.0, lra_target: 6.6, tol_lra: 4.0, stereo_target: 0.3, tol_stereo: 0.15, bands: { sub:{target_db:-7.6,tol_db:6.0}, low_bass:{target_db:-6.6,tol_db:4.5}, upper_bass:{target_db:-11.4,tol_db:3.5}, low_mid:{target_db:-8.2,tol_db:3.5}, mid:{target_db:-6.7,tol_db:3.0}, high_mid:{target_db:-12.8,tol_db:4.5}, brilho:{target_db:-16.6,tol_db:4.5}, presenca:{target_db:-22.7,tol_db:5.0} } },
+        funk_automotivo:{ lufs_target: -8,  tol_lufs: 1.2, true_peak_target: -1.0, tol_true_peak: 1.0, dr_target: 8.1, tol_dr: 2.0, lra_target: 6.6, tol_lra: 4.0, stereo_target: 0.3, tol_stereo: 0.15, bands: { sub:{target_db:-7.6,tol_db:6.0}, low_bass:{target_db:-6.6,tol_db:4.5}, upper_bass:{target_db:-11.4,tol_db:3.5}, low_mid:{target_db:-8.2,tol_db:3.5}, mid:{target_db:-6.7,tol_db:3.0}, high_mid:{target_db:-12.8,tol_db:4.5}, brilho:{target_db:-16.6,tol_db:4.5}, presenca:{target_db:-22.7,tol_db:5.0} } },
         eletronico:     { 
             version: "1.0.1",
             lufs_target: -14, tol_lufs: 0.5, tol_lufs_min: 0.5, tol_lufs_max: 0.5,  
-            true_peak_target: -7.79, tol_true_peak: 1.57, true_peak_streaming_max: -7.79, true_peak_baile_max: 0.0,
+            true_peak_target: -1.0, tol_true_peak: 1.0, true_peak_streaming_max: -1.0, true_peak_baile_max: 0.0,
             dr_target: 10.1, tol_dr: 1.4, 
             lra_target: 5.2, lra_min: 1.2, lra_max: 9.2, tol_lra: 4, 
             stereo_target: 0.19, tol_stereo: 0.07, stereo_width_mids_highs_tolerance: "moderate",

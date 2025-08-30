@@ -49,6 +49,54 @@
         // ✅ ATIVAÇÃO AUTOMÁTICA TT-DR OFICIAL
         console.log('🎯 Iniciando TT-DR Oficial - Ativação Automática...');
         
+        // 🎯 SISTEMA UNIFICADO STATUS/SUGESTÃO V1 - ATIVAÇÃO AUTOMÁTICA
+        window.STATUS_SUGGESTION_UNIFIED_V1 = true;
+        console.log('🎯 Sistema Unificado Status/Sugestão V1 - ATIVADO');
+        
+        // 🔧 FUNÇÃO DE TESTE INLINE (sempre disponível)
+        window.testarSistemaUnificado = function() {
+            console.group('🧪 TESTE SISTEMA UNIFICADO');
+            
+            console.log('1️⃣ Feature Flag:', window.STATUS_SUGGESTION_UNIFIED_V1 ? '✅ ATIVA' : '❌ INATIVA');
+            console.log('2️⃣ Função Principal:', typeof window.calcularStatusSugestaoUnificado === 'function' ? '✅ DISPONÍVEL' : '❌ INDISPONÍVEL');
+            
+            if (window.calcularStatusSugestaoUnificado) {
+                // Testes funcionais
+                const casos = [
+                    { valor: -14.0, alvo: -14, tolerancia: 1, esperado: 'ideal' },
+                    { valor: -15.5, alvo: -14, tolerancia: 1, esperado: 'ajustar' },
+                    { valor: -17.0, alvo: -14, tolerancia: 1, esperado: 'corrigir' }
+                ];
+                
+                let todosPassaram = true;
+                casos.forEach((caso, i) => {
+                    const resultado = window.calcularStatusSugestaoUnificado(caso.valor, caso.alvo, caso.tolerancia, 'LUFS', 'Teste');
+                    const passou = resultado.status === caso.esperado;
+                    todosPassaram = todosPassaram && passou;
+                    console.log(`${passou ? '✅' : '❌'} Caso ${i+1}: ${caso.valor} → ${resultado.status}`);
+                });
+                
+                console.log(`🎯 RESULTADO: ${todosPassaram ? '✅ FUNCIONANDO PERFEITAMENTE!' : '❌ COM PROBLEMAS'}`);
+            } else {
+                console.log('⏳ Sistema ainda não carregou. Aguarde ou recarregue a página.');
+            }
+            
+            console.groupEnd();
+        };
+        
+        console.log('💡 Execute no console: testarSistemaUnificado()');
+    </script>
+    
+    <!-- 🎯 Sistema Unificado Status/Sugestão V1 (SEM DEFER para carregamento imediato) -->
+    <script src="/status-suggestion-unified-v1.js?v=20250829"></script>
+    <script src="/status-migration-v1.js?v=20250829"></script>
+    <script src="/force-unified-activation.js?v=20250829"></script>
+    <script src="/auto-validator-unified.js?v=20250829" defer></script>
+    
+    <!-- 🛡️ TONAL BALANCE SAFE V1 - Sistema seguro para bandas espectrais -->
+    <script src="/tonal-balance-safe-v1.js?v=20250829"></script>
+    <script src="/auto-validator-tonal-safe.js?v=20250829" defer></script>
+        
         // Definir flags principais AUTOMATICAMENTE
         window.USE_TT_DR = true;
         window.SCORING_V2 = true;
@@ -342,8 +390,10 @@
     
     <!-- 🎵 AUDIO ANALYZER - Carregar os scripts -->
     <script src="audio-analyzer.js?v=20250825-memory-fix" defer></script>
+    <!-- 🎯 CACHE CONTEXT-AWARE V1 - Sistema inteligente de cache -->
+    <script src="cache-context-aware-v1.js?v=20250829-ctx-aware" defer></script>
     <!-- Opcional: o integrador possui fallback inline; permita rede setando window.REFS_ALLOW_NETWORK=true antes do load -->
-    <script src="refs/embedded-refs-new.js?v=20250823j&timestamp=1724440300" defer></script>
+    <script src="refs/embedded-refs-new.js?v=20250829-true-peak-fix&timestamp=1756500921" defer></script>
     <script src="suggestion-text-generator.js?v=20250815" defer></script>
     <script src="audio-analyzer-integration.js?v=20250823k&final_fix=1724440500" defer></script>
     
